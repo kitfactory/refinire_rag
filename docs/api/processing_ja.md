@@ -13,8 +13,16 @@ class DocumentProcessor(ABC):
     """ドキュメント処理の基底インターフェース"""
     
     @abstractmethod
-    def process(self, document: Document) -> List[Document]:
-        """ドキュメントを処理する"""
+    def process(self, documents: Iterable[Document], config: Optional[Any] = None) -> Iterator[Document]:
+        """ドキュメントを処理する
+        
+        Args:
+            documents: 処理対象のドキュメントのイテラブル
+            config: オプションの設定
+            
+        Returns:
+            処理結果のドキュメントのイテレータ
+        """
         pass
 ```
 
@@ -46,8 +54,8 @@ config = NormalizerConfig(
 normalizer = Normalizer(config)
 
 # 使用例
-doc = Document(id="doc1", content="検索強化生成について")
-normalized_docs = normalizer.process(doc)
+docs = [Document(id="doc1", content="検索強化生成について")]
+normalized_docs = list(normalizer.process(docs))
 # → "検索拡張生成について"
 ```
 
@@ -80,8 +88,8 @@ config = ChunkingConfig(
 chunker = Chunker(config)
 
 # 使用例
-doc = Document(id="doc1", content="長い文書...")
-chunks = chunker.process(doc)
+docs = [Document(id="doc1", content="長い文書...")]
+chunks = list(chunker.process(docs))
 # → [Chunk1, Chunk2, ...]
 ```
 
@@ -113,8 +121,8 @@ config = DictionaryMakerConfig(
 dict_maker = DictionaryMaker(config)
 
 # 使用例
-doc = Document(id="doc1", content="RAG（Retrieval-Augmented Generation）は...")
-dict_maker.process(doc)
+docs = [Document(id="doc1", content="RAG（Retrieval-Augmented Generation）は...")]
+list(dict_maker.process(docs))
 # → 辞書ファイルが更新される
 ```
 
@@ -143,13 +151,14 @@ pipeline = DocumentPipeline([
 
 # 使用例
 doc = Document(id="doc1", content="検索強化生成について...")
-results = pipeline.process(doc)
+results = pipeline.process_document(doc)
 # → 辞書作成 → 正規化 → チャンキング
 ```
 
 ### メソッド
 
-- `process(document: Document) -> List[Document]` - ドキュメントを処理
+- `process_document(document: Document) -> List[Document]` - ドキュメントを処理
+- `process_documents(documents: List[Document]) -> List[Document]` - 複数のドキュメントを処理
 - `add_processor(processor: DocumentProcessor)` - プロセッサを追加
 - `remove_processor(index: int)` - プロセッサを削除
 
@@ -171,8 +180,8 @@ config = VectorStoreProcessorConfig(
 processor = VectorStoreProcessor(vector_store, config)
 
 # 使用例
-doc = Document(id="doc1", content="RAGは検索拡張生成技術です")
-processor.process(doc)
+docs = [Document(id="doc1", content="RAGは検索拡張生成技術です")]
+list(processor.process(docs))
 # → ベクトル化してストアに保存
 ```
 
@@ -195,8 +204,8 @@ config = GraphBuilderConfig(
 graph_builder = GraphBuilder(config)
 
 # 使用例
-doc = Document(id="doc1", content="RAGはLLMと外部知識を組み合わせます")
-graph_builder.process(doc)
+docs = [Document(id="doc1", content="RAGはLLMと外部知識を組み合わせます")]
+list(graph_builder.process(docs))
 # → グラフファイルが更新される
 ```
 

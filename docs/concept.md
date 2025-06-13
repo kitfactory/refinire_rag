@@ -2,25 +2,28 @@
 
 ## 1. 概要
 
-refinire-rag は、RAG (Retrieval-Augmented Generation) システムの開発・運用を支援する Python ライブラリである。本設計は「ユースケース＝RefinireライブラリのStep」「DocumentProcessor統一アーキテクチャ」を「設定ファイルやDI（依存性注入）」によって構成を切り替えて使用する。
+refinire-rag は、RAG (Retrieval-Augmented Generation) システムの開発・運用を支援する Python ライブラリである。本設計はRag機能を＝RefinireライブラリのStepとして提供する。
+
+DocumentProcessor統一アーキテクチャ、を「DI（依存性注入）」によって構成を切り替えて使用する。
 
 また、Refinireのサブパッケージとして、RAG機能を提供する。
 * Refinire: https://github.com/kitfactory/refinire
 
+これはentry_point
+
+
 ### 1.1 アーキテクチャの特徴
 
-**DocumentProcessor統一モデル**
-すべての文書処理機能（ローディング、正規化、チャンキング、埋め込み生成、評価など）は、統一されたDocumentProcessorベースクラスを継承し、単一の`process(document) -> List[Document]`インターフェースで実装される。
-
-**DocumentPipeline**
-複数のDocumentProcessorを連鎖させて、文書処理パイプラインを構築する。各プロセッサは独立してテスト・設定可能。
-
-**増分処理対応**
-IncrementalLoaderにより、ファイル変更検出と差分処理を行い、大規模文書コーパスの効率的な更新を実現。
+大きく3つのユースケースに分けて、処理を実現する。
 
 ## 2. ユースケースクラス
 
-各ユースケースはRefinire Stepサブクラスである。各ユースケースごとに関連するDocumentProcessorをDIで可変にし、切り替える。
+Ragの主要機能は3つある。
+この主要機能をそれぞれのユースケース・クラスを窓口として対応する。
+
+* エンベッディングやインデックスの作成：CorpusManager
+* 実際の検索：
+* 品質指標の取得
 
 ### 2.1 CorpusManager
 
@@ -34,84 +37,79 @@ IncrementalLoaderにより、ファイル変更検出と差分処理を行い、
 
 ### 2.2 QueryEngine
 
-* **責務**: クエリに対する文書検索、再ランキング、回答生成
+* **責務**: クエリに対する文書検索、再ランキングした情報を返却する
 
 * **主なメソッド**:
-  * `answer(query: str, ctx:Context )`: クエリに対して RAG 生成を行う。
+  * `run(query: str, ctx:Context )`: クエリに対して RAG 生成を行う。
   
-QueryEngineはrefinireのStepサブクラスとして実装し、answerメソッドがStep#run()メソッドと同等とする。
+QueryEngineはrefinireのStepサブクラスとして実装されている。Step#run()メソッドと同等とする。この出力をrefinireと連結することで様々なエージェントに組み込み、品質計測付きのRagとして実現が可能である。
 
 ### 2.3 QualityLab
 
-* **責務**: 評価データの作成、RAG 結果の自動評価、文書矛盾の検知、改善レポート生成
+* **責務**: RAGの評価データの作成、RAGの評価、評価レポート生成
+
 * **主なメソッド**:
-
+  * `build_qa_pair()`: CorpusStoreのデータを用いて、処理を行う。
   * `run_evaluation(test_set_path: str)`
-  * `detect_conflicts(docs: List[Document])`
-  * `generate_report(metrics: Dict)`
 
-## 3. DocumentProcessor モジュール（統一アーキテクチャ）
+## 3. 主要なデータ
 
-すべての文書処理機能は`DocumentProcessor`ベースクラスを継承し、統一インターフェースで実装される。
+主要なデータクラス、refinire.rag.modelsパッケージにて提供される。
 
-### 3.1 文書処理プロセッサ
+### 3.1. Document
 
-| プロセッサ名                | 責務                  | 入力 → 出力                        |
-| --------------------- | ------------------- | ----------------------------- |
-| UniversalLoader       | 外部ファイル → Document 化 | `trigger_doc` → `List[Document]`           |
-| DictionaryMaker       | 用語・略語の抽出とMD辞書更新 | `Document` → `Document + dict.md更新`        |
-| Normalizer            | 用語の置換・タグ付け          | `Document` → `Document`       |
-| GraphBuilder          | 主語・述語・目的語の関係抽出とMDグラフ更新      | `Document` → `Document + graph.md更新`       |
-| TokenBasedChunker     | トークンでチャンク化          | `Document` → `List[Document(chunks)]`    |
-| VectorStoreProcessor  | 埋め込み生成とベクトルストア保存      | `Document` → `Document + vector_store更新`          |
+文書データを示す。メタデータやid情報などを含む。あるDocumentが処理されると１つまたは複数のDocumentが生成される。CorpusStoreにほぞんされる。
 
-### 3.2 品質評価プロセッサ
+### 3.2. QAPair
 
-| プロセッサ名                | 責務                  | 入力 → 出力                        |
-| --------------------- | ------------------- | ----------------------------- |
-| TestSuite             | 評価ランナー              | `Document(test_queries)` → `List[Document(results)]`   |
-| Evaluator             | メトリクス集計             | `Document(results)` → `Document(metrics)`         |
-| ContradictionDetector | claim 抽出 + NLI 判定   | `Document` → `Document(conflicts)` |
-| InsightReporter       | 閾値超過の解釈とレポート        | `Document(metrics)` → `Document(insights)`      |
+主にDocumentから生成されたQA情報。必要に応じて生成で作
 
-### 3.3 クエリエンジンコンポーネント
+### 3.3. EvaluationResult
 
-QueryEngineで使用される独立コンポーネント（DocumentProcessorとは別系統）:
+RAGの評価結果を表したクラス。
 
-| コンポーネント名             | 責務                  | 入力 → 出力                        |
-| --------------------- | ------------------- | ----------------------------- |
-| Retriever             | 文書検索                | `query` → `List[SearchResult]`       |
-| Reranker              | 候補再順位付け             | `query, List[SearchResult]` → `List[SearchResult]` |
-| Reader                | 回答生成                | `query + contexts` → `answer`   |
+## 3. 主要なクラス
 
-## 4. 増分処理とDocumentPipeline
+ユースケースは機能部品で実現される。重要な機能部品クラスを記載する。これらは抽象クラスである。抽象クラスはrefinire.ragパッケージに配備される。
 
-### 4.1 IncrementalLoader
+### 3.1 CorpusStore
 
-大規模文書コーパスの効率的な管理のため、増分処理機能を提供：
+* **責務**: Embeddings/Indexとなる前の文書をメタデータとともに保存する。
 
-- **ファイル変更検出**: 修正時刻、サイズ、コンテンツハッシュによる変更検出
-- **差分処理**: 新規・更新文書のみを処理し、未変更文書をスキップ
-- **キャッシュ管理**: JSONベースのファイル状態キャッシュ
-- **クリーンアップ**: 削除されたファイルに対応する文書の自動削除
+* **主な実装クラス**: SQLiteCorpusStore
 
-### 4.2 DocumentPipeline統合
 
-CorpusManagerはDocumentPipelineベースで再実装され、以下の利点を提供：
+### 3.2. DocumentProcessor
 
-- **モジュラー設計**: 各処理ステップを独立したプロセッサとして実装
-- **設定可能性**: プロセッサの組み合わせと順序を動的に変更
-- **エラーハンドリング**: 各プロセッサでの例外処理と継続性制御
-- **パフォーマンス**: バッチ処理と並列処理対応
+* **責務**: 文書を処理するインターフェースである。すべての文書処理機能（ローディング、正規化、チャンキング、埋め込み生成、評価など）はDocumentProcessorベースクラスを継承し、単一の`process(input:List[Document]) -> Iterator[Document]`インターフェースで実装される。
 
-## 5. 対応状況と実装特徴
+## 3.3. Loader
 
-| 対応項目       | 実装内容                                                                                  |
-| ---------- | ------------------------------------------------------------------------------------- |
-| 統一アーキテクチャ | すべての処理機能をDocumentProcessorサブクラスとして実装、統一インターフェース提供 |
-| 増分処理       | IncrementalLoaderによるファイル変更検出と差分処理で大規模コーパス効率更新対応              |
-| Config 検証  | dataclassベースの設定とpydanticバリデーション。型安全性と設定エラーの即時検出                                  |
-| ロギング/メトリクス | 各ユースケースとプロセッサでの詳細ログ記録とパフォーマンス統計 |
-| 並列化        | LoaderのAsync対応、並列処理オプション、バッチ処理による大規模データ対応|
-| エラー処理    | 階層化された例外定義とgracefulな失敗処理、継続可能な処理フロー |
+* **責務**: 文書を処理するインターフェースである。DocumentProcessorベースクラスを継承し、単一の`process(input:List[Document]) -> Iterator[Document]`インターフェースで実装される。実体は入力を無視して、ロード結果をIteratorに返却する。
+
+## 3.4. Retriever
+
+メタデータの条件とクエリ文から文書の検索を担当する
+
+## 3.5. Indexer
+
+与えられた文書、メタデータから文書を検索可能な状態にする
+
+## 3.6. KeywordSearch
+
+RetrieverとIndexerを継承したクラス。実質的にはVectorStoreと差異はないが、技術が明確に異なるため、BM25s等のKeywordSearch型には、こちらを利用する。
+
+## 3.7. VectorStore
+
+RetrieverとIndexerを継承したクラス。実質的にはVectorStoreと差異はないが、技術が明確に異なるため、BM25s等のKeywordSearch型には、こちらを利用する。
+
+## 3.8. Embedder
+
+VectorSearchに必要な情報をEmbeddingsを提供する。指定テキストの他、埋め込みの次元数を返却する。
+
+
+## 3.9. Reranker
+
+Retrieverから取得された返却結果をRerank結果を返却する。
+
 

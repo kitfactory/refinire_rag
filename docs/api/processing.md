@@ -1,6 +1,6 @@
 # processing - Document Processing Pipeline
 
-Unified document processing architecture where all document processing components inherit from the `DocumentProcessor` base class and implement a single `process(document) -> List[Document]` interface.
+Unified document processing architecture where all document processing components inherit from the `DocumentProcessor` base class and implement a single `process(documents) -> Iterator[Document]` interface.
 
 ## DocumentProcessor Base Class
 
@@ -13,8 +13,16 @@ class DocumentProcessor(ABC):
     """Base interface for all document processing components"""
     
     @abstractmethod
-    def process(self, document: Document, config: Optional[DocumentProcessorConfig] = None) -> List[Document]:
-        """Process a document and return processed documents"""
+    def process(self, documents: Iterable[Document], config: Optional[Any] = None) -> Iterator[Document]:
+        """Process documents and return processed documents
+        
+        Args:
+            documents: Input documents to process
+            config: Optional configuration for processing
+            
+        Returns:
+            Iterator of processed documents
+        """
         pass
     
     @classmethod
@@ -88,8 +96,8 @@ config = NormalizerConfig(
 normalizer = Normalizer(config)
 
 # Example usage
-doc = Document(id="doc1", content="About retrieval-enhanced generation")
-normalized_docs = normalizer.process(doc)
+docs = [Document(id="doc1", content="About retrieval-enhanced generation")]
+normalized_docs = list(normalizer.process(docs))
 # → "About retrieval-augmented generation"
 ```
 
@@ -122,8 +130,8 @@ config = ChunkingConfig(
 chunker = Chunker(config)
 
 # Example usage
-doc = Document(id="doc1", content="Long document text...")
-chunks = chunker.process(doc)
+docs = [Document(id="doc1", content="Long document text...")]
+chunks = list(chunker.process(docs))
 # → [Chunk1, Chunk2, ...]
 ```
 
@@ -155,8 +163,8 @@ config = DictionaryMakerConfig(
 dict_maker = DictionaryMaker(config)
 
 # Example usage
-doc = Document(id="doc1", content="RAG (Retrieval-Augmented Generation) is...")
-dict_maker.process(doc)
+docs = [Document(id="doc1", content="RAG (Retrieval-Augmented Generation) is...")]
+list(dict_maker.process(docs))
 # → Dictionary file is updated
 ```
 
@@ -185,13 +193,14 @@ pipeline = DocumentPipeline([
 
 # Example usage
 doc = Document(id="doc1", content="About retrieval-enhanced generation...")
-results = pipeline.process(doc)
+results = pipeline.process_document(doc)
 # → Dictionary creation → Normalization → Chunking
 ```
 
 ### Methods
 
-- `process(document: Document) -> List[Document]` - Process document
+- `process_document(document: Document) -> List[Document]` - Process document
+- `process_documents(documents: List[Document]) -> List[Document]` - Process multiple documents
 - `add_processor(processor: DocumentProcessor)` - Add processor
 - `remove_processor(index: int)` - Remove processor
 
@@ -213,8 +222,8 @@ config = VectorStoreProcessorConfig(
 processor = VectorStoreProcessor(vector_store, config)
 
 # Example usage
-doc = Document(id="doc1", content="RAG is a retrieval-augmented generation technology")
-processor.process(doc)
+docs = [Document(id="doc1", content="RAG is a retrieval-augmented generation technology")]
+list(processor.process(docs))
 # → Vectorized and stored
 ```
 
@@ -237,8 +246,8 @@ config = GraphBuilderConfig(
 graph_builder = GraphBuilder(config)
 
 # Example usage
-doc = Document(id="doc1", content="RAG combines LLMs with external knowledge")
-graph_builder.process(doc)
+docs = [Document(id="doc1", content="RAG combines LLMs with external knowledge")]
+list(graph_builder.process(docs))
 # → Graph file is updated
 ```
 
