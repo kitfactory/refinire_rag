@@ -12,7 +12,7 @@ from refinire_rag.processing.evaluator import Evaluator, EvaluatorConfig
 from refinire_rag.processing.contradiction_detector import ContradictionDetector, ContradictionDetectorConfig
 from refinire_rag.processing.insight_reporter import InsightReporter, InsightReporterConfig
 from refinire_rag.processing.document_pipeline import DocumentPipeline
-from refinire_rag.use_cases.query_engine import QueryEngine
+from refinire_rag.application.query_engine import QueryEngine
 from refinire_rag.retrieval.simple_retriever import SimpleRetriever
 from refinire_rag.retrieval.simple_reranker import SimpleReranker
 from refinire_rag.retrieval.simple_reader import SimpleReader

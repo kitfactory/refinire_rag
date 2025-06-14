@@ -47,7 +47,7 @@ Successfully completed migration from VectorStoreProcessor wrapper pattern to un
 
 ### 4. CorpusManager Integration
 
-**File**: `src/refinire_rag/use_cases/corpus_manager_new.py`
+**File**: `src/refinire_rag/application/corpus_manager_new.py`
 
 - ✅ **Updated to use VectorStore directly**
   - Uses `self.vector_store` directly in pipelines (line 279)
@@ -148,7 +148,7 @@ pipeline = DocumentPipeline([vector_store])  # Direct usage
 1. `/src/refinire_rag/storage/vector_store.py` - Enhanced with DocumentProcessor
 2. `/src/refinire_rag/retrieval/base.py` - Enhanced KeywordSearch
 3. `/src/refinire_rag/processing/vector_store_processor.py` - **DELETED**
-4. `/src/refinire_rag/use_cases/corpus_manager_new.py` - Updated to use VectorStore directly
+4. `/src/refinire_rag/application/corpus_manager_new.py` - Updated to use VectorStore directly
 
 ## Next Steps
 

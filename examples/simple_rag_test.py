@@ -13,7 +13,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from refinire_rag.use_cases.query_engine import QueryEngine, QueryEngineConfig
+from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
 from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
 from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
 from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader

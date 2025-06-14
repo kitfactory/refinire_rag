@@ -69,7 +69,7 @@ System design philosophy and implementation details.
 - [Requirements](requirements.md)
 - [Function Specifications](function_spec.md)
 - [Backend Interfaces](backend_interfaces.md)
-- [Use Case Interfaces](usecase_interfaces.md)
+- [Use Case Interfaces](application_interfaces.md)
 
 ## 🚀 Quick Start
 
@@ -90,7 +90,7 @@ print(answer)
 
 ### Production-Ready Setup (Unified Architecture)
 ```python
-from refinire_rag.use_cases import CorpusManager, QueryEngine
+from refinire_rag.application import CorpusManager, QueryEngine
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
 from refinire_rag.embedding import OpenAIEmbedder
 

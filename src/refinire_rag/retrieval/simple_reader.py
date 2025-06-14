@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any, Type
 import logging
 from openai import OpenAI
 
-from refinire_rag.use_cases.query_engine import QueryEngine, QueryEngineConfig
+from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
 from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
 from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
 from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader

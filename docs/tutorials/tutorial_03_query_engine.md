@@ -37,7 +37,7 @@ from pathlib import Path
 def setup_normalized_corpus():
     """正規化されたコーパスを構築"""
     
-    from refinire_rag.use_cases.corpus_manager_new import CorpusManager
+    from refinire_rag.application.corpus_manager_new import CorpusManager
     from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
     from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
     from refinire_rag.models.document import Document
@@ -181,7 +181,7 @@ def setup_normalized_corpus():
 def create_basic_query_engine(document_store, vector_store, embedder):
     """基本的なQueryEngineを作成"""
     
-    from refinire_rag.use_cases.query_engine import QueryEngine, QueryEngineConfig
+    from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
     from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader
     
     print("🤖 基本QueryEngineを作成中...")

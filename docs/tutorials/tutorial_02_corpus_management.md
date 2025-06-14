@@ -104,7 +104,7 @@ def create_test_dictionary(temp_dir: Path):
 def demo_preset_configurations(temp_dir: Path, file_paths: list):
     """プリセット設定のデモ"""
     
-    from refinire_rag.use_cases.corpus_manager_new import CorpusManager
+    from refinire_rag.application.corpus_manager_new import CorpusManager
     from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
     from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
     

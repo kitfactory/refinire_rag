@@ -1,6 +1,6 @@
 # QueryEngine - クエリ処理エンジン
 
-クエリ処理と回答生成を管理するユースケースクラスです。
+クエリ処理と回答生成を管理するアプリケーションクラスです。
 
 ## 概要
 
@@ -12,7 +12,7 @@ QueryEngineは、ユーザーのクエリを受け取り、以下の処理を統
 4. **回答生成** - LLMによる回答生成
 
 ```python
-from refinire_rag.use_cases.query_engine import QueryEngine, QueryEngineConfig
+from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
 from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader
 
 # コンポーネントの作成

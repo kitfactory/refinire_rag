@@ -13,7 +13,7 @@ refinire-ragライブラリのAPIリファレンスドキュメントです。
 - [retrieval](retrieval.md) - 検索と回答生成
 - [loaders](loaders.md) - ファイルローダー
 
-### ユースケースクラス
+### アプリケーションクラス
 
 - [CorpusManager](corpus_manager.md) - コーパス管理
 - [QueryEngine](query_engine.md) - クエリ処理エンジン
@@ -24,8 +24,8 @@ refinire-ragライブラリのAPIリファレンスドキュメントです。
 ### 基本的な使い方
 
 ```python
-from refinire_rag.use_cases.corpus_manager_new import CorpusManager
-from refinire_rag.use_cases.query_engine import QueryEngine
+from refinire_rag.application.corpus_manager_new import CorpusManager
+from refinire_rag.application.query_engine import QueryEngine
 from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
 from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
 

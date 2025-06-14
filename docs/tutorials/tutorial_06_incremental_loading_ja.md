@@ -36,8 +36,8 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from refinire_rag.loaders.incremental_loader import IncrementalLoader
-from refinire_rag.use_cases.corpus_manager import CorpusManager, CorpusManagerConfig
-from refinire_rag.use_cases.query_engine import QueryEngine, QueryEngineConfig
+from refinire_rag.application.corpus_manager import CorpusManager, CorpusManagerConfig
+from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
 from refinire_rag.embedding import TFIDFEmbedder, TFIDFEmbeddingConfig
 from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader

@@ -43,7 +43,7 @@ RAGシステムの構築方法を段階的に学習できます。
 - [要件定義](requirements.md)
 - [機能仕様](function_spec.md)
 - [バックエンドインターフェース](backend_interfaces.md)
-- [ユースケースインターフェース](usecase_interfaces.md)
+- [アプリケーションインターフェース](application_interfaces.md)
 
 ## 🚀 クイックスタート
 
@@ -54,8 +54,8 @@ pip install -e .
 
 ### 基本的な使い方
 ```python
-from refinire_rag.use_cases.corpus_manager_new import CorpusManager
-from refinire_rag.use_cases.query_engine import QueryEngine
+from refinire_rag.application.corpus_manager_new import CorpusManager
+from refinire_rag.application.query_engine import QueryEngine
 
 # コーパスの構築
 corpus_manager = CorpusManager.create_simple_rag(doc_store, vector_store)

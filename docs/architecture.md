@@ -9,7 +9,7 @@ refinire-ragは、クリーンアーキテクチャの原則に基づいた階�
 ```mermaid
 graph TB
     subgraph "Presentation Layer"
-        UC[ユースケースクラス<br/>CorpusManager/QueryEngine/QualityLab]
+        UC[アプリケーションクラス<br/>CorpusManager/QueryEngine/QualityLab]
     end
     
     subgraph "Application Layer"
@@ -70,7 +70,7 @@ pipeline = DocumentPipeline([vector_store])  # 直接使用
 ```
 
 #### 3. 依存性注入（DI）による切り替え自由度
-各ユースケースクラスとプロセッサーは、背後モジュールをDIによって注入可能：
+各アプリケーションクラスとプロセッサーは、背後モジュールをDIによって注入可能：
 - **ベクトルストア切り替え**: InMemory ↔ Chroma ↔ Faiss
 - **Embeddingモデル切り替え**: TF-IDF ↔ OpenAI ↔ HuggingFace
 - **LLMプロバイダ切り替え**: OpenAI ↔ Anthropic ↔ Gemini ↔ Ollama
@@ -84,7 +84,7 @@ pipeline = DocumentPipeline([vector_store])  # 直接使用
 
 ## 主要インターフェース
 
-### ユースケースクラス一覧
+### アプリケーションクラス一覧
 
 | クラス名 | 責務 | 主要メソッド | 継承元 |
 |---|---|---|---|
@@ -351,7 +351,7 @@ RefinireRAGError (基底クラス)
 
 ## モニタリング・トレーシング
 
-OpenTelemetryを使用して、各ユースケースの実行をトレース：
+OpenTelemetryを使用して、各アプリケーションの実行をトレース：
 
 - 各Stepの実行時間
 - LLM APIコール数と応答時間

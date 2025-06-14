@@ -12,7 +12,7 @@ QueryEngine receives user queries and manages the following integrated processin
 4. **Answer Generation** - Generating answers using LLM
 
 ```python
-from refinire_rag.use_cases.query_engine import QueryEngine, QueryEngineConfig
+from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
 from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader
 
 # Create components

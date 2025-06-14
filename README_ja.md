@@ -30,7 +30,7 @@ refinire-ragは、Refinireライブラリのサブパッケージとして、RAG
 
 ## アーキテクチャ
 
-### ユースケースクラス（Refinire Steps）
+### アプリケーションクラス（Refinire Steps）
 - **CorpusManager**: 文書ローディング、正規化、チャンク化、埋め込み生成、保存
 - **QueryEngine**: 文書検索、再ランキング、回答生成（Refinire Stepを継承）
 - **QualityLab**: 評価データ作成、自動RAG評価、矛盾検出、レポート生成
@@ -71,7 +71,7 @@ print(answer)
 
 ### 本番対応セットアップ
 ```python
-from refinire_rag.use_cases import CorpusManager, QueryEngine
+from refinire_rag.application import CorpusManager, QueryEngine
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
 
 # ストレージを設定
@@ -185,7 +185,7 @@ refinire-rag/
 │   ├── loaders/              # 文書ローディングシステム
 │   ├── processing/           # 文書処理パイプライン
 │   ├── storage/              # ストレージシステム
-│   ├── use_cases/            # ユースケースクラス
+│   ├── application/            # ユースケースクラス
 │   └── retrieval/            # 検索・回答生成
 ├── docs/                     # アーキテクチャドキュメント
 ├── examples/                 # 使用例

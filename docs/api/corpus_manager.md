@@ -12,7 +12,7 @@ CorpusManager provides a unified interface for managing document corpora with th
 - **Comprehensive Workflow** - Loading → Processing → Chunking → Embedding → Storage
 
 ```python
-from refinire_rag.use_cases.corpus_manager import CorpusManager
+from refinire_rag.application.corpus_manager import CorpusManager
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
 from refinire_rag.embedding import OpenAIEmbedder, OpenAIEmbeddingConfig
 from refinire_rag.processing import Normalizer, Chunker, ChunkingConfig
@@ -134,7 +134,7 @@ print(f"Skipped: {len(results['skipped'])}")
 Complete configuration for CorpusManager behavior.
 
 ```python
-from refinire_rag.use_cases.corpus_manager import CorpusManagerConfig
+from refinire_rag.application.corpus_manager import CorpusManagerConfig
 from refinire_rag.models.config import LoadingConfig
 
 config = CorpusManagerConfig(

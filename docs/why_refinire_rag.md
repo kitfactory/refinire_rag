@@ -76,7 +76,7 @@ Each component has different initialization patterns, parameter names, and error
 **One Interface for Everything**
 ```python
 # refinire-rag: 5 lines to build the same RAG system
-from refinire_rag.use_cases import CorpusManager
+from refinire_rag.application import CorpusManager
 
 # One-liner RAG system
 manager = CorpusManager.create_simple_rag(doc_store, vector_store)

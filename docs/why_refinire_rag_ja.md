@@ -76,7 +76,7 @@ def build_rag_system():
 **すべてに統一インターフェース**
 ```python
 # refinire-rag: 同じRAGシステムを5行で構築
-from refinire_rag.use_cases import CorpusManager
+from refinire_rag.application import CorpusManager
 
 # ワンライナーRAGシステム
 manager = CorpusManager.create_simple_rag(doc_store, vector_store)

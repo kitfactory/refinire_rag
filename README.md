@@ -30,7 +30,7 @@ refinire-rag provides RAG (Retrieval-Augmented Generation) functionality as a su
 
 ## Architecture
 
-### Use Case Classes (Refinire Steps)
+### Application Classes (Refinire Steps)
 - **CorpusManager**: Document loading, normalization, chunking, embedding generation, and storage
 - **QueryEngine**: Document retrieval, re-ranking, and answer generation (inherits from Refinire Step)
 - **QualityLab**: Evaluation data creation, automatic RAG evaluation, conflict detection, and report generation
@@ -110,7 +110,7 @@ print(answer)
 
 ### Production-Ready Setup
 ```python
-from refinire_rag.use_cases import CorpusManager, QueryEngine
+from refinire_rag.application import CorpusManager, QueryEngine
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
 
 # Configure storage
@@ -227,7 +227,7 @@ refinire-rag/
 │   ├── loaders/              # Document loading system
 │   ├── processing/           # Document processing pipeline
 │   ├── storage/              # Storage systems
-│   ├── use_cases/            # Use case classes
+│   ├── application/            # Use case classes
 │   └── retrieval/            # Search and answer generation
 ├── docs/                     # Architecture documentation
 ├── examples/                 # Usage examples

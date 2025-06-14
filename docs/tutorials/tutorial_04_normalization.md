@@ -230,7 +230,7 @@ def demo_advanced_normalization_configs(temp_dir: Path):
 def demo_query_normalization_optimization(temp_dir: Path):
     """クエリ正規化最適化のデモ"""
     
-    from refinire_rag.use_cases.query_engine import QueryEngine, QueryEngineConfig
+    from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
     from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
     from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
     from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader

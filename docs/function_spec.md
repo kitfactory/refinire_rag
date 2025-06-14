@@ -120,7 +120,7 @@ corpus_manager.build_corpus(
 | **chunk** | 文書分割処理 | ✅ | load |
 | **vector** | ベクトル埋め込み・保存 | ✅ | chunk |
 
-### ユースケースフロー図
+### アプリケーションフロー図
 
 ```mermaid
 sequenceDiagram
@@ -193,7 +193,7 @@ sequenceDiagram
 
 ## 2. QueryEngine（クエリ応答）
 
-### ユースケース手順
+### アプリケーション手順
 
 1. ユーザーがクエリを入力
 2. クエリをEmbedderでベクトル化
@@ -204,7 +204,7 @@ sequenceDiagram
 7. **DocumentStoreから関連するオリジナル文書情報を取得してソース情報を充実**
 8. 結果をユーザーに返却
 
-### ユースケースフロー図
+### アプリケーションフロー図
 
 ```mermaid
 sequenceDiagram
@@ -255,7 +255,7 @@ sequenceDiagram
 
 ## 3. QualityLab（品質評価）
 
-### ユースケース手順
+### アプリケーション手順
 
 1. ユーザーが評価データセットを指定
 2. **DocumentStoreから評価対象文書を取得・フィルタリング**
@@ -267,7 +267,7 @@ sequenceDiagram
 8. **DocumentStoreに評価結果を保存**
 9. 結果をユーザーに提供
 
-### ユースケースフロー図
+### アプリケーションフロー図
 
 ```mermaid
 sequenceDiagram

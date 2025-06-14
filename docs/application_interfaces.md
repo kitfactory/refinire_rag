@@ -1,8 +1,8 @@
-# ユースケースクラス インターフェース定義書
+# アプリケーションクラス インターフェース定義書
 
 ## 概要
 
-本文書では、refinire-ragの3つの主要ユースケースクラスの詳細なインターフェースを定義します。QueryEngineクラスのみRefinireのStepクラスを継承し、Flow/Step構造に統合可能な設計となっています。CorpusManagerとQualityLabは通常のクラスとして実装されます。
+本文書では、refinire-ragの3つの主要アプリケーションクラスの詳細なインターフェースを定義します。QueryEngineクラスのみRefinireのStepクラスを継承し、Flow/Step構造に統合可能な設計となっています。CorpusManagerとQualityLabは通常のクラスとして実装されます。
 
 ## 1. CorpusManager
 

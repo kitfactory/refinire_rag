@@ -107,7 +107,7 @@ mv src/refinire_rag/processing/document_store_loader.py \
 
 #### 3. CorpusManager機能実装
 ```python
-# src/refinire_rag/use_cases/corpus_manager_new.py に追加
+# src/refinire_rag/application/corpus_manager_new.py に追加
 @classmethod
 def create_simple_rag(cls, doc_store: DocumentStore, vector_store: VectorStore) -> 'CorpusManager':
     """シンプルRAG構成: Load → Chunk → Vector"""

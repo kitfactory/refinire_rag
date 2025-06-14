@@ -56,7 +56,7 @@ eval_docs = [
 ### ステップ2: RAGシステムの実行と応答の収集
 
 ```python
-from refinire_rag.use_cases.query_engine import QueryEngine
+from refinire_rag.application.query_engine import QueryEngine
 
 # RAGシステムの初期化
 query_engine = QueryEngine(retriever, reranker, reader)
@@ -254,8 +254,8 @@ with open("evaluation_report.md", "w", encoding="utf-8") as f:
 # evaluation_ci.py
 import sys
 import os
-from refinire_rag.use_cases.corpus_manager import CorpusManager
-from refinire_rag.use_cases.query_engine import QueryEngine
+from refinire_rag.application.corpus_manager import CorpusManager
+from refinire_rag.application.query_engine import QueryEngine
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
 from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader
 
@@ -320,7 +320,7 @@ def main():
     eval_dataset = load_evaluation_dataset(dataset_type)
     
     # 評価の実行
-    from refinire_rag.use_cases.quality_lab import QualityLab
+    from refinire_rag.application.quality_lab import QualityLab
     quality_lab = QualityLab()
     results = quality_lab.evaluate_system(rag_system, eval_dataset)
     

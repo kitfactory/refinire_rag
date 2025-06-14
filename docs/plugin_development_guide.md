@@ -4,11 +4,11 @@
 
 refinire-ragでは、統一されたプラグインアーキテクチャを提供しており、開発者は一貫したルールに従ってカスタム実装を作成できます。
 
-## プラグインの種類と使用ユースケース
+## プラグインの種類と使用アプリケーション
 
 refinire-ragは以下のプラグインタイプをサポートしています：
 
-| プラグインタイプ | サブパッケージ | 実装インターフェース | 使用ユースケース | 目的 |
+| プラグインタイプ | サブパッケージ | 実装インターフェース | 使用アプリケーション | 目的 |
 |---|---|---|---|---|
 | DocumentProcessor | refinire.rag.document_processor | DocumentProcessor | CorpusManager | 文書の前処理・変換 |
 | VectorStore | refinire.rag.vectorstore | VectorStore | CorpusManager, QueryEngine | ベクトルベースの文書検索 |

@@ -13,8 +13,8 @@ from typing import List, Dict, Any
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from refinire_rag.use_cases.corpus_manager import CorpusManager, CorpusManagerConfig
-from refinire_rag.use_cases.query_engine import QueryEngine, QueryEngineConfig
+from refinire_rag.application.corpus_manager import CorpusManager, CorpusManagerConfig
+from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
 from refinire_rag.models.document import Document
 from refinire_rag.embedding import TFIDFEmbedder, TFIDFEmbeddingConfig
 from refinire_rag.storage import InMemoryVectorStore, SQLiteDocumentStore
