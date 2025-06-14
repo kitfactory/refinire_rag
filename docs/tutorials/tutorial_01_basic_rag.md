@@ -23,12 +23,12 @@ Query → [Embedding] → [Search] → [Re-ranking] → [Answer Generation] → 
 First, import the necessary modules:
 
 ```python
-from refinire_rag.use_cases.corpus_manager_new import CorpusManager
+from refinire_rag.use_cases.corpus_manager import CorpusManager
 from refinire_rag.use_cases.query_engine import QueryEngine
 from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
 from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
-from refinire_rag.retrieval import SimpleRetriever, SimpleReranker, SimpleReader
-from refinire_rag.embedding import TFIDFEmbedder, TFIDFEmbeddingConfig
+from refinire_rag.retrieval import SimpleReranker, SimpleAnswerSynthesizer
+from refinire_rag.embedding import OpenAIEmbedder, OpenAIEmbeddingConfig
 from refinire_rag.models.document import Document
 ```
 
@@ -119,26 +119,14 @@ def build_simple_corpus(documents, document_store, vector_store):
     for doc in documents:
         document_store.store_document(doc)
     
-    # Manually create vector embeddings
-    embedder_config = TFIDFEmbeddingConfig(min_df=1, max_df=1.0)
-    embedder = TFIDFEmbedder(config=embedder_config)
+    # Configure embedder and set to vector store (統合アーキテクチャ)
+    embedder_config = OpenAIEmbeddingConfig(model="text-embedding-ada-002")
+    embedder = OpenAIEmbedder(config=embedder_config)
+    vector_store.set_embedder(embedder)  # VectorStoreに直接設定
     
-    # Train embedder on corpus
-    corpus_texts = [doc.content for doc in documents]
-    embedder.fit(corpus_texts)
-    
-    # Generate vectors for each document and store
-    from refinire_rag.storage.vector_store import VectorEntry
-    
+    # Index documents using VectorStore integrated functionality
     for doc in documents:
-        embedding_result = embedder.embed_text(doc.content)
-        vector_entry = VectorEntry(
-            document_id=doc.id,
-            content=doc.content[:200] + "..." if len(doc.content) > 200 else doc.content,
-            embedding=embedding_result.vector.tolist(),
-            metadata=doc.metadata
-        )
-        vector_store.add_vector(vector_entry)
+        vector_store.index_document(doc)  # 統合されたインデックス機能を使用
     
     print(f"✅ Built corpus with {len(documents)} documents")
     return embedder
@@ -154,16 +142,16 @@ def create_query_engine(document_store, vector_store, embedder):
     
     print("🤖 Creating query engine...")
     
-    # Create search and answer generation components
-    retriever = SimpleRetriever(vector_store, embedder=embedder)
+    # Create search and answer generation components (統合アーキテクチャ)
+    # vector_store is already a Retriever, so use it directly
     reranker = SimpleReranker()
-    reader = SimpleReader()
+    reader = SimpleAnswerSynthesizer()
     
-    # Create query engine
+    # Create query engine - vector_store serves as both storage and retriever
     query_engine = QueryEngine(
         document_store=document_store,
         vector_store=vector_store,
-        retriever=retriever,
+        retriever=vector_store,  # VectorStore自体がRetrieverインターフェースを実装
         reader=reader,
         reranker=reranker
     )

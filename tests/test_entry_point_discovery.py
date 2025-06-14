@@ -13,12 +13,12 @@ except ImportError:
 from typing import Dict, Any
 
 # Import the modules to test
-from refinire.rag.plugins.auto_discovery import PluginAutoDiscovery, auto_discovery
-from refinire.rag.vectorstore import _VectorStoreRegistry
-from refinire.rag.retrieval.vector_store_base import VectorStore
-from refinire.rag.plugins.plugin_config import PluginConfig
+from refinire_rag.plugins.auto_discovery import PluginAutoDiscovery, auto_discovery
+from refinire_rag.vectorstore import _VectorStoreRegistry
+from refinire_rag.retrieval.vector_store_base import VectorStore
+from refinire_rag.plugins.plugin_config import PluginConfig
 
-from refinire.rag import vectorstore
+from refinire_rag import vectorstore
 
 
 class MockVectorStore(VectorStore):
@@ -325,7 +325,7 @@ class TestUnifiedImportSystem:
     
     def test_dynamic_getattr(self):
         """Test dynamic __getattr__ functionality"""
-        from refinire.rag import vectorstore
+        from refinire_rag import vectorstore
         
         with patch.object(vectorstore._registry, 'get_store_class') as mock_get:
             mock_get.return_value = MockVectorStore
@@ -337,7 +337,7 @@ class TestUnifiedImportSystem:
     
     def test_dynamic_getattr_not_found(self):
         """Test __getattr__ with non-existent stores"""
-        from refinire.rag import vectorstore
+        from refinire_rag import vectorstore
         
         with patch.object(vectorstore._registry, 'get_store_class') as mock_get:
             mock_get.return_value = None
@@ -350,7 +350,7 @@ class TestUnifiedImportSystem:
     
     def test_dynamic_dir(self):
         """Test __dir__ functionality for IDE support"""
-        from refinire.rag import vectorstore
+        from refinire_rag import vectorstore
         
         with patch.object(vectorstore._registry, 'list_available_stores') as mock_list:
             mock_list.return_value = {
@@ -371,7 +371,7 @@ class TestUnifiedImportSystem:
     
     def test_utility_functions_access(self):
         """Test access to utility functions via __getattr__"""
-        from refinire.rag import vectorstore
+        from refinire_rag import vectorstore
         
         # Test list_available_stores
         with patch.object(vectorstore._registry, 'list_available_stores') as mock_list:
@@ -404,14 +404,14 @@ class TestIntegration:
             mock_entry_points.return_value = mock_eps
             
             # Test discovery
-            from refinire.rag.plugins.auto_discovery import auto_discovery
+            from refinire_rag.plugins.auto_discovery import auto_discovery
             auto_discovery.refresh_discovery()  # Force refresh
             
             plugins = auto_discovery.discover_all_plugins()
             assert 'IntegrationTestStore' in plugins['vectorstore']
             
             # Test unified import
-            from refinire.rag import vectorstore
+            from refinire_rag import vectorstore
             
             # Force registry to use our mocked entry point
             vectorstore._registry._entry_points = {"IntegrationTestStore": mock_entry_point}
@@ -438,7 +438,7 @@ class TestIntegration:
             mock_entry_points.return_value = mock_eps
             
             # Discovery should handle the error gracefully
-            from refinire.rag.plugins.auto_discovery import auto_discovery
+            from refinire_rag.plugins.auto_discovery import auto_discovery
             auto_discovery.refresh_discovery()
             
             plugins = auto_discovery.discover_all_plugins()
@@ -446,7 +446,7 @@ class TestIntegration:
             assert 'FailingStore' not in plugins['vectorstore']
             
             # Registry should also handle it gracefully
-            from refinire.rag import vectorstore
+            from refinire_rag import vectorstore
             vectorstore._registry._entry_points = {"FailingStore": mock_entry_point}
             vectorstore._registry._discovered = True
             

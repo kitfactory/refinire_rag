@@ -8,7 +8,7 @@ import tempfile
 import yaml
 from pathlib import Path
 
-from refinire.rag.plugins.plugin_config import PluginConfig, ConfigManager
+from refinire_rag.plugins.plugin_config import PluginConfig, ConfigManager
 
 
 class TestPluginConfig:

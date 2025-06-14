@@ -9,18 +9,10 @@ import csv
 from pathlib import Path
 
 # Add src to path so we can import our modules
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from refinire_rag import (
-    UniversalLoader,
-    TextLoader,
-    MarkdownLoader,
-    JSONLoader,
-    CSVLoader,
-    PathBasedMetadataGenerator,
-    LoadingConfig
-)
-
+from refinire_rag.loader.csv_loader import CSVLoader
+from refinire_rag.models.document import Document
 
 def create_test_files():
     """Create test files for each loader type"""
@@ -171,25 +163,47 @@ def test_csv_loader():
     """Test CSVLoader specifically"""
     print("\n=== Testing CSVLoader ===")
     
+    # テストファイルの作成
+    # Create test files
+    create_test_files()
+    
+    # 通常のローダー（ヘッダー行なし）
+    # Normal loader (without header)
     loader = CSVLoader()
     
-    # Test supported formats
-    formats = loader.supported_formats()
-    print(f"✓ Supported formats: {formats}")
-    assert ".csv" in formats
-    
-    # Test loading
-    doc = loader.load("test_files/sample.csv")
+    # Test loading without header
+    input_doc = Document(
+        id="test_input",
+        content="",
+        metadata={"file_path": "test_files/sample.csv"}
+    )
+    docs = list(loader.process([input_doc]))
+    doc = docs[0]  # 最初のドキュメントを取得
     print(f"✓ Loaded document ID: {doc.id}")
     print(f"✓ Content length: {len(doc.content)}")
     print(f"✓ Content preview: {doc.content}")
     
-    # Check content
-    lines = doc.content.split('\n')
-    assert "Name Age City" in lines[0]
-    assert "Alice 25 Tokyo" in lines[1]
-    assert "Bob 30 Osaka" in lines[2]
-    assert doc.metadata["loader_used"] == "CSVLoader"
+    # Check content without header
+    assert "Alice" in doc.content
+    assert "25" in doc.content
+    assert "Tokyo" in doc.content
+    
+    # ヘッダー行を含めるローダー
+    # Loader with header
+    loader_with_header = CSVLoader(include_header=True)
+    
+    # Test loading with header
+    docs_with_header = list(loader_with_header.process([input_doc]))
+    doc_with_header = docs_with_header[0]  # 最初のドキュメントを取得
+    print(f"✓ Loaded document with header ID: {doc_with_header.id}")
+    print(f"✓ Content length with header: {len(doc_with_header.content)}")
+    print(f"✓ Content preview with header: {doc_with_header.content}")
+    
+    # Check content with header
+    assert "Header:" in doc_with_header.content
+    assert "Row:" in doc_with_header.content
+    assert "Name" in doc_with_header.content
+    assert "Alice" in doc_with_header.content
     
     print("✓ CSVLoader tests passed")
 

@@ -1,0 +1,13 @@
+{
+  "title": "Sample JSON",
+  "description": "This is test data",
+  "items": [
+    "item1",
+    "item2",
+    "item3"
+  ],
+  "metadata": {
+    "version": "1.0",
+    "author": "test"
+  }
+}

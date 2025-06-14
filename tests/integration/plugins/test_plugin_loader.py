@@ -14,9 +14,9 @@ from unittest.mock import Mock, patch
 # Add src to path for testing
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
-from refinire.rag.plugins import PluginLoader, PluginRegistry, PluginConfig
-from refinire.rag.plugins.base import PluginInterface, VectorStorePlugin
-from refinire.rag.plugins.plugin_loader import PluginInfo
+from refinire_rag.plugins import PluginLoader, PluginRegistry, PluginConfig
+from refinire_rag.plugins.base import PluginInterface, VectorStorePlugin
+from refinire_rag.plugins.plugin_loader import PluginInfo
 
 
 class TestPluginRegistry:
@@ -187,7 +187,7 @@ class TestGlobalPluginLoader:
     
     def test_get_plugin_loader(self):
         """Test global plugin loader / グローバルプラグインローダーをテスト"""
-        from refinire.rag.plugins.plugin_loader import get_plugin_loader
+        from refinire_rag.plugins.plugin_loader import get_plugin_loader
         
         loader1 = get_plugin_loader()
         loader2 = get_plugin_loader()
@@ -198,7 +198,7 @@ class TestGlobalPluginLoader:
     
     def test_convenience_functions(self):
         """Test convenience functions / 便利関数をテスト"""
-        from refinire.rag.plugins.plugin_loader import get_available_plugins
+        from refinire_rag.plugins.plugin_loader import get_available_plugins
         
         available = get_available_plugins()
         assert isinstance(available, list)

@@ -3,8 +3,8 @@ Tests for the CodeTextSplitter class.
 """
 
 import pytest
-from refinire.rag.splitter import CodeTextSplitter
-from refinire.rag.document import Document
+from refinire_rag.splitter import CodeTextSplitter
+from refinire_rag.models.document import Document
 
 
 def test_basic_code_splitting():

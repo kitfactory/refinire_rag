@@ -7,8 +7,8 @@ This module contains tests for the TokenTextSplitter class.
 """
 
 import pytest
-from refinire.rag.splitter.token_splitter import TokenTextSplitter
-from refinire.rag.models.document import Document
+from refinire_rag.splitter.token_splitter import TokenTextSplitter
+from refinire_rag.models.document import Document
 
 def test_basic_splitting():
     """

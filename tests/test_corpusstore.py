@@ -3,9 +3,9 @@ import pytest
 import tempfile
 from pathlib import Path
 from datetime import datetime
-from refinire.rag.models import Document
-from refinire.rag.corpusstore import CorpusStore
-from refinire.rag.corpus_store.sqlite_corpus_store import SQLiteCorpusStore
+from refinire_rag.models import Document
+from refinire_rag.corpusstore import CorpusStore
+from refinire_rag.corpus_store.sqlite_corpus_store import SQLiteCorpusStore
 
 @pytest.fixture
 def test_db_path(tmp_path):

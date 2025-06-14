@@ -3,8 +3,8 @@
 
 import pytest
 
-from refinire.rag.models.document import Document
-from refinire.rag.splitter.size_splitter import SizeSplitter
+from refinire_rag.models.document import Document
+from refinire_rag.splitter.size_splitter import SizeSplitter
 
 def test_small_document():
     """Test processing of document smaller than chunk size

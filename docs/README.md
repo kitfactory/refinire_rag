@@ -63,7 +63,8 @@ Detailed API documentation for each module.
 ### 🏗️ Architecture & Design
 System design philosophy and implementation details.
 
-- [Architecture Overview](architecture.md)
+- [Architecture Overview](architecture.md) - **Updated with Unified Architecture (Dec 2024)**
+- [Migration Guide: Unified Architecture](migration_guide_unified_architecture.md) - **New: VectorStore Integration**
 - [Concept](concept.md)
 - [Requirements](requirements.md)
 - [Function Specifications](function_spec.md)
@@ -87,21 +88,30 @@ answer = rag.query("How does this work?")
 print(answer)
 ```
 
-### Production-Ready Setup
+### Production-Ready Setup (Unified Architecture)
 ```python
 from refinire_rag.use_cases import CorpusManager, QueryEngine
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
+from refinire_rag.embedding import OpenAIEmbedder
 
-# Configure storage
+# Configure storage with unified architecture
 doc_store = SQLiteDocumentStore("corpus.db")
 vector_store = InMemoryVectorStore()
 
-# Build corpus with incremental processing
-manager = CorpusManager.create_simple_rag(doc_store, vector_store)
-results = manager.process_corpus(["documents/"])
+# Configure embedder directly to vector store (no wrapper needed)
+embedder = OpenAIEmbedder()
+vector_store.set_embedder(embedder)
 
-# Query with confidence
-query_engine = QueryEngine(retriever, reranker, reader)
+# Build corpus - VectorStore used directly in pipeline
+manager = CorpusManager(doc_store, vector_store)  # Simplified constructor
+results = manager.build_corpus(["documents/"])
+
+# Query with VectorStore as integrated retriever
+query_engine = QueryEngine(
+    document_store=doc_store,
+    retriever=vector_store,  # VectorStore implements Retriever interface
+    reader=reader
+)
 result = query_engine.answer("What is our company policy on remote work?")
 ```
 

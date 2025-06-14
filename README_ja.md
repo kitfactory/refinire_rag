@@ -41,10 +41,10 @@ refinire-ragは、Refinireライブラリのサブパッケージとして、RAG
 #### 文書処理プロセッサ
 - **UniversalLoader**: 拡張子ベースのファイル読み込み
 - **Normalizer**: 辞書ベースの用語正規化
-- **TokenBasedChunker**: トークンベースのチャンク化
+- **Chunker**: トークンベースのチャンク化
 - **DictionaryMaker**: 用語・略語抽出とMD辞書更新
 - **GraphBuilder**: 知識グラフ構築
-- **VectorStoreProcessor**: 埋め込み生成とベクトル保存
+- **VectorStore**: 統合埋め込み生成・ベクトル保存・検索（DocumentProcessor + Indexer + Retriever）
 
 #### 品質評価プロセッサ
 - **TestSuite**: 評価ランナー

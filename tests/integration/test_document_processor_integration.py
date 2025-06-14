@@ -23,7 +23,7 @@ from refinire_rag.processing.dictionary_maker import DictionaryMaker, Dictionary
 from refinire_rag.processing.normalizer import Normalizer, NormalizerConfig
 from refinire_rag.processing.graph_builder import GraphBuilder, GraphBuilderConfig
 from refinire_rag.processing.chunker import Chunker, ChunkingConfig
-from refinire_rag.loaders.base import Loader, LoaderConfig
+from refinire_rag.loaders.loader import Loader, LoaderConfig
 
 
 class TestDocumentProcessorBase:

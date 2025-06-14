@@ -51,14 +51,32 @@ graph TB
 - **設定の型安全性**: 各プロセッサーが独自の設定クラスを持ち、型チェックが効く
 - **統計情報の一元管理**: すべてのプロセッサーが統一された統計情報を提供
 
-#### 2. 依存性注入（DI）による切り替え自由度
+#### 2. 統合ストアアーキテクチャ（2024年12月更新）
+**VectorStore**と**KeywordSearch**は、プロセッサーラッパーを廃止し、直接DocumentProcessorを継承：
+- **VectorStore**: `DocumentProcessor` + `Indexer` + `Retriever` を統合実装
+- **KeywordSearch**: `DocumentProcessor` + `Indexer` + `Retriever` を統合実装
+- **利点**: ラッパークラス不要、直接パイプライン使用、シンプルな構成
+
+```python
+# 従来（ラッパー方式）
+vector_store = InMemoryVectorStore()
+processor = VectorStoreProcessor(vector_store)  # ラッパー必要
+pipeline = DocumentPipeline([processor])
+
+# 現在（統合方式）
+vector_store = InMemoryVectorStore()  # DocumentProcessor直接継承
+vector_store.set_embedder(embedder)   # 直接設定
+pipeline = DocumentPipeline([vector_store])  # 直接使用
+```
+
+#### 3. 依存性注入（DI）による切り替え自由度
 各ユースケースクラスとプロセッサーは、背後モジュールをDIによって注入可能：
 - **ベクトルストア切り替え**: InMemory ↔ Chroma ↔ Faiss
 - **Embeddingモデル切り替え**: TF-IDF ↔ OpenAI ↔ HuggingFace
 - **LLMプロバイダ切り替え**: OpenAI ↔ Anthropic ↔ Gemini ↔ Ollama
 - **DocumentStore切り替え**: SQLite ↔ PostgreSQL ↔ MongoDB
 
-#### 3. 処理の透明性と追跡可能性
+#### 4. 処理の透明性と追跡可能性
 - **文書系譜管理**: original_document_id, parent_document_idによる完全な系譜追跡
 - **処理段階管理**: processing_stageによる各段階の明確化
 - **メタデータ富化**: 各プロセッサーが段階的にメタデータを充実
@@ -87,8 +105,8 @@ graph TB
 | Normalizer | 表現揺らぎ正規化 | NormalizerConfig | MD辞書ベース表現統一、揺らぎ訂正 |
 | GraphBuilder | 知識グラフ累積構築 | GraphBuilderConfig | LLMベース関係抽出、MD形式グラフ累積更新 |
 | Chunker | 文書分割・チャンク化 | ChunkingConfig | トークンベース分割、オーバーラップ |
-| VectorStoreProcessor | ベクトル化・保存 | VectorStoreProcessorConfig | 埋め込み生成、ベクトル保存 |
-| Retriever | 文書検索・取得 | RetrieverConfig | クエリ検索、類似度計算 |
+| **VectorStore** | **ベクトル化・保存・検索** | **VectorStoreConfig** | **埋め込み生成、ベクトル保存、類似度検索** |
+| **KeywordSearch** | **キーワード検索・インデックス** | **KeywordSearchConfig** | **テキスト検索、インデックス管理** |
 | Reranker | 候補再順位付け | RerankerConfig | 検索結果再ランキング |
 | Reader | 回答生成・読解 | ReaderConfig | LLMベース回答生成 |
 | TestSuite | 評価実行 | TestSuiteConfig | テストケース実行 |
@@ -116,13 +134,17 @@ class DocumentProcessor(ABC):
 #### DocumentPipeline による処理チェーン
 
 ```python
-# 文書処理パイプラインの例
+# 文書処理パイプラインの例（統合アーキテクチャ）
+# VectorStoreを直接使用 - プロセッサーラッパーは不要
+vector_store = InMemoryVectorStore()
+vector_store.set_embedder(OpenAIEmbedder())
+
 pipeline = DocumentPipeline([
     Loader(LoaderConfig(source_paths=["./docs"])),
     DictionaryMaker(DictionaryMakerConfig(extract_abbreviations=True)),
     Normalizer(NormalizerConfig(apply_abbreviation_expansion=True)),
     Chunker(ChunkingConfig(chunk_size=512, overlap=50)),
-    VectorStoreProcessor(vector_store, VectorStoreProcessorConfig(embedder_type="openai"))
+    vector_store  # VectorStoreを直接パイプラインで使用
 ])
 
 # 統計追跡付きで一括処理
@@ -132,12 +154,13 @@ stats = pipeline.get_pipeline_stats()
 
 ### インフラストラクチャ層インターフェース
 
-| インターフェース | 責務 | 実装例 |
-|---|---|---|
-| DocumentStore | 文書永続化・検索 | SQLiteDocumentStore, ChromaDocumentStore |
-| VectorStore | ベクトル保存・検索 | InMemoryVectorStore, PickleVectorStore |
-| Embedder | ベクトル埋め込み | TFIDFEmbedder, OpenAIEmbedder |
-| MetadataGenerator | メタデータ生成 | PathBasedMetadataGenerator |
+| インターフェース | 責務 | 実装例 | 統合機能 |
+|---|---|---|---|
+| DocumentStore | 文書永続化・検索 | SQLiteDocumentStore, ChromaDocumentStore | - |
+| **VectorStore** | **ベクトル保存・検索・インデックス** | **InMemoryVectorStore, PickleVectorStore** | **DocumentProcessor + Indexer + Retriever** |
+| **KeywordSearch** | **キーワード検索・インデックス** | **SimpleKeywordSearch** | **DocumentProcessor + Indexer + Retriever** |
+| Embedder | ベクトル埋め込み | TFIDFEmbedder, OpenAIEmbedder | - |
+| MetadataGenerator | メタデータ生成 | PathBasedMetadataGenerator | - |
 
 ## 主要データ（データの種類、構造）
 

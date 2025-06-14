@@ -24,8 +24,9 @@ from refinire_rag.processing.dictionary_maker import DictionaryMakerConfig
 from refinire_rag.processing.normalizer import NormalizerConfig
 from refinire_rag.processing.graph_builder import GraphBuilderConfig
 from refinire_rag.processing.chunker import ChunkingConfig
-from refinire_rag.loaders.base import LoaderConfig
+from refinire_rag.loaders.loader import LoaderConfig
 from refinire_rag.loaders.specialized import TextLoader
+from refinire_rag.loaders.loader import Loader
 
 
 def create_sample_files(temp_dir: Path) -> list:

@@ -13,12 +13,12 @@ class TestVectorStoreUnifiedImports:
     def test_standard_vector_store_import(self):
         """Test importing standard vector stores"""
         # This should work as it's a standard implementation
-        from refinire.rag.vectorstore import OpenAIVectorStore
+        from refinire_rag.vectorstore import OpenAIVectorStore
         assert OpenAIVectorStore is not None
     
     def test_list_available_stores(self):
         """Test listing available vector stores"""
-        from refinire.rag.vectorstore import list_available_stores
+        from refinire_rag.vectorstore import list_available_stores
         
         stores = list_available_stores()
         assert isinstance(stores, dict)
@@ -29,7 +29,7 @@ class TestVectorStoreUnifiedImports:
     
     def test_register_external_store(self):
         """Test registering external vector stores"""
-        from refinire.rag.vectorstore import register_external_store, list_available_stores
+        from refinire_rag.vectorstore import register_external_store, list_available_stores
         
         # Register a mock external store
         register_external_store("TestVectorStore", "test_module", "TestClass")
@@ -42,7 +42,7 @@ class TestVectorStoreUnifiedImports:
     def test_unavailable_store_error(self):
         """Test error when trying to import unavailable store"""
         with pytest.raises(AttributeError) as exc_info:
-            from refinire.rag.vectorstore import NonExistentStore
+            from refinire_rag.vectorstore import NonExistentStore
         
         assert "not available" in str(exc_info.value)
         assert "Available stores:" in str(exc_info.value)
@@ -57,7 +57,7 @@ class TestVectorStoreUnifiedImports:
         mock_import.return_value = mock_module
         
         # This should work with the mock
-        from refinire.rag.vectorstore import ChromaVectorStore
+        from refinire_rag.vectorstore import ChromaVectorStore
         assert ChromaVectorStore == mock_class
 
 
@@ -66,12 +66,12 @@ class TestKeywordStoreUnifiedImports:
     
     def test_standard_keyword_store_import(self):
         """Test importing standard keyword stores"""
-        from refinire.rag.keywordstore import TFIDFKeywordStore
+        from refinire_rag.keywordstore import TFIDFKeywordStore
         assert TFIDFKeywordStore is not None
     
     def test_list_available_stores(self):
         """Test listing available keyword stores"""
-        from refinire.rag.keywordstore import list_available_stores
+        from refinire_rag.keywordstore import list_available_stores
         
         stores = list_available_stores()
         assert isinstance(stores, dict)
@@ -81,7 +81,7 @@ class TestKeywordStoreUnifiedImports:
     def test_unavailable_store_error(self):
         """Test error when trying to import unavailable keyword store"""
         with pytest.raises(AttributeError):
-            from refinire.rag.keywordstore import NonExistentKeywordStore
+            from refinire_rag.keywordstore import NonExistentKeywordStore
 
 
 class TestLoaderUnifiedImports:
@@ -89,7 +89,7 @@ class TestLoaderUnifiedImports:
     
     def test_list_available_loaders(self):
         """Test listing available loaders"""
-        from refinire.rag.loaders import list_available_loaders
+        from refinire_rag.loaders import list_available_loaders
         
         loaders = list_available_loaders()
         assert isinstance(loaders, dict)
@@ -99,7 +99,7 @@ class TestLoaderUnifiedImports:
     
     def test_register_external_loader(self):
         """Test registering external loaders"""
-        from refinire.rag.loaders import register_external_loader, list_available_loaders
+        from refinire_rag.loaders import register_external_loader, list_available_loaders
         
         # Register a mock external loader
         register_external_loader("TestLoader", "test_module", "TestLoaderClass")
@@ -110,7 +110,7 @@ class TestLoaderUnifiedImports:
     def test_unavailable_loader_error(self):
         """Test error when trying to import unavailable loader"""
         with pytest.raises(AttributeError):
-            from refinire.rag.loaders import NonExistentLoader
+            from refinire_rag.loaders import NonExistentLoader
 
 
 class TestUnifiedImportSystem:
@@ -119,9 +119,9 @@ class TestUnifiedImportSystem:
     def test_consistent_api_across_modules(self):
         """Test that all modules provide consistent API"""
         # All modules should have list_available_* functions
-        from refinire.rag.vectorstore import list_available_stores
-        from refinire.rag.keywordstore import list_available_stores as list_keyword_stores
-        from refinire.rag.loaders import list_available_loaders
+        from refinire_rag.vectorstore import list_available_stores
+        from refinire_rag.keywordstore import list_available_stores as list_keyword_stores
+        from refinire_rag.loaders import list_available_loaders
         
         # All should return dictionaries
         assert isinstance(list_available_stores(), dict)
@@ -130,9 +130,9 @@ class TestUnifiedImportSystem:
     
     def test_dir_functionality(self):
         """Test that __dir__ works for IDE support"""
-        import refinire.rag.vectorstore as vs
-        import refinire.rag.keywordstore as ks
-        import refinire.rag.loaders as loaders
+        import refinire_rag.vectorstore as vs
+        import refinire_rag.keywordstore as ks
+        import refinire_rag.loaders as loaders
         
         # Should include utility functions
         assert "list_available_stores" in dir(vs)
@@ -142,9 +142,9 @@ class TestUnifiedImportSystem:
     
     def test_all_exports(self):
         """Test that __all__ includes expected exports"""
-        import refinire.rag.vectorstore as vs
-        import refinire.rag.keywordstore as ks
-        import refinire.rag.loaders as loaders
+        import refinire_rag.vectorstore as vs
+        import refinire_rag.keywordstore as ks
+        import refinire_rag.loaders as loaders
         
         # Should include utility functions
         assert "list_available_stores" in vs.__all__
@@ -160,7 +160,7 @@ class TestErrorHandling:
     
     def test_import_error_handling(self):
         """Test graceful handling of import errors"""
-        from refinire.rag.vectorstore import list_available_stores
+        from refinire_rag.vectorstore import list_available_stores
         
         stores = list_available_stores()
         # Should not raise exceptions even if some stores are unavailable
@@ -168,7 +168,7 @@ class TestErrorHandling:
     
     def test_repeated_failed_import_caching(self):
         """Test that failed imports are cached to avoid repeated attempts"""
-        from refinire.rag.vectorstore import _registry
+        from refinire_rag.vectorstore import _registry
         
         # Clear cache for clean test
         _registry._failed_imports.clear()
@@ -183,7 +183,7 @@ class TestErrorHandling:
     
     def test_successful_import_caching(self):
         """Test that successful imports are cached"""
-        from refinire.rag.vectorstore import _registry
+        from refinire_rag.vectorstore import _registry
         
         # This should work and be cached
         result1 = _registry.get_store_class("OpenAIVectorStore")

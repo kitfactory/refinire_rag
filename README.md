@@ -41,10 +41,10 @@ All document processing components inherit from a single base class with consist
 #### Document Processing Pipeline
 - **UniversalLoader**: Multi-format document loading with parallel processing
 - **Normalizer**: Dictionary-based term normalization and linguistic optimization
-- **TokenBasedChunker**: Intelligent document chunking for optimal embedding
+- **Chunker**: Intelligent document chunking for optimal embedding
 - **DictionaryMaker**: Term and abbreviation extraction with LLM integration
 - **GraphBuilder**: Knowledge graph construction and relationship extraction
-- **VectorStoreProcessor**: Embedding generation and vector storage
+- **VectorStore**: Integrated embedding generation, vector storage, and retrieval (DocumentProcessor + Indexer + Retriever)
 
 #### Quality & Evaluation
 - **TestSuite**: Comprehensive evaluation pipeline execution
@@ -63,13 +63,14 @@ All document processing components inherit from a single base class with consist
 All document processing components inherit from a single base class with consistent `process(document) -> List[Document]` interface:
 
 ```python
-# Every processor follows the same pattern
+# Every processor follows the same pattern (統合アーキテクチャ)
 normalizer = Normalizer(config)
-chunker = TokenBasedChunker(config)
-embedder = VectorStoreProcessor(config)
+chunker = Chunker(config)
+vector_store = InMemoryVectorStore()  # VectorStore直接使用
+vector_store.set_embedder(embedder)   # 埋め込み設定
 
-# Chain them together
-pipeline = DocumentPipeline([normalizer, chunker, embedder])
+# Chain them together - VectorStoreを直接パイプラインで使用
+pipeline = DocumentPipeline([normalizer, chunker, vector_store])
 results = pipeline.process_document(document)
 ```
 

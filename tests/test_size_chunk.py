@@ -4,8 +4,8 @@ SizeChunkProcessorのテスト
 """
 
 import pytest
-from refinire.rag.processor import SizeChunkProcessor
-from refinire.rag.models.document import Document
+from refinire_rag.processor import SizeChunkProcessor
+from refinire_rag.models.document import Document
 
 def test_small_document():
     """Test processing of document smaller than chunk size

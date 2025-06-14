@@ -7,8 +7,8 @@ This module contains tests for the RecursiveCharacterTextSplitter class.
 """
 
 import pytest
-from refinire.rag.splitter.recursive_character_splitter import RecursiveCharacterTextSplitter
-from refinire.rag.models.document import Document
+from refinire_rag.splitter.recursive_character_splitter import RecursiveCharacterTextSplitter
+from refinire_rag.models.document import Document
 
 def test_basic_splitting():
     """

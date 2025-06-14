@@ -1,6 +1,6 @@
 import pytest
-from refinire.rag.splitter.html_splitter import HTMLTextSplitter
-from refinire.rag.models.document import Document
+from refinire_rag.splitter.html_splitter import HTMLTextSplitter
+from refinire_rag.models.document import Document
 
 # Test basic HTML splitting
 # 基本的なHTML分割のテスト

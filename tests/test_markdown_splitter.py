@@ -1,6 +1,6 @@
 import pytest
-from refinire.rag.splitter import MarkdownTextSplitter
-from refinire.rag.models.document import Document
+from refinire_rag.splitter import MarkdownTextSplitter
+from refinire_rag.models.document import Document
 
 # Test basic markdown splitting
 # 基本的なMarkdown分割のテスト

@@ -1,0 +1,15 @@
+# namespace package用の__init__.py
+# このファイルをrefinireとrefinire-ragの両方で使用する
+
+# Option 1: pkgutil-style (Python 2.7+ 互換)
+__path__ = __import__('pkgutil').extend_path(__path__, __name__)
+
+# Option 2: pkg_resources style (setuptoolsが必要)
+# try:
+#     __import__('pkg_resources').declare_namespace(__name__)
+# except ImportError:
+#     from pkgutil import extend_path
+#     __path__ = extend_path(__path__, __name__)
+
+# Option 3: PEP 420 style (Python 3.3+)
+# このファイル自体を削除する

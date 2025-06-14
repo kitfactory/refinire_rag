@@ -1,5 +1,5 @@
 import pytest
-from refinire.rag.models import Document, QAPair, EvaluationResult
+from refinire_rag.models import Document, QAPair, EvaluationResult
 
 def test_document_creation():
     """

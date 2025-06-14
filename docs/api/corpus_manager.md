@@ -12,32 +12,24 @@ CorpusManager provides a unified interface for managing document corpora with th
 - **Comprehensive Workflow** - Loading → Processing → Chunking → Embedding → Storage
 
 ```python
-from refinire_rag.use_cases.corpus_manager import CorpusManager, CorpusManagerConfig
+from refinire_rag.use_cases.corpus_manager import CorpusManager
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
-from refinire_rag.embedding import TFIDFEmbedder, TFIDFEmbeddingConfig
-from refinire_rag.processing import Normalizer, TokenBasedChunker, ChunkingConfig
+from refinire_rag.embedding import OpenAIEmbedder, OpenAIEmbeddingConfig
+from refinire_rag.processing import Normalizer, Chunker, ChunkingConfig
 
 # Initialize storage
 doc_store = SQLiteDocumentStore("corpus.db")
 vector_store = InMemoryVectorStore()
 
-# Configure components
-embedder = TFIDFEmbedder(TFIDFEmbeddingConfig(min_df=1, max_df=1.0))
+# Configure embedder and set to vector store (統合アーキテクチャ)
+embedder = OpenAIEmbedder(OpenAIEmbeddingConfig(model="text-embedding-ada-002"))
+vector_store.set_embedder(embedder)  # VectorStoreに直接設定
 
-# Create configuration
-config = CorpusManagerConfig(
+# Create CorpusManager with integrated architecture
+corpus_manager = CorpusManager(
     document_store=doc_store,
-    vector_store=vector_store,
-    embedder=embedder,
-    processors=[
-        Normalizer(normalizer_config),
-        TokenBasedChunker(chunking_config)
-    ],
-    enable_progress_reporting=True
+    vector_store=vector_store  # VectorStoreを直接使用、ラッパー不要
 )
-
-# Create CorpusManager
-corpus_manager = CorpusManager(config)
 ```
 
 ## Core Workflow Methods
