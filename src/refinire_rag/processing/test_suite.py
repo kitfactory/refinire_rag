@@ -12,7 +12,7 @@ import json
 import time
 from pathlib import Path
 
-from .document_processor import DocumentProcessor, DocumentProcessorConfig
+from ..document_processor import DocumentProcessor
 from ..models.document import Document
 
 
@@ -43,7 +43,7 @@ class TestResult(BaseModel):
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class TestSuiteConfig(DocumentProcessorConfig):
+class TestSuiteConfig(BaseModel):
     """TestSuite設定"""
     
     test_cases_file: Optional[str] = None

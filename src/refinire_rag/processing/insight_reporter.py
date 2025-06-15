@@ -14,7 +14,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 
-from .document_processor import DocumentProcessor, DocumentProcessorConfig
+from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
 
 

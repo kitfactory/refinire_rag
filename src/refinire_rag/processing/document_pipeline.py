@@ -10,7 +10,7 @@ import time
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
-from .document_processor import DocumentProcessor
+from ..document_processor import DocumentProcessor
 from ..models.document import Document
 
 logger = logging.getLogger(__name__)

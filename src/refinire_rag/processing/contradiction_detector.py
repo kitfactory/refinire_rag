@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 from enum import Enum
 
-from .document_processor import DocumentProcessor, DocumentProcessorConfig
+from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
 
 

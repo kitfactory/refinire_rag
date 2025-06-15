@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Type, Tuple
 from pathlib import Path
 
-from .document_processor import DocumentProcessor, DocumentProcessorConfig
+from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
 
 logger = logging.getLogger(__name__)

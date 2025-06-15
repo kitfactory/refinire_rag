@@ -12,6 +12,7 @@ import numpy as np
 
 from ..models.document import Document
 from ..document_processor import DocumentProcessor
+from ..utils.model_config import get_default_llm_model
 
 
 @dataclass
@@ -84,9 +85,15 @@ class AnswerSynthesizerConfig(QueryComponentConfig):
                    生成する最大トークン数
     """
     max_context_length: int = 2000
-    llm_model: str = "gpt-4o-mini"
+    llm_model: str = None  # Will be set to default in __post_init__
     temperature: float = 0.1
     max_tokens: int = 500
+    
+    def __post_init__(self):
+        """Initialize default values"""
+        # Set default LLM model from environment variables if not specified
+        if self.llm_model is None:
+            self.llm_model = get_default_llm_model()
 
 
 class QueryComponent(ABC):

@@ -6,13 +6,7 @@ import logging
 from typing import List, Optional
 from datetime import datetime
 
-print("[DEBUG] document.py import start")
-
 # from refinire_rag.models.config import DocumentConfig  # 不要なので削除
-
-print("[DEBUG] document.py import completed")
-
-print("document.py start")
 """
 Document data model for refinire-rag
 """

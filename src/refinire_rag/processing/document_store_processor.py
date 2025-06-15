@@ -9,7 +9,7 @@ import logging
 from dataclasses import dataclass
 from typing import List, Optional, Type
 
-from .document_processor import DocumentProcessor, DocumentProcessorConfig
+from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
 
 logger = logging.getLogger(__name__)

@@ -12,13 +12,14 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Type
 from pathlib import Path
 
-from .document_processor import DocumentProcessor, DocumentProcessorConfig
+from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
+from ..utils.model_config import get_default_llm_model
 
 try:
-    from refinire import get_llm
+    from refinire import LLMPipeline
 except ImportError:
-    get_llm = None
+    LLMPipeline = None
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class GraphBuilderConfig(DocumentProcessorConfig):
     backup_graph: bool = True
     
     # LLM settings
-    llm_model: str = "gpt-4o-mini"
+    llm_model: str = None  # Will be set to default in __post_init__
     llm_temperature: float = 0.3
     max_tokens: int = 3000
     
@@ -57,6 +58,10 @@ class GraphBuilderConfig(DocumentProcessorConfig):
 
     def __post_init__(self):
         """Initialize default values"""
+        # Set default LLM model from environment variables if not specified
+        if self.llm_model is None:
+            self.llm_model = get_default_llm_model()
+        
         # Ensure file paths are absolute
         if not os.path.isabs(self.graph_file_path):
             self.graph_file_path = os.path.abspath(self.graph_file_path)
@@ -84,16 +89,20 @@ class GraphBuilder(DocumentProcessor):
         """
         super().__init__(config or GraphBuilderConfig())
         
-        # Initialize Refinire LLM client
-        if get_llm is not None:
+        # Initialize Refinire LLM Pipeline
+        if LLMPipeline is not None:
             try:
-                self._llm_client = get_llm(self.config.llm_model)
-                logger.info(f"Initialized Refinire LLM with model: {self.config.llm_model}")
+                self._llm_pipeline = LLMPipeline(
+                    name="graph_builder",
+                    generation_instructions="You are a knowledge graph expert that extracts important relationships from documents.",
+                    model=self.config.llm_model
+                )
+                logger.info(f"Initialized Refinire LLMPipeline with model: {self.config.llm_model}")
             except Exception as e:
-                self._llm_client = None
-                logger.warning(f"Failed to initialize Refinire LLM: {e}. GraphBuilder will use mock data.")
+                self._llm_pipeline = None
+                logger.warning(f"Failed to initialize Refinire LLMPipeline: {e}. GraphBuilder will use mock data.")
         else:
-            self._llm_client = None
+            self._llm_pipeline = None
             logger.warning("Refinire not available. GraphBuilder will use mock data.")
         
         # Processing statistics
@@ -273,10 +282,11 @@ class GraphBuilder(DocumentProcessor):
             document, existing_graph, dictionary_content, config
         )
         
-        # Use Refinire LLM for relationship extraction
-        if self._llm_client is not None:
+        # Use Refinire LLM Pipeline for relationship extraction
+        if self._llm_pipeline is not None:
             try:
-                response = self._llm_client.complete(prompt)
+                result = self._llm_pipeline.run(prompt)
+                response = result.content
                 
                 # Parse JSON response
                 try:

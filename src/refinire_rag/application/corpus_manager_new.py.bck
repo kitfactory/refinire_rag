@@ -1,0 +1,1004 @@
+"""
+CorpusManager - Document corpus construction and management
+
+A Refinire Step that provides flexible corpus building with multiple pipeline execution.
+Supports preset configurations, stage selection, and custom pipeline definitions.
+"""
+
+import logging
+import time
+from typing import List, Optional, Dict, Any, Union
+from dataclasses import dataclass
+from pathlib import Path
+
+from ..processing.document_pipeline import DocumentPipeline
+from ..document_processor import DocumentProcessor
+from ..processing.document_store_processor import DocumentStoreProcessor, DocumentStoreProcessorConfig
+from ..loader.document_store_loader import DocumentStoreLoader, DocumentLoadConfig, LoadStrategy
+from ..processing.dictionary_maker import DictionaryMaker, DictionaryMakerConfig
+from ..processing.normalizer import Normalizer, NormalizerConfig
+from ..processing.graph_builder import GraphBuilder, GraphBuilderConfig
+from ..processing.chunker import Chunker, ChunkingConfig
+from ..loader.loader import Loader
+from ..loader.text_loader import TextLoader
+from ..models.document import Document
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CorpusStats:
+    """Statistics for corpus building operations"""
+    total_files_processed: int = 0
+    total_documents_created: int = 0
+    total_chunks_created: int = 0
+    total_processing_time: float = 0.0
+    pipeline_stages_executed: int = 0
+    documents_by_stage: Dict[str, int] = None
+    errors_encountered: int = 0
+    
+    def __post_init__(self):
+        if self.documents_by_stage is None:
+            self.documents_by_stage = {}
+
+
+class CorpusManager:
+    """Document corpus construction and management system
+    
+    This class provides flexible corpus building with support for:
+    - Preset configurations (simple_rag, semantic_rag, knowledge_rag)
+    - Stage selection (load, dictionary, graph, normalize, chunk, vector)
+    - Custom pipeline definitions (complete control over processing)
+    
+    The system uses multiple-stage pipeline execution where each stage
+    can involve DocumentStore operations for persistence and retrieval.
+    """
+    
+    def __init__(self, document_store, vector_store, config: Optional[Dict[str, Any]] = None):
+        """Initialize CorpusManager
+        
+        Args:
+            document_store: DocumentStore for document persistence
+            vector_store: VectorStore for vector persistence
+            config: Optional global configuration
+        """
+        self.document_store = document_store
+        self.vector_store = vector_store
+        self.config = config or {}
+        self.stats = CorpusStats()
+        
+        logger.info(f"Initialized CorpusManager with DocumentStore: {type(document_store).__name__}, "
+                   f"VectorStore: {type(vector_store).__name__}")
+    
+    def build_corpus(self, 
+                    file_paths: List[str],
+                    stages: Optional[List[str]] = None,
+                    custom_pipelines: Optional[List[DocumentPipeline]] = None,
+                    stage_configs: Optional[Dict[str, Any]] = None) -> CorpusStats:
+        """Build corpus using specified approach
+        
+        Args:
+            file_paths: List of file paths to process
+            stages: List of stages to execute (stage selection approach)
+            custom_pipelines: List of custom pipelines (custom approach)
+            stage_configs: Configuration for each stage
+            
+        Returns:
+            CorpusStats with processing results
+        """
+        start_time = time.time()
+        
+        try:
+            logger.info(f"Starting corpus building for {len(file_paths)} files")
+            
+            if custom_pipelines:
+                # Custom pipeline approach
+                logger.info("Using custom pipeline approach")
+                result_stats = self._execute_custom_pipelines(file_paths, custom_pipelines)
+            elif stages:
+                # Stage selection approach
+                logger.info(f"Using stage selection approach: {stages}")
+                result_stats = self._execute_stage_selection(file_paths, stages, stage_configs or {})
+            else:
+                # Default approach (simple_rag)
+                logger.info("Using default simple_rag approach")
+                result_stats = self._execute_simple_rag(file_paths, stage_configs or {})
+            
+            # Update timing
+            total_time = time.time() - start_time
+            result_stats.total_processing_time = total_time
+            
+            logger.info(f"Corpus building completed in {total_time:.3f}s: "
+                       f"{result_stats.total_documents_created} documents, "
+                       f"{result_stats.total_chunks_created} chunks")
+            
+            self.stats = result_stats
+            return result_stats
+            
+        except Exception as e:
+            logger.error(f"Corpus building failed: {e}")
+            self.stats.errors_encountered += 1
+            raise
+    
+    def _execute_custom_pipelines(self, file_paths: List[str], pipelines: List[DocumentPipeline]) -> CorpusStats:
+        """Execute custom pipelines sequentially"""
+        stats = CorpusStats()
+        
+        # Create trigger document for pipeline execution
+        trigger_doc = Document(
+            id="corpus_build_trigger",
+            content="",
+            metadata={
+                "paths": file_paths,
+                "trigger_type": "corpus_build"
+            }
+        )
+        
+        # Execute each pipeline in sequence
+        for i, pipeline in enumerate(pipelines):
+            logger.info(f"Executing custom pipeline {i+1}/{len(pipelines)}")
+            
+            try:
+                # Execute pipeline
+                results = pipeline.process_document(trigger_doc)
+                
+                # Update statistics
+                pipeline_stats = pipeline.get_pipeline_stats()
+                stats.pipeline_stages_executed += 1
+                
+                # Collect statistics from pipeline
+                self._update_stats_from_pipeline(stats, pipeline_stats, results)
+                
+                logger.info(f"Pipeline {i+1} completed: {len(results)} documents")
+                
+            except Exception as e:
+                logger.error(f"Pipeline {i+1} failed: {e}")
+                stats.errors_encountered += 1
+        
+        return stats
+    
+    def _execute_stage_selection(self, file_paths: List[str], stages: List[str], 
+                                stage_configs: Dict[str, Any]) -> CorpusStats:
+        """Execute stages based on selection"""
+        stats = CorpusStats()
+        
+        # Build pipelines from stages
+        pipelines = self._build_pipelines_from_stages(stages, stage_configs)
+        
+        # Execute pipelines sequentially
+        trigger_doc = Document(
+            id="stage_build_trigger",
+            content="",
+            metadata={
+                "paths": file_paths,
+                "trigger_type": "stage_build",
+                "stages": stages
+            }
+        )
+        
+        for i, (stage_name, pipeline) in enumerate(pipelines):
+            logger.info(f"Executing stage: {stage_name} ({i+1}/{len(pipelines)})")
+            
+            try:
+                # Execute pipeline
+                results = pipeline.process_document(trigger_doc)
+                
+                # Update statistics
+                pipeline_stats = pipeline.get_pipeline_stats()
+                stats.pipeline_stages_executed += 1
+                
+                # Collect stage-specific statistics
+                self._update_stats_from_stage(stats, stage_name, pipeline_stats, results)
+                
+                logger.info(f"Stage '{stage_name}' completed: {len(results)} documents")
+                
+            except Exception as e:
+                logger.error(f"Stage '{stage_name}' failed: {e}")
+                stats.errors_encountered += 1
+        
+        return stats
+    
+    def _execute_simple_rag(self, file_paths: List[str], stage_configs: Dict[str, Any]) -> CorpusStats:
+        """Execute simple RAG approach (load → chunk → vector)"""
+        logger.info("Executing simple RAG approach")
+        
+        # Use stage selection with simple_rag stages
+        simple_stages = ["load", "chunk", "vector"]
+        return self._execute_stage_selection(file_paths, simple_stages, stage_configs)
+    
+    def _build_pipelines_from_stages(self, stages: List[str], 
+                                   stage_configs: Dict[str, Any]) -> List[tuple]:
+        """Build pipelines from stage selection
+        
+        Returns:
+            List of (stage_name, pipeline) tuples
+        """
+        pipelines = []
+        
+        # Stage 0: Import original documents with incremental loader (if requested)
+        if "import_original" in stages:
+            import_pipeline = self._build_import_original_pipeline(stage_configs)
+            pipelines.append(("import_original", import_pipeline))
+        
+        # Stage 1: Loading (if requested)
+        if "load" in stages:
+            # TextLoader accepts encoding parameter
+            encoding = stage_configs.get("text_encoding", "utf-8")
+            load_pipeline = DocumentPipeline([
+                TextLoader(encoding=encoding),
+                DocumentStoreProcessor(self.document_store, 
+                                     stage_configs.get("store_config", DocumentStoreProcessorConfig()))
+            ])
+            pipelines.append(("load", load_pipeline))
+        
+        # Stage 2: Knowledge extraction (dictionary/graph)
+        knowledge_processors = []
+        if "dictionary" in stages:
+            dict_config = stage_configs.get("dictionary_config", DictionaryMakerConfig())
+            knowledge_processors.append(DictionaryMaker(dict_config))
+        
+        if "graph" in stages:
+            graph_config = stage_configs.get("graph_config", GraphBuilderConfig())
+            knowledge_processors.append(GraphBuilder(graph_config))
+        
+        if knowledge_processors:
+            loader_config = DocumentLoadConfig(strategy=LoadStrategy.FILTERED, metadata_filters={"processing_stage": "original"})
+            knowledge_pipeline = DocumentPipeline([
+                DocumentStoreLoader(self.document_store, load_config=loader_config)
+            ] + knowledge_processors)
+            pipelines.append(("knowledge_extraction", knowledge_pipeline))
+        
+        # Stage 3: Normalization (if requested)
+        if "normalize" in stages:
+            loader_config = DocumentLoadConfig(strategy=LoadStrategy.FILTERED, metadata_filters={"processing_stage": "original"})
+            norm_config = stage_configs.get("normalizer_config", NormalizerConfig())
+            store_config = stage_configs.get("store_config", DocumentStoreProcessorConfig())
+            
+            normalize_pipeline = DocumentPipeline([
+                DocumentStoreLoader(self.document_store, load_config=loader_config),
+                Normalizer(norm_config),
+                DocumentStoreProcessor(self.document_store, store_config)
+            ])
+            pipelines.append(("normalize", normalize_pipeline))
+        
+        # Stage 4: Chunking and vectorization
+        final_processors = []
+        
+        # Determine source stage for final processing
+        source_stage = "normalized" if "normalize" in stages else "original"
+        loader_config = DocumentLoadConfig(strategy=LoadStrategy.FILTERED, metadata_filters={"processing_stage": source_stage})
+        final_processors.append(DocumentStoreLoader(self.document_store, load_config=loader_config))
+        
+        if "chunk" in stages:
+            chunk_config = stage_configs.get("chunker_config", ChunkingConfig())
+            final_processors.append(Chunker(chunk_config))
+        
+        if "vector" in stages:
+            # Use VectorStore directly (with DocumentProcessor integration)
+            vector_config = stage_configs.get("vector_config", {})
+            # VectorStore is now a DocumentProcessor, use it directly
+            if hasattr(self.vector_store, 'set_embedder'):
+                # Set up embedder if provided in config
+                embedder = vector_config.get('embedder')
+                if embedder:
+                    self.vector_store.set_embedder(embedder)
+            final_processors.append(self.vector_store)
+        
+        if len(final_processors) > 1:  # More than just the loader
+            final_pipeline = DocumentPipeline(final_processors)
+            pipelines.append(("chunk_vector", final_pipeline))
+        
+        return pipelines
+    
+    def _build_import_original_pipeline(self, stage_configs: Dict[str, Any]) -> DocumentPipeline:
+        """Build pipeline for importing original documents with incremental loader
+        
+        Args:
+            stage_configs: Configuration for the stage
+            
+        Returns:
+            DocumentPipeline for incremental import with original stage metadata
+        """
+        from ..loader.incremental_directory_loader import IncrementalDirectoryLoader
+        from ..metadata.constant_metadata import ConstantMetadata
+        from datetime import datetime
+        
+        # Create ConstantMetadata to automatically add processing_stage: "original"
+        constant_metadata_processor = ConstantMetadata({
+            "processing_stage": "original",
+            "import_timestamp": datetime.now().isoformat(),
+            "imported_by": "import_original_documents"
+        })
+        
+        # Get import configuration
+        import_config = stage_configs.get("import_config", {})
+        folder_paths = import_config.get("folder_paths", [])
+        
+        if not folder_paths:
+            raise ValueError("import_original stage requires 'folder_paths' in import_config")
+        
+        # Create incremental loaders for each folder
+        import_processors = []
+        
+        for folder_path in folder_paths:
+            incremental_loader = IncrementalDirectoryLoader(
+                directory_path=folder_path,
+                document_store=self.document_store,
+                recursive=import_config.get("recursive", True),
+                metadata_processors=[constant_metadata_processor],
+                additional_metadata=import_config.get("additional_metadata", {})
+            )
+            import_processors.append(incremental_loader)
+        
+        # Create pipeline with DocumentStoreProcessor to ensure storage
+        store_config = stage_configs.get("store_config", DocumentStoreProcessorConfig())
+        import_processors.append(DocumentStoreProcessor(self.document_store, store_config))
+        
+        return DocumentPipeline(import_processors)
+    
+    @staticmethod
+    def _get_default_output_directory(env_var_name: str, subdir: str) -> Path:
+        """Get default output directory from environment variable or .refinire/
+        
+        環境変数またはデフォルト.refinire/ディレクトリから出力ディレクトリを取得
+        
+        Args:
+            env_var_name: Environment variable name to check
+            subdir: Subdirectory name under .refinire/
+            
+        Returns:
+            Path to the output directory
+        """
+        import os
+        from pathlib import Path
+        
+        # Check environment variable first
+        env_path = os.getenv(env_var_name)
+        if env_path:
+            return Path(env_path)
+        
+        # Fall back to .refinire/subdir in user's home directory
+        home_dir = Path.home()
+        default_dir = home_dir / ".refinire" / subdir
+        default_dir.mkdir(parents=True, exist_ok=True)
+        
+        return default_dir
+    
+    def import_original_documents(self, 
+                                folder_paths: List[str],
+                                corpus_name: str,
+                                recursive: bool = True,
+                                file_extensions: Optional[List[str]] = None,
+                                exclude_patterns: Optional[List[str]] = None,
+                                additional_metadata: Optional[Dict[str, Any]] = None,
+                                tracking_file_path: Optional[str] = None,
+                                force_reload: bool = False,
+                                create_dictionary: bool = False,
+                                create_knowledge_graph: bool = False,
+                                dictionary_output_dir: Optional[str] = None,
+                                graph_output_dir: Optional[str] = None) -> CorpusStats:
+        """Import original documents from specified folders with incremental loading
+        
+        指定フォルダからIncrementalLoaderを使って元文書を取り込み、
+        processing_stage: "original"メタデータを自動設定し、オプションで辞書・グラフを作成
+        
+        Args:
+            folder_paths: List of folder paths to import from
+                        取り込み対象フォルダパスのリスト
+            corpus_name: Name of the corpus (used in metadata and output filenames)
+                       コーパス名（メタデータと出力ファイル名に使用）
+            recursive: Whether to scan subdirectories recursively (default: True)
+                     サブディレクトリを再帰的にスキャンするか（デフォルト: True）
+            file_extensions: List of file extensions to include (e.g., ['.txt', '.md'])
+                           取り込み対象の拡張子リスト（例: ['.txt', '.md']）
+            exclude_patterns: List of patterns to exclude (e.g., ['*.tmp', '.*'])
+                            除外パターンのリスト（例: ['*.tmp', '.*']）
+            additional_metadata: Additional metadata to add to all imported documents
+                               すべての取り込み文書に追加する追加メタデータ
+            tracking_file_path: Path to store file tracking data for incremental loading
+                              増分ローディング用ファイル追跡データの保存パス
+            force_reload: Force reload all files ignoring incremental cache
+                        増分キャッシュを無視してすべてのファイルを強制再読み込み
+            create_dictionary: Whether to create domain dictionary after import
+                             取り込み後にドメイン辞書を作成するか
+            create_knowledge_graph: Whether to create knowledge graph after import
+                                  取り込み後にナレッジグラフを作成するか
+            dictionary_output_dir: Directory to save dictionary file (default: env REFINIRE_DICTIONARY_DIR or ~/.refinire/dictionaries)
+                                 辞書ファイルの保存ディレクトリ（デフォルト: 環境変数REFINIRE_DICTIONARY_DIRまたは~/.refinire/dictionaries）
+            graph_output_dir: Directory to save graph file (default: env REFINIRE_GRAPH_DIR or ~/.refinire/graphs)
+                            グラフファイルの保存ディレクトリ（デフォルト: 環境変数REFINIRE_GRAPH_DIRまたは~/.refinire/graphs）
+        
+        Returns:
+            CorpusStats: Import statistics including files processed and documents created
+                        処理ファイル数と作成文書数を含む取り込み統計
+        
+        Example:
+            # 基本的な取り込み
+            stats = corpus_manager.import_original_documents(
+                folder_paths=["/path/to/docs"],
+                corpus_name="product_docs"
+            )
+            
+            # 辞書・グラフ作成付きの詳細設定
+            stats = corpus_manager.import_original_documents(
+                folder_paths=["/path/to/docs", "/another/path"],
+                corpus_name="engineering_docs",
+                recursive=True,
+                file_extensions=['.txt', '.md', '.pdf'],
+                exclude_patterns=['*.tmp', '.*', '__pycache__'],
+                additional_metadata={"department": "engineering", "project": "rag"},
+                tracking_file_path="./import_tracking.json",
+                create_dictionary=True,
+                create_knowledge_graph=True,
+                dictionary_output_dir="./knowledge",
+                graph_output_dir="./knowledge"
+            )
+            # → ./knowledge/engineering_docs_dictionary.md
+            # → ./knowledge/engineering_docs_graph.md が作成される
+        """
+        from ..loader.incremental_directory_loader import IncrementalDirectoryLoader
+        from ..metadata.constant_metadata import ConstantMetadata
+        from ..loader.models.filter_config import FilterConfig
+        from datetime import datetime
+        
+        stats = CorpusStats()
+        
+        # Create ConstantMetadata to automatically add processing_stage: "original"
+        base_metadata = {
+            "processing_stage": "original",
+            "import_timestamp": datetime.now().isoformat(),
+            "imported_by": "import_original_documents",
+            "corpus_name": corpus_name
+        }
+        
+        # Add additional metadata if provided
+        if additional_metadata:
+            base_metadata.update(additional_metadata)
+        
+        constant_metadata_processor = ConstantMetadata(base_metadata)
+        
+        # Create filter configuration if specified
+        filter_config = None
+        if file_extensions or exclude_patterns:
+            filter_config = FilterConfig(
+                include_extensions=file_extensions,
+                exclude_patterns=exclude_patterns or []
+            )
+        
+        # Process each folder
+        for folder_path in folder_paths:
+            try:
+                logger.info(f"Importing documents from: {folder_path}")
+                
+                # Create incremental loader for this folder
+                incremental_loader = IncrementalDirectoryLoader(
+                    directory_path=folder_path,
+                    document_store=self.document_store,
+                    filter_config=filter_config,
+                    tracking_file_path=tracking_file_path,
+                    recursive=recursive,
+                    metadata_processors=[constant_metadata_processor]
+                )
+                
+                # Handle force reload
+                if force_reload:
+                    incremental_loader.file_tracker.clear_tracking_data()
+                
+                # Perform incremental sync
+                sync_result = incremental_loader.sync_with_store()
+                
+                # Update statistics
+                documents_processed = len(sync_result.added_documents) + len(sync_result.updated_documents)
+                stats.total_files_processed += documents_processed
+                stats.total_documents_created += documents_processed
+                stats.pipeline_stages_executed += 1
+                
+                # Track by stage
+                stage_key = "original"
+                if stage_key not in stats.documents_by_stage:
+                    stats.documents_by_stage[stage_key] = 0
+                stats.documents_by_stage[stage_key] += documents_processed
+                
+                # Track errors
+                if sync_result.has_errors:
+                    stats.errors_encountered += len(sync_result.errors)
+                
+                logger.info(f"Imported {documents_processed} documents from {folder_path}")
+                
+            except Exception as e:
+                logger.error(f"Error importing from folder {folder_path}: {e}")
+                stats.errors_encountered += 1
+                if len(folder_paths) == 1:  # Re-raise if only one folder
+                    raise
+        
+        logger.info(f"Import completed: {stats.total_documents_created} documents from {len(folder_paths)} folders")
+        
+        # Create dictionary and/or knowledge graph if requested
+        # 辞書・ナレッジグラフ作成（要求された場合）
+        if create_dictionary or create_knowledge_graph:
+            self._create_knowledge_artifacts(
+                corpus_name=corpus_name,
+                create_dictionary=create_dictionary,
+                create_knowledge_graph=create_knowledge_graph,
+                dictionary_output_dir=dictionary_output_dir,
+                graph_output_dir=graph_output_dir,
+                stats=stats
+            )
+        
+        return stats
+    
+    def _create_knowledge_artifacts(self,
+                                  corpus_name: str,
+                                  create_dictionary: bool,
+                                  create_knowledge_graph: bool,
+                                  dictionary_output_dir: Optional[str],
+                                  graph_output_dir: Optional[str],
+                                  stats: CorpusStats):
+        """Create dictionary and/or knowledge graph from imported documents
+        
+        取り込み済み文書から辞書・ナレッジグラフを作成
+        """
+        from ..processing.dictionary_maker import DictionaryMaker, DictionaryMakerConfig
+        from ..processing.graph_builder import GraphBuilder, GraphBuilderConfig
+        from pathlib import Path
+        import os
+        
+        knowledge_stages = []
+        
+        # Prepare dictionary creation
+        if create_dictionary:
+            if dictionary_output_dir:
+                dict_output_dir = Path(dictionary_output_dir)
+            else:
+                dict_output_dir = self._get_default_output_directory("REFINIRE_DICTIONARY_DIR", "dictionaries")
+            dict_output_dir.mkdir(parents=True, exist_ok=True)
+            dict_file_path = dict_output_dir / f"{corpus_name}_dictionary.md"
+            
+            dict_config = DictionaryMakerConfig(
+                dictionary_file_path=str(dict_file_path),
+                focus_on_technical_terms=True,
+                extract_abbreviations=True,
+                detect_expression_variations=True
+            )
+            knowledge_stages.append(("dictionary", dict_config))
+            logger.info(f"Will create dictionary: {dict_file_path}")
+        
+        # Prepare knowledge graph creation  
+        if create_knowledge_graph:
+            if graph_output_dir:
+                graph_output_dir_path = Path(graph_output_dir)
+            else:
+                graph_output_dir_path = self._get_default_output_directory("REFINIRE_GRAPH_DIR", "graphs")
+            graph_output_dir_path.mkdir(parents=True, exist_ok=True)
+            graph_file_path = graph_output_dir_path / f"{corpus_name}_graph.md"
+            
+            graph_config = GraphBuilderConfig(
+                output_file=str(graph_file_path),
+                enable_relationship_extraction=True,
+                enable_entity_linking=True
+            )
+            knowledge_stages.append(("graph", graph_config))
+            logger.info(f"Will create knowledge graph: {graph_file_path}")
+        
+        # Execute knowledge extraction stages
+        if knowledge_stages:
+            stage_configs = {}
+            stages_to_run = []
+            
+            for stage_name, stage_config in knowledge_stages:
+                if stage_name == "dictionary":
+                    stages_to_run.append("dictionary")
+                    stage_configs["dictionary_config"] = stage_config
+                elif stage_name == "graph":
+                    stages_to_run.append("graph") 
+                    stage_configs["graph_config"] = stage_config
+            
+            try:
+                logger.info(f"Creating knowledge artifacts for corpus '{corpus_name}'...")
+                knowledge_stats = self.build_corpus(
+                    file_paths=[],  # Use existing documents from store
+                    stages=stages_to_run,
+                    stage_configs=stage_configs
+                )
+                
+                # Update main stats with knowledge creation results
+                stats.pipeline_stages_executed += knowledge_stats.pipeline_stages_executed
+                stats.errors_encountered += knowledge_stats.errors_encountered
+                
+                logger.info(f"Knowledge artifacts created successfully for '{corpus_name}'")
+                
+            except Exception as e:
+                logger.error(f"Error creating knowledge artifacts for '{corpus_name}': {e}")
+                stats.errors_encountered += 1
+    
+    def _update_stats_from_pipeline(self, stats: CorpusStats, pipeline_stats: Dict[str, Any], 
+                                   results: List[Document]):
+        """Update corpus stats from pipeline statistics"""
+        stats.total_documents_created += len(results)
+        
+        # Count chunks (documents with chunk metadata)
+        chunks = [doc for doc in results if doc.metadata.get("processing_stage") == "chunked"]
+        stats.total_chunks_created += len(chunks)
+        
+        # Update stage counts
+        for doc in results:
+            stage = doc.metadata.get("processing_stage", "unknown")
+            stats.documents_by_stage[stage] = stats.documents_by_stage.get(stage, 0) + 1
+    
+    def _update_stats_from_stage(self, stats: CorpusStats, stage_name: str, 
+                                pipeline_stats: Dict[str, Any], results: List[Document]):
+        """Update corpus stats from stage execution"""
+        self._update_stats_from_pipeline(stats, pipeline_stats, results)
+        
+        # Add stage-specific tracking
+        if stage_name == "load":
+            stats.total_files_processed = pipeline_stats.get("total_documents_processed", 0)
+    
+    @classmethod
+    def get_default_document_store_path(cls, corpus_name: Optional[str] = None) -> str:
+        """Get default SQLite document store path from environment or .refinire/
+        
+        環境変数または.refinire/からSQLiteドキュメントストアのデフォルトパスを取得
+        
+        Args:
+            corpus_name: Optional corpus name to use in filename
+            
+        Returns:
+            Path to SQLite database file
+        """
+        db_dir = cls._get_default_output_directory("REFINIRE_DB_DIR", "databases")
+        
+        if corpus_name:
+            db_filename = f"{corpus_name}_corpus.db"
+        else:
+            db_filename = "default_corpus.db"
+            
+        return str(db_dir / db_filename)
+    
+    @classmethod
+    def create_simple_rag(cls, document_store, vector_store, config: Optional[Dict[str, Any]] = None):
+        """Create CorpusManager configured for simple RAG
+        
+        Pipeline: Load → Chunk → Vector
+        """
+        manager = cls(document_store, vector_store, config)
+        
+        def build_simple_corpus(file_paths: List[str], **kwargs):
+            return cls.build_corpus(
+                manager,
+                file_paths=file_paths,
+                stages=["load", "chunk", "vector"],
+                stage_configs=kwargs
+            )
+        
+        # Replace build_corpus method
+        manager.build_corpus = build_simple_corpus
+        return manager
+    
+    @classmethod
+    def create_incremental_rag(cls, document_store, vector_store, config: Optional[Dict[str, Any]] = None):
+        """Create CorpusManager configured for incremental RAG with original import
+        
+        Pipeline: ImportOriginal → Chunk → Vector
+        """
+        manager = cls(document_store, vector_store, config)
+        
+        def build_incremental_corpus(folder_paths: List[str], **kwargs):
+            return cls.build_corpus(
+                manager,
+                file_paths=[],  # Not used for import_original stage
+                stages=["import_original", "chunk", "vector"],
+                stage_configs={
+                    "import_config": {
+                        "folder_paths": folder_paths,
+                        "recursive": kwargs.get("recursive", True),
+                        "additional_metadata": kwargs.get("additional_metadata", {})
+                    },
+                    **kwargs
+                }
+            )
+        
+        # Replace build_corpus method
+        manager.build_corpus = build_incremental_corpus
+        return manager
+    
+    @classmethod
+    def create_semantic_rag(cls, document_store, vector_store, config: Optional[Dict[str, Any]] = None):
+        """Create CorpusManager configured for semantic RAG
+        
+        Pipeline: Load → Dictionary → Normalize → Chunk → Vector
+        """
+        manager = cls(document_store, vector_store, config)
+        
+        def build_semantic_corpus(file_paths: List[str], **kwargs):
+            return cls.build_corpus(
+                manager,
+                file_paths=file_paths,
+                stages=["load", "dictionary", "normalize", "chunk", "vector"],
+                stage_configs=kwargs
+            )
+        
+        # Replace build_corpus method
+        manager.build_corpus = build_semantic_corpus
+        return manager
+    
+    @classmethod
+    def create_knowledge_rag(cls, document_store, vector_store, config: Optional[Dict[str, Any]] = None):
+        """Create CorpusManager configured for knowledge RAG
+        
+        Pipeline: Load → Dictionary → Graph → Normalize → Chunk → Vector
+        """
+        manager = cls(document_store, vector_store, config)
+        
+        def build_knowledge_corpus(file_paths: List[str], **kwargs):
+            return cls.build_corpus(
+                manager,
+                file_paths=file_paths,
+                stages=["load", "dictionary", "graph", "normalize", "chunk", "vector"],
+                stage_configs=kwargs
+            )
+        
+        # Replace build_corpus method
+        manager.build_corpus = build_knowledge_corpus
+        return manager
+    
+    @classmethod
+    def create_with_defaults(cls, corpus_name: str, config: Optional[Dict[str, Any]] = None):
+        """Create CorpusManager with default SQLite store and vector store using environment paths
+        
+        環境変数パスを使用してデフォルトのSQLiteストアとベクトルストアでCorpusManagerを作成
+        
+        Args:
+            corpus_name: Name of the corpus (used for DB filename and directories)
+            config: Optional additional configuration
+            
+        Returns:
+            CorpusManager with default stores configured
+        """
+        from ..storage import SQLiteDocumentStore, InMemoryVectorStore
+        
+        # Create document store with environment-aware path
+        db_path = cls.get_default_document_store_path(corpus_name)
+        document_store = SQLiteDocumentStore(db_path)
+        
+        # Create vector store (in-memory by default, could be extended)
+        vector_store = InMemoryVectorStore()
+        
+        logger.info(f"Created CorpusManager for '{corpus_name}' with DB: {db_path}")
+        return cls(document_store, vector_store, config)
+    
+    def get_corpus_stats(self) -> CorpusStats:
+        """Get current corpus statistics"""
+        return self.stats
+    
+    def get_documents_by_stage(self, processing_stage: str) -> List[Document]:
+        """Get documents by processing stage
+        
+        Args:
+            processing_stage: Stage to filter by
+            
+        Returns:
+            List of documents in the specified stage
+        """
+        loader = DocumentStoreLoader(self.document_store, 
+                                   load_config=DocumentLoadConfig(strategy=LoadStrategy.FILTERED, 
+                                                                 metadata_filters={"processing_stage": processing_stage}))
+        
+        # Create trigger document
+        trigger = Document(id="stage_query", content="", metadata={})
+        return loader.process(trigger)
+    
+    def rebuild_corpus_from_original(self,
+                                   corpus_name: str,
+                                   use_dictionary: bool = True,
+                                   use_knowledge_graph: bool = False,
+                                   dictionary_file_path: Optional[str] = None,
+                                   graph_file_path: Optional[str] = None,
+                                   additional_metadata: Optional[Dict[str, Any]] = None,
+                                   stage_configs: Optional[Dict[str, Any]] = None) -> CorpusStats:
+        """Rebuild corpus from existing original documents using existing knowledge artifacts
+        
+        既存のoriginalステージ文書から、既存の辞書・ナレッジグラフを利用してコーパスを再構築
+        
+        Args:
+            corpus_name: Name of the corpus for metadata
+                       メタデータ用のコーパス名
+            use_dictionary: Whether to use existing dictionary for normalization
+                          既存辞書を正規化に使用するか
+            use_knowledge_graph: Whether to use existing knowledge graph for normalization
+                               既存ナレッジグラフを正規化に使用するか
+            dictionary_file_path: Path to existing dictionary file to use
+                                既存の辞書ファイルパス
+            graph_file_path: Path to existing knowledge graph file to use
+                           既存のナレッジグラフファイルパス
+            additional_metadata: Additional metadata to add during rebuild
+                               再構築時に追加するメタデータ
+            stage_configs: Configuration for each processing stage
+                         各処理ステージの設定
+            
+        Returns:
+            CorpusStats: Rebuild statistics
+                        再構築統計
+            
+        Note:
+            This method does NOT create new dictionary or knowledge graph files.
+            It uses existing files for normalization if specified.
+            このメソッドは新しい辞書やナレッジグラフファイルを作成しません。
+            指定された既存ファイルを正規化に使用します。
+            
+        Example:
+            # 基本的な再構築（既存辞書使用）
+            stats = corpus_manager.rebuild_corpus_from_original(
+                corpus_name="product_docs",
+                use_dictionary=True,
+                dictionary_file_path="./knowledge/product_docs_dictionary.md",
+                additional_metadata={"rebuild_version": "2.0"}
+            )
+            
+            # 辞書+ナレッジグラフ使用での再構築
+            stats = corpus_manager.rebuild_corpus_from_original(
+                corpus_name="engineering_docs", 
+                use_dictionary=True,
+                use_knowledge_graph=True,
+                dictionary_file_path="./knowledge/engineering_docs_dictionary.md",
+                graph_file_path="./knowledge/engineering_docs_graph.md",
+                additional_metadata={
+                    "rebuild_timestamp": datetime.now().isoformat(),
+                    "rebuild_reason": "parameter_tuning"
+                },
+                stage_configs={
+                    "normalizer_config": NormalizerConfig(
+                        enable_spell_correction=True,
+                        aggressive_normalization=True
+                    ),
+                    "chunker_config": ChunkingConfig(
+                        chunk_size=1024,
+                        overlap=100
+                    )
+                }
+            )
+        """
+        start_time = time.time()
+        logger.info(f"Starting corpus rebuild for '{corpus_name}' from original documents")
+        
+        # Check if original documents exist
+        original_docs = list(self.get_documents_by_stage("original"))
+        if not original_docs:
+            raise ValueError("No original documents found. Please import documents first using import_original_documents()")
+        
+        logger.info(f"Found {len(original_docs)} original documents to rebuild from")
+        
+        # Prepare metadata for rebuilt documents
+        from datetime import datetime
+        rebuild_metadata = {
+            "rebuild_timestamp": datetime.now().isoformat(),
+            "rebuild_corpus_name": corpus_name,
+            "rebuilt_from": "original"
+        }
+        if additional_metadata:
+            rebuild_metadata.update(additional_metadata)
+        
+        # Validate that knowledge files exist if specified
+        if use_dictionary:
+            if dictionary_file_path:
+                dict_path = Path(dictionary_file_path)
+                if not dict_path.exists():
+                    raise FileNotFoundError(f"Dictionary file not found: {dictionary_file_path}")
+                logger.info(f"Using existing dictionary: {dictionary_file_path}")
+            else:
+                # Try to find default dictionary file
+                default_dict_dir = self._get_default_output_directory("REFINIRE_DICTIONARY_DIR", "dictionaries")
+                default_dict_path = default_dict_dir / f"{corpus_name}_dictionary.md"
+                if default_dict_path.exists():
+                    dictionary_file_path = str(default_dict_path)
+                    logger.info(f"Found default dictionary: {dictionary_file_path}")
+                else:
+                    logger.warning(f"No dictionary file specified and default not found: {default_dict_path}")
+                    use_dictionary = False
+        
+        if use_knowledge_graph:
+            if graph_file_path:
+                graph_path = Path(graph_file_path)
+                if not graph_path.exists():
+                    raise FileNotFoundError(f"Knowledge graph file not found: {graph_file_path}")
+                logger.info(f"Using existing knowledge graph: {graph_file_path}")
+            else:
+                # Try to find default graph file
+                default_graph_dir = self._get_default_output_directory("REFINIRE_GRAPH_DIR", "graphs")
+                default_graph_path = default_graph_dir / f"{corpus_name}_graph.md"
+                if default_graph_path.exists():
+                    graph_file_path = str(default_graph_path)
+                    logger.info(f"Found default knowledge graph: {graph_file_path}")
+                else:
+                    logger.warning(f"No graph file specified and default not found: {default_graph_path}")
+                    use_knowledge_graph = False
+        
+        # Determine stages to execute based on options
+        stages_to_run = []
+        stage_configs = stage_configs or {}
+        
+        # Add normalization stage if using dictionary or knowledge graph
+        if use_dictionary or use_knowledge_graph:
+            stages_to_run.append("normalize")
+            
+            # Configure normalizer to use existing files
+            if not stage_configs.get("normalizer_config"):
+                from ..processing.normalizer import NormalizerConfig
+                normalizer_config = NormalizerConfig()
+                
+                # Set dictionary file path if using dictionary
+                if use_dictionary and dictionary_file_path:
+                    normalizer_config.dictionary_file_path = dictionary_file_path
+                    normalizer_config.auto_detect_dictionary_path = False  # Use specified path
+                    normalizer_config.skip_if_no_dictionary = False
+                
+                # Note: Normalizer currently only supports dictionary normalization
+                # Knowledge graph integration would need to be implemented separately
+                if use_knowledge_graph and graph_file_path:
+                    logger.warning("Knowledge graph normalization not yet supported by Normalizer")
+                
+                stage_configs["normalizer_config"] = normalizer_config
+        
+        # Always add chunking and vectorization stages
+        stages_to_run.extend(["chunk", "vector"])
+        
+        # Add rebuild metadata to store config
+        if "store_config" not in stage_configs:
+            stage_configs["store_config"] = DocumentStoreProcessorConfig()
+        
+        # Store rebuild metadata with documents
+        if not hasattr(stage_configs["store_config"], 'additional_metadata'):
+            stage_configs["store_config"].additional_metadata = {}
+        stage_configs["store_config"].additional_metadata.update(rebuild_metadata)
+        
+        try:
+            # Execute rebuild pipeline
+            logger.info(f"Executing rebuild pipeline with stages: {stages_to_run}")
+            stats = self.build_corpus(
+                file_paths=[],  # Use existing documents from store
+                stages=stages_to_run,
+                stage_configs=stage_configs
+            )
+            
+            # Update timing
+            total_time = time.time() - start_time
+            stats.total_processing_time = total_time
+            
+            logger.info(f"Corpus rebuild completed in {total_time:.3f}s for '{corpus_name}': "
+                       f"{stats.total_documents_created} documents processed, "
+                       f"{stats.total_chunks_created} chunks created")
+            
+            # Log knowledge artifacts used
+            if use_dictionary and dictionary_file_path:
+                logger.info(f"Used dictionary: {dictionary_file_path}")
+            
+            if use_knowledge_graph and graph_file_path:
+                logger.info(f"Used knowledge graph: {graph_file_path}")
+            
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Corpus rebuild failed for '{corpus_name}': {e}")
+            raise
+    
+    def rebuild_stage(self, stage_name: str, stage_config: Optional[Dict[str, Any]] = None):
+        """Rebuild a specific processing stage
+        
+        特定の処理ステージを再構築
+        
+        Args:
+            stage_name: Name of stage to rebuild
+                      再構築するステージ名
+            stage_config: Configuration for the stage
+                        ステージの設定
+        """
+        logger.info(f"Rebuilding stage: {stage_name}")
+        
+        # This would implement stage-specific rebuilding logic
+        # For now, just log the request
+        logger.warning("Stage rebuilding not yet implemented")
+    
+    def clear_corpus(self):
+        """Clear all documents from the corpus"""
+        logger.warning("Corpus clearing not yet implemented")
+        # This would implement corpus clearing logic

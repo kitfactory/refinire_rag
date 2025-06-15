@@ -7,12 +7,12 @@ normalization based on corpus state and flexible component configuration.
 
 import logging
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Union
 from dataclasses import dataclass
 
 from ..retrieval.base import Retriever, Reranker, AnswerSynthesizer, QueryResult, SearchResult
 from ..processing.normalizer import Normalizer, NormalizerConfig
-from ..processing.document_store_loader import DocumentStoreLoader, DocumentStoreLoaderConfig
+from ..loader.document_store_loader import DocumentStoreLoader, DocumentLoadConfig
 from ..models.document import Document
 from ..plugins.plugin_config import PluginConfig
 
@@ -25,21 +25,25 @@ class QueryEngineConfig:
     
     # Query processing settings
     enable_query_normalization: bool = True
-    auto_detect_corpus_state: bool = True
     
     # Component settings
-    retriever_top_k: int = 10
-    reranker_top_k: int = 5
-    synthesizer_max_context: int = 2000
+    retriever_top_k: int = 10                    # Results per retriever
+    total_top_k: int = 20                        # Total results after combining all retrievers
+    reranker_top_k: int = 5                      # Final results after reranking
+    synthesizer_max_context: int = 2000          # Max context for answer generation
     
     # Performance settings
     enable_caching: bool = True
-    cache_ttl: int = 3600  # seconds
+    cache_ttl: int = 3600                        # seconds
     
     # Output settings
     include_sources: bool = True
     include_confidence: bool = True
     include_processing_metadata: bool = True
+    
+    # Multi-retriever settings
+    deduplicate_results: bool = True             # Remove duplicate documents
+    combine_scores: str = "max"                  # How to combine scores: "max", "average", "sum"
 
 
 class QueryEngine:
@@ -56,31 +60,43 @@ class QueryEngine:
     """
     
     def __init__(self, 
-                 document_store,
-                 vector_store,
-                 retriever: Retriever,
-                 reranker: Reranker,
+                 corpus_name: str,
+                 retrievers: Union[Retriever, List[Retriever]],
                  synthesizer: AnswerSynthesizer,
+                 reranker: Optional[Reranker] = None,
                  config: Optional[QueryEngineConfig] = None):
         """Initialize QueryEngine
         
         Args:
-            document_store: DocumentStore for metadata and lineage
-            vector_store: VectorStore for similarity search
-            retriever: Retriever component for document search
-            reranker: Reranker component for result reranking
+            corpus_name: Name of the corpus for this query engine
+                        このクエリエンジンのコーパス名
+            retrievers: Retriever component(s) for document search
+                       単一のRetrieverまたはRetrieverのリスト
             synthesizer: AnswerSynthesizer component for answer generation
+                        回答生成のためのAnswerSynthesizerコンポーネント
+            reranker: Optional Reranker component for result reranking
+                     結果再ランキングのためのオプションのRerankerコンポーネント
             config: Configuration for the engine
+                   エンジンの設定
         """
-        self.document_store = document_store
-        self.vector_store = vector_store
-        self.retriever = retriever
+        self.corpus_name = corpus_name
+        
+        # Handle single retriever or list of retrievers
+        if isinstance(retrievers, list):
+            self.retrievers = retrievers
+        else:
+            self.retrievers = [retrievers]
+        
         self.reranker = reranker
         self.synthesizer = synthesizer
         self.config = config or QueryEngineConfig()
         
-        # Corpus state detection
-        self.corpus_state = None
+        # Corpus state detection with corpus name
+        self.corpus_state = {
+            "corpus_name": corpus_name,
+            "has_normalization": False, 
+            "auto_detected": False
+        }
         self.normalizer = None
         
         # Processing statistics
@@ -92,69 +108,23 @@ class QueryEngine:
             "average_response_time": 0.0
         }
         
-        # Initialize components
-        self._detect_corpus_state()
-        
-        logger.info(f"Initialized QueryEngine with corpus state: {self.corpus_state}")
+        logger.info(f"Initialized QueryEngine for corpus '{corpus_name}' with {len(self.retrievers)} retriever(s)")
     
-    def _detect_corpus_state(self):
-        """Detect corpus processing state and setup normalization if needed"""
-        if not self.config.auto_detect_corpus_state:
-            return
+    def set_normalizer(self, normalizer: Optional[Normalizer]):
+        """Set normalizer for query processing
         
-        try:
-            # Get sample documents to detect processing state
-            loader = DocumentStoreLoader(
-                self.document_store, 
-                config=DocumentStoreLoaderConfig(processing_stage="normalized", max_documents=1)
-            )
-            
-            # Create trigger document for sampling
-            trigger = Document(id="corpus_state_check", content="", metadata={})
-            normalized_docs = loader.process(trigger)
-            
-            if normalized_docs:
-                # Found normalized documents - setup normalization
-                sample_doc = normalized_docs[0]
-                norm_metadata = sample_doc.metadata.get("normalization_stats", {})
-                
-                if norm_metadata and "dictionary_file_used" in norm_metadata:
-                    dictionary_path = norm_metadata["dictionary_file_used"]
-                    
-                    # Setup normalizer for queries
-                    self.normalizer = Normalizer(NormalizerConfig(
-                        dictionary_file_path=dictionary_path,
-                        normalize_variations=True,
-                        expand_abbreviations=True
-                    ))
-                    
-                    self.corpus_state = {
-                        "has_normalization": True,
-                        "dictionary_path": dictionary_path,
-                        "normalization_config": norm_metadata
-                    }
-                    
-                    logger.info(f"Detected normalized corpus with dictionary: {dictionary_path}")
-                else:
-                    self.corpus_state = {"has_normalization": False}
-            else:
-                # Check for original documents
-                loader_original = DocumentStoreLoader(
-                    self.document_store,
-                    config=DocumentStoreLoaderConfig(processing_stage="original", max_documents=1)
-                )
-                original_docs = loader_original.process(trigger)
-                
-                self.corpus_state = {
-                    "has_normalization": False,
-                    "has_documents": len(original_docs) > 0
-                }
-                
-        except Exception as e:
-            logger.warning(f"Failed to detect corpus state: {e}")
-            self.corpus_state = {"has_normalization": False, "detection_failed": True}
+        Args:
+            normalizer: Normalizer instance for query normalization
+                       クエリ正規化のためのNormalizerインスタンス
+        """
+        self.normalizer = normalizer
+        if normalizer:
+            self.corpus_state.update({"has_normalization": True, "manually_set": True})
+            logger.info(f"Query normalizer set manually for corpus '{self.corpus_name}'")
+        else:
+            self.corpus_state.update({"has_normalization": False, "manually_set": True})
     
-    def answer(self, query: str, context: Optional[Dict[str, Any]] = None) -> QueryResult:
+    def query(self, query: str, context: Optional[Dict[str, Any]] = None) -> QueryResult:
         """Generate answer for query
         
         Args:
@@ -168,7 +138,7 @@ class QueryEngine:
         context = context or {}
         
         try:
-            logger.debug(f"Processing query: {query}")
+            logger.debug(f"Processing query for corpus '{self.corpus_name}': {query}")
             
             # Step 1: Query normalization (if applicable)
             normalized_query = self._normalize_query(query)
@@ -176,7 +146,8 @@ class QueryEngine:
             # Step 2: Document retrieval
             search_results = self._retrieve_documents(
                 normalized_query, 
-                context.get("top_k", self.config.retriever_top_k)
+                context.get("retriever_top_k", self.config.retriever_top_k),
+                context.get("total_top_k", self.config.total_top_k)
             )
             
             # Step 3: Reranking (if available)
@@ -196,15 +167,19 @@ class QueryEngine:
             # Update statistics
             self._update_stats(start_time, len(search_results), normalized_query != query)
             
-            logger.info(f"Query processed in {time.time() - start_time:.3f}s: {len(reranked_results)} sources")
+            logger.info(f"Query processed for corpus '{self.corpus_name}' in {time.time() - start_time:.3f}s: {len(reranked_results)} sources")
             return result
             
         except Exception as e:
-            logger.error(f"Query processing failed: {e}")
+            logger.error(f"Query processing failed for corpus '{self.corpus_name}': {e}")
             return QueryResult(
                 query=query,
                 answer=f"申し訳ございませんが、クエリの処理中にエラーが発生しました: {str(e)}",
-                metadata={"error": str(e), "processing_time": time.time() - start_time}
+                metadata={
+                    "error": str(e), 
+                    "corpus_name": self.corpus_name,
+                    "processing_time": time.time() - start_time
+                }
             )
     
     def _normalize_query(self, query: str) -> str:
@@ -233,16 +208,69 @@ class QueryEngine:
             logger.warning(f"Query normalization failed: {e}")
             return query
     
-    def _retrieve_documents(self, query: str, top_k: int) -> "List[SearchResult]":
-        """Retrieve relevant documents"""
-        try:
-            search_results = self.retriever.retrieve(query, limit=top_k)
-            logger.debug(f"Retrieved {len(search_results)} documents")
-            return search_results
+    def _retrieve_documents(self, query: str, retriever_top_k: int, total_top_k: int) -> "List[SearchResult]":
+        """Retrieve relevant documents from all retrievers
+        
+        Args:
+            query: Search query
+            retriever_top_k: Maximum number of results per retriever
+            total_top_k: Maximum total results after combination
             
-        except Exception as e:
-            logger.error(f"Document retrieval failed: {e}")
-            return []
+        Returns:
+            Combined and deduplicated search results
+        """
+        all_results = []
+        
+        for i, retriever in enumerate(self.retrievers):
+            try:
+                results = retriever.retrieve(query, limit=retriever_top_k)
+                logger.debug(f"Retriever {i+1} retrieved {len(results)} documents")
+                
+                # Add retriever info to metadata
+                for result in results:
+                    if result.metadata is None:
+                        result.metadata = {}
+                    result.metadata["retriever_index"] = i
+                    result.metadata["retriever_type"] = type(retriever).__name__
+                
+                all_results.extend(results)
+                
+            except Exception as e:
+                logger.error(f"Retriever {i+1} failed: {e}")
+                continue
+        
+        if not self.config.deduplicate_results:
+            # No deduplication, just sort and limit
+            all_results.sort(key=lambda x: x.score, reverse=True)
+            final_results = all_results[:total_top_k]
+        else:
+            # Deduplicate by document_id and combine scores
+            seen_docs = {}
+            for result in all_results:
+                doc_id = result.document_id
+                if doc_id not in seen_docs:
+                    seen_docs[doc_id] = result
+                else:
+                    # Combine scores based on configuration
+                    existing = seen_docs[doc_id]
+                    if self.config.combine_scores == "max":
+                        if result.score > existing.score:
+                            seen_docs[doc_id] = result
+                    elif self.config.combine_scores == "average":
+                        # Average the scores
+                        new_score = (existing.score + result.score) / 2
+                        existing.score = new_score
+                        # Keep existing result but update score
+                    elif self.config.combine_scores == "sum":
+                        # Sum the scores
+                        existing.score += result.score
+            
+            dedup_results = list(seen_docs.values())
+            dedup_results.sort(key=lambda x: x.score, reverse=True)
+            final_results = dedup_results[:total_top_k]
+        
+        logger.debug(f"Retrieved {len(all_results)} total, {len(final_results)} final")
+        return final_results
     
     def _rerank_results(self, query: str, results: "List[SearchResult]") -> "List[SearchResult]":
         """Rerank search results for better relevance"""
@@ -281,6 +309,7 @@ class QueryEngine:
         
         # Build metadata
         metadata = {
+            "corpus_name": self.corpus_name,
             "processing_time": processing_time,
             "source_count": len(sources),
             "confidence": confidence
@@ -291,7 +320,7 @@ class QueryEngine:
                 "query_normalized": normalized_query != query,
                 "corpus_state": self.corpus_state,
                 "reranker_used": self.reranker is not None,
-                "retrieval_stats": self.retriever.get_processing_stats(),
+                "retrieval_stats": [r.get_processing_stats() for r in self.retrievers],
                 "synthesizer_stats": self.synthesizer.get_processing_stats()
             })
             
@@ -330,20 +359,40 @@ class QueryEngine:
         """Get comprehensive engine statistics"""
         base_stats = self.stats.copy()
         
-        # Add component statistics
-        base_stats["retriever_stats"] = self.retriever.get_processing_stats()
+        # Add retriever statistics (for each retriever)
+        retriever_stats = []
+        for i, retriever in enumerate(self.retrievers):
+            try:
+                stats = retriever.get_processing_stats()
+                stats["retriever_index"] = i
+                stats["retriever_type"] = type(retriever).__name__
+                retriever_stats.append(stats)
+            except Exception as e:
+                logger.warning(f"Failed to get stats from retriever {i}: {e}")
+                retriever_stats.append({
+                    "retriever_index": i,
+                    "retriever_type": type(retriever).__name__,
+                    "error": str(e)
+                })
+        
+        base_stats["retrievers_stats"] = retriever_stats
+        base_stats["retriever_count"] = len(self.retrievers)
+        
+        # Add synthesizer statistics
         base_stats["synthesizer_stats"] = self.synthesizer.get_processing_stats()
         
+        # Add reranker statistics if available
         if self.reranker:
             base_stats["reranker_stats"] = self.reranker.get_processing_stats()
         
+        # Add normalizer statistics if available
         if self.normalizer:
             base_stats["normalizer_stats"] = self.normalizer.get_processing_stats()
         
+        base_stats["corpus_name"] = self.corpus_name
         base_stats["corpus_state"] = self.corpus_state
         base_stats["config"] = {
             "query_normalization_enabled": self.config.enable_query_normalization,
-            "auto_detect_corpus_state": self.config.auto_detect_corpus_state,
             "retriever_top_k": self.config.retriever_top_k,
             "reranker_top_k": self.config.reranker_top_k
         }
@@ -355,7 +404,28 @@ class QueryEngine:
         # This would clear query caches if implemented
         logger.info("Query cache cleared")
     
-    def refresh_corpus_state(self):
-        """Refresh corpus state detection"""
-        logger.info("Refreshing corpus state detection")
-        self._detect_corpus_state()
+    def add_retriever(self, retriever: Retriever):
+        """Add a new retriever to the engine
+        
+        Args:
+            retriever: Retriever to add
+        """
+        self.retrievers.append(retriever)
+        logger.info(f"Added retriever {type(retriever).__name__} to corpus '{self.corpus_name}'. Total retrievers: {len(self.retrievers)}")
+    
+    def remove_retriever(self, index: int) -> bool:
+        """Remove a retriever by index
+        
+        Args:
+            index: Index of the retriever to remove
+            
+        Returns:
+            True if successful, False if index is invalid
+        """
+        if 0 <= index < len(self.retrievers):
+            removed = self.retrievers.pop(index)
+            logger.info(f"Removed retriever {type(removed).__name__} at index {index} from corpus '{self.corpus_name}'")
+            return True
+        else:
+            logger.warning(f"Invalid retriever index: {index} for corpus '{self.corpus_name}'")
+            return False

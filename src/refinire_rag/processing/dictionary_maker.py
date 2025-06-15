@@ -12,13 +12,14 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Type
 from pathlib import Path
 
-from .document_processor import DocumentProcessor, DocumentProcessorConfig
+from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
+from ..utils.model_config import get_default_llm_model
 
 try:
-    from refinire import get_llm
+    from refinire import LLMPipeline
 except ImportError:
-    get_llm = None
+    LLMPipeline = None
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class DictionaryMakerConfig(DocumentProcessorConfig):
     backup_dictionary: bool = True
     
     # LLM settings
-    llm_model: str = "gpt-4o-mini"
+    llm_model: str = None  # Will be set to default in __post_init__
     llm_temperature: float = 0.3
     max_tokens: int = 2000
     
@@ -52,6 +53,10 @@ class DictionaryMakerConfig(DocumentProcessorConfig):
 
     def __post_init__(self):
         """Initialize default values"""
+        # Set default LLM model from environment variables if not specified
+        if self.llm_model is None:
+            self.llm_model = get_default_llm_model()
+        
         # Ensure dictionary file path is absolute
         if not os.path.isabs(self.dictionary_file_path):
             self.dictionary_file_path = os.path.abspath(self.dictionary_file_path)
@@ -76,16 +81,20 @@ class DictionaryMaker(DocumentProcessor):
         """
         super().__init__(config or DictionaryMakerConfig())
         
-        # Initialize Refinire LLM client
-        if get_llm is not None:
+        # Initialize Refinire LLM Pipeline
+        if LLMPipeline is not None:
             try:
-                self._llm_client = get_llm(self.config.llm_model)
-                logger.info(f"Initialized Refinire LLM with model: {self.config.llm_model}")
+                self._llm_pipeline = LLMPipeline(
+                    name="dictionary_maker",
+                    generation_instructions="You are a domain expert that extracts technical terms and their variations from documents.",
+                    model=self.config.llm_model
+                )
+                logger.info(f"Initialized Refinire LLMPipeline with model: {self.config.llm_model}")
             except Exception as e:
-                self._llm_client = None
-                logger.warning(f"Failed to initialize Refinire LLM: {e}. DictionaryMaker will use mock data.")
+                self._llm_pipeline = None
+                logger.warning(f"Failed to initialize Refinire LLMPipeline: {e}. DictionaryMaker will use mock data.")
         else:
-            self._llm_client = None
+            self._llm_pipeline = None
             logger.warning("Refinire not available. DictionaryMaker will use mock data.")
         
         # Processing statistics
@@ -217,10 +226,11 @@ class DictionaryMaker(DocumentProcessor):
         # Create prompt for LLM
         prompt = self._create_extraction_prompt(document, existing_dictionary, config)
         
-        # Use Refinire LLM for term extraction
-        if self._llm_client is not None:
+        # Use Refinire LLM Pipeline for term extraction
+        if self._llm_pipeline is not None:
             try:
-                response = self._llm_client.complete(prompt)
+                result = self._llm_pipeline.run(prompt)
+                response = result.content
                 
                 # Parse JSON response
                 try:

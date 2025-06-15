@@ -10,19 +10,42 @@ from datetime import datetime
 from dataclasses import dataclass
 
 from refinire_rag.models.document import Document
-from refinire_rag.storage.document_store import DocumentStore
 
 if TYPE_CHECKING:
     from refinire_rag.storage.document_store import DocumentStore
-
-print("[DEBUG] document_processor.py import start")
-
-print("[DEBUG] document_processor.py import completed")
 
 logger = logging.getLogger(__name__)
 
 # Type variable for config classes
 TConfig = TypeVar('TConfig')
+
+
+@dataclass
+class DocumentProcessorConfig:
+    """Base configuration for document processors
+    文書プロセッサーの基本設定
+    
+    This is the base configuration class that all document processor configs should inherit from.
+    It provides common configuration options that apply to all processors.
+    """
+    
+    # Processing options
+    name: Optional[str] = None  # Processor name for identification
+    enabled: bool = True  # Whether the processor is enabled
+    log_level: str = "INFO"  # Logging level for this processor
+    
+    # Performance options
+    batch_processing: bool = False  # Enable batch processing mode
+    max_workers: int = 1  # Maximum number of workers for parallel processing
+    timeout: Optional[float] = None  # Processing timeout in seconds
+    
+    # Error handling
+    skip_on_error: bool = False  # Skip documents that cause errors
+    retry_count: int = 0  # Number of retries on error
+    
+    # Metadata options
+    preserve_metadata: bool = True  # Preserve original document metadata
+    add_processor_metadata: bool = True  # Add processor-specific metadata
 
 
 class DocumentProcessor(ABC):
@@ -135,7 +158,7 @@ class DocumentPipeline:
     def __init__(
         self, 
         processors: List[DocumentProcessor], 
-        document_store: Optional[DocumentStore] = None,
+        document_store: Optional['DocumentStore'] = None,
         store_intermediate_results: bool = True
     ):
         """Initialize document pipeline

@@ -573,6 +573,19 @@ wheels = [
 ]
 
 [[package]]
+name = "oneenv"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4a/e7/9e6ac5492dff8a1406cdea292184511f1dea266d3762f0d837e52609e285/oneenv-0.2.0.tar.gz", hash = "sha256:402f3723b8ebd88e4b5cfdac21c20d81749d495ffc8caf992fa74122a30eea4f", size = 23727, upload-time = "2025-06-15T04:35:37.886Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/bf/21f7a2903f2459c50a472b87bdb7dd326ca40a2e8cd4e1448e1784502887/oneenv-0.2.0-py3-none-any.whl", hash = "sha256:47b8fe2361955e3a2f76fb8e29099f6e739442666d42eab6601b2459eeda7b57", size = 17458, upload-time = "2025-06-15T04:35:36.176Z" },
+]
+
+[[package]]
 name = "openai"
 version = "1.86.0"
 source = { registry = "https://pypi.org/simple" }
@@ -822,29 +835,28 @@ wheels = [
 
 [[package]]
 name = "refinire"
-version = "0.1.1"
+version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
-    { name = "openai" },
+    { name = "oneenv" },
     { name = "openai-agents" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d0/5f/87c81e817366a2f2040e1bb160ff9d219f5ba7a9fa8e4a9503cd0427a246/refinire-0.1.1.tar.gz", hash = "sha256:9c238eb248ccbcfe4207e31c87cb5ee287cc1abff11001c37a1e320325889829", size = 1317720, upload-time = "2025-06-08T15:10:48.952Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0a/73/0e629868b454e2e7ea5d99ead03e3f0a8411f02f885da1e9e11d13de5005/refinire-0.2.2.tar.gz", hash = "sha256:43f2e525a6bd98184195f5659c156954e91d3653534146c73de8399a1f5018d4", size = 1588526, upload-time = "2025-06-15T12:26:17.005Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/d9/30/913ebac983e175131ea147fb752a14fe54fb6c522112bdc56026425e4140/refinire-0.1.1-py3-none-any.whl", hash = "sha256:756388bc0a76f9b2a70fef0c8b9e153d29d1e945d5bba5ba11a713fd2dacb0ca", size = 114359, upload-time = "2025-06-08T15:10:46.669Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/08/2a1943c38cb7d31c7d4d2f04c66b0ea7eaa21375cd6587885fd887094741/refinire-0.2.2-py3-none-any.whl", hash = "sha256:c3a7e0076375208b0be21b5be2b92dc9748fafcc3f895f3bc1c263c6381dc7c1", size = 112707, upload-time = "2025-06-15T12:26:12.872Z" },
 ]
 
 [[package]]
 name = "refinire-rag"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "nltk" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
+    { name = "oneenv" },
     { name = "refinire" },
     { name = "scikit-learn" },
 ]
@@ -866,12 +878,11 @@ requires-dist = [
     { name = "black", marker = "extra == 'dev'", specifier = ">=23.0.0" },
     { name = "nltk", specifier = ">=3.8" },
     { name = "numpy", specifier = ">=1.20.0" },
+    { name = "oneenv", specifier = ">=0.2.0" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0.0" },
-    { name = "pytest", specifier = ">=8.4.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
-    { name = "pytest-cov", specifier = ">=6.2.1" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "refinire" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
+    { name = "refinire", specifier = ">=0.2.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "scikit-learn", specifier = ">=1.0.0" },
     { name = "tiktoken", marker = "extra == 'openai'", specifier = ">=0.4.0" },

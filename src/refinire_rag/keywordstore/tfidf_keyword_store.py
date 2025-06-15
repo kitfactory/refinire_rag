@@ -13,14 +13,14 @@ import logging
 import time
 from typing import List, Optional, Dict, Any
 
-from refinire_rag.retrieval.base import KeywordStore, SearchResult
+from refinire_rag.retrieval.base import KeywordSearch, SearchResult
 from refinire_rag.models.document import Document
 from ..plugins.plugin_config import PluginConfig
 
 logger = logging.getLogger(__name__)
 
 
-class TFIDFKeywordStore(KeywordStore):
+class TFIDFKeywordStore(KeywordSearch):
     """TF-IDF based keyword search implementation
     TF-IDFベースのキーワード検索実装
     
@@ -384,3 +384,16 @@ class TFIDFKeywordStore(KeywordStore):
         })
         
         return stats
+    
+    @classmethod
+    def get_config_class(cls):
+        """Get the configuration class for this keyword search"""
+        return dict  # Simple dict config for TF-IDF
+    
+    def add_document(self, document: Document) -> None:
+        """Add a document to the store (alias for index_document)"""
+        return self.index_document(document)
+    
+    def search(self, query: str, limit: int = 10) -> List[SearchResult]:
+        """Search for documents using keyword matching (alias for retrieve)"""
+        return self.retrieve(query, limit=limit)
