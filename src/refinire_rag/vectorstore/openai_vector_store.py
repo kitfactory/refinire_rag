@@ -17,6 +17,7 @@ from refinire_rag.retrieval.base import VectorStore, SearchResult
 from refinire_rag.models.document import Document
 from refinire_rag.storage.vector_store import VectorStore as BackendVectorStore, VectorEntry
 from refinire_rag.embedding.base import Embedder
+from refinire_rag.plugins.plugin_config import PluginConfig
 
 logger = logging.getLogger(__name__)
 
