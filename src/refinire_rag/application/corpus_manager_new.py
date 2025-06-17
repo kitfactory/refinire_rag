@@ -6,6 +6,7 @@ Simplified CorpusManager with core functionality for document import and rebuild
 
 import logging
 import time
+import os
 from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,6 +15,8 @@ from ..processing.normalizer import NormalizerConfig
 from ..processing.chunker import ChunkingConfig
 from ..loader.document_store_loader import DocumentStoreLoader, DocumentLoadConfig, LoadStrategy
 from ..models.document import Document
+from ..registry.plugin_registry import PluginRegistry
+from ..factories.plugin_factory import PluginFactory
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +47,9 @@ class CorpusManager:
     
     Environment Variables:
     - REFINIRE_DIR: Base directory for Refinire files (default: './refinire')
-    - REFINIRE_RAG_CORPUS_STORE: Corpus store type (default: 'sqlite')
+    - REFINIRE_RAG_DOCUMENT_STORES: Document store plugins (default: 'sqlite')
+    - REFINIRE_RAG_VECTOR_STORES: Vector store plugins (default: 'inmemory_vector')
+    - REFINIRE_RAG_RETRIEVERS: Retriever plugins for corpus operations
     
     File Naming Convention:
     - Tracking file: {corpus_name}_track.json
@@ -52,21 +57,172 @@ class CorpusManager:
     - Knowledge graph file: {corpus_name}_knowledge_graph.md
     """
     
-    def __init__(self, document_store, vector_store, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, document_store=None, retrievers=None, config: Optional[Dict[str, Any]] = None):
         """Initialize CorpusManager
         
         Args:
-            document_store: DocumentStore for document persistence
-            vector_store: VectorStore for vector persistence
+            document_store: DocumentStore for document persistence (optional, can be created from env)
+            retrievers: List of retrievers (VectorStore, KeywordSearch, etc.) or single retriever
+                       (optional, can be created from env)
             config: Optional global configuration
         """
-        self.document_store = document_store
-        self.vector_store = vector_store
+        # Initialize document store
+        if document_store is None:
+            self.document_store = self._create_document_store_from_env()
+        else:
+            self.document_store = document_store
+        
+        # Initialize retrievers
+        if retrievers is None:
+            self.retrievers = self._create_retrievers_from_env()
+        else:
+            # Ensure retrievers is a list
+            if not isinstance(retrievers, list):
+                self.retrievers = [retrievers]
+            else:
+                self.retrievers = retrievers
+        
         self.config = config or {}
         self.stats = CorpusStats()
         
-        logger.info(f"Initialized CorpusManager with DocumentStore: {type(document_store).__name__}, "
-                   f"VectorStore: {type(vector_store).__name__}")
+        # Backward compatibility - set vector_store to first VectorStore found
+        self.vector_store = self._get_vector_store_from_retrievers()
+        
+        logger.info(f"Initialized CorpusManager with DocumentStore: {type(self.document_store).__name__}, "
+                   f"Retrievers: {[type(r).__name__ for r in self.retrievers]}")
+    
+    @classmethod
+    def from_env(cls, config: Optional[Dict[str, Any]] = None):
+        """Create CorpusManager from environment variables
+        
+        環境変数からCorpusManagerを作成
+        
+        Returns:
+            CorpusManager instance configured from environment variables
+        """
+        return cls(document_store=None, retrievers=None, config=config)
+    
+    def _create_document_store_from_env(self):
+        """Create document store from environment variables
+        
+        環境変数からDocumentStoreを作成
+        """
+        document_store_config = os.getenv("REFINIRE_RAG_DOCUMENT_STORES", "sqlite")
+        try:
+            document_stores = PluginFactory.create_document_stores_from_env()
+            if document_stores:
+                logger.info(f"Created document store from registry: {document_store_config}")
+                return document_stores[0]  # Use first document store
+            else:
+                # Fallback to built-in SQLite store via registry
+                logger.info("Using built-in SQLite document store")
+                return PluginRegistry.create_plugin('document_stores', 'sqlite')
+        except Exception as e:
+            logger.error(f"Failed to create document store '{document_store_config}': {e}")
+            # Final fallback to built-in SQLite store
+            return PluginRegistry.create_plugin('document_stores', 'sqlite')
+    
+    def _create_retrievers_from_env(self) -> List:
+        """Create retrievers from environment variables
+        
+        環境変数からRetrieverリストを作成
+        
+        Returns:
+            List of configured retrievers (VectorStore, KeywordSearch, etc.)
+        """
+        all_retrievers = []
+        
+        try:
+            # Get vector stores from environment
+            vector_stores = PluginFactory.create_vector_stores_from_env()
+            if vector_stores:
+                all_retrievers.extend(vector_stores)
+                logger.info(f"Created {len(vector_stores)} vector stores from environment")
+            
+            # Get keyword stores from environment  
+            keyword_stores = PluginFactory.create_keyword_stores_from_env()
+            if keyword_stores:
+                all_retrievers.extend(keyword_stores)
+                logger.info(f"Created {len(keyword_stores)} keyword stores from environment")
+            
+            # Get actual retrievers from environment (like SimpleRetriever, HybridRetriever)
+            retrievers = PluginFactory.create_retrievers_from_env()
+            if retrievers:
+                all_retrievers.extend(retrievers)
+                logger.info(f"Created {len(retrievers)} retrievers from environment")
+            
+            if all_retrievers:
+                logger.info(f"Created {len(all_retrievers)} total retrievers from environment")
+                return all_retrievers
+            else:
+                # Fallback to built-in in-memory vector store via registry
+                logger.info("No retrievers configured, using built-in InMemoryVectorStore")
+                return [PluginRegistry.create_plugin('vector_stores', 'inmemory_vector')]
+                
+        except Exception as e:
+            logger.error(f"Failed to create retrievers from environment: {e}")
+            # Final fallback to built-in in-memory vector store
+            return [PluginRegistry.create_plugin('vector_stores', 'inmemory_vector')]
+    
+    def _get_vector_store_from_retrievers(self):
+        """Get VectorStore from retrievers for backward compatibility
+        
+        後方互換性のためretrieverからVectorStoreを取得
+        """
+        # Look for VectorStore-type retrievers
+        for retriever in self.retrievers:
+            # Check if retriever has vector store capabilities
+            if hasattr(retriever, 'add_vector') and hasattr(retriever, 'search_similar'):
+                return retriever
+        
+        # If no VectorStore found, return the first retriever (may be None)
+        return self.retrievers[0] if self.retrievers else None
+    
+    def get_retrievers_by_type(self, retriever_type: str) -> List:
+        """Get retrievers by type
+        
+        タイプ別にretrieverを取得
+        
+        Args:
+            retriever_type: Type of retriever ('vector', 'keyword', 'hybrid', etc.)
+        
+        Returns:
+            List of retrievers matching the specified type
+        """
+        matching_retrievers = []
+        for retriever in self.retrievers:
+            class_name = type(retriever).__name__.lower()
+            if retriever_type.lower() in class_name:
+                matching_retrievers.append(retriever)
+        return matching_retrievers
+    
+    def add_retriever(self, retriever) -> None:
+        """Add a new retriever to the corpus manager
+        
+        新しいretrieverを追加
+        """
+        self.retrievers.append(retriever)
+        logger.info(f"Added retriever: {type(retriever).__name__}")
+        
+        # Update vector_store if this is the first VectorStore
+        if self.vector_store is None and hasattr(retriever, 'add_vector'):
+            self.vector_store = retriever
+    
+    def remove_retriever(self, index: int) -> bool:
+        """Remove retriever by index
+        
+        インデックスでretrieverを削除
+        """
+        if 0 <= index < len(self.retrievers):
+            removed = self.retrievers.pop(index)
+            logger.info(f"Removed retriever: {type(removed).__name__}")
+            
+            # Update vector_store if removed retriever was the vector_store
+            if self.vector_store is removed:
+                self.vector_store = self._get_vector_store_from_retrievers()
+            
+            return True
+        return False
     
     @staticmethod
     def _get_refinire_rag_dir() -> Path:
@@ -609,8 +765,10 @@ class CorpusManager:
             stage_configs["chunker_config"] = ChunkingConfig()
         processors.append(Chunker(stage_configs["chunker_config"]))
         
-        # Add vectorization stage
-        processors.append(self.vector_store)
+        # Add retriever stages (VectorStore, KeywordSearch, etc.)
+        for retriever in self.retrievers:
+            processors.append(retriever)
+            logger.info(f"Added retriever to pipeline: {type(retriever).__name__}")
         
         try:
             # Execute rebuild pipeline
@@ -683,8 +841,8 @@ class CorpusManager:
         コーパスからすべての文書を削除
         
         Note:
-            This method will remove all documents from both DocumentStore and VectorStore.
-            このメソッドはDocumentStoreとVectorStoreの両方からすべての文書を削除します。
+            This method will remove all documents from DocumentStore and all retrievers.
+            このメソッドはDocumentStoreとすべてのretrieverからすべての文書を削除します。
         """
         try:
             logger.info("Starting corpus clearing...")
@@ -696,12 +854,23 @@ class CorpusManager:
             else:
                 logger.warning("DocumentStore does not support clear_all_documents method")
             
-            # Clear vector store
-            if hasattr(self.vector_store, 'clear_all_vectors'):
-                self.vector_store.clear_all_vectors()
-                logger.info("Cleared all vectors from VectorStore")
-            else:
-                logger.warning("VectorStore does not support clear_all_vectors method")
+            # Clear all retrievers
+            for i, retriever in enumerate(self.retrievers):
+                try:
+                    # Try different clear methods based on retriever type
+                    if hasattr(retriever, 'clear_all_vectors'):
+                        retriever.clear_all_vectors()
+                        logger.info(f"Cleared vectors from retriever {i}: {type(retriever).__name__}")
+                    elif hasattr(retriever, 'clear_all_documents'):
+                        retriever.clear_all_documents()
+                        logger.info(f"Cleared documents from retriever {i}: {type(retriever).__name__}")
+                    elif hasattr(retriever, 'clear'):
+                        retriever.clear()
+                        logger.info(f"Cleared retriever {i}: {type(retriever).__name__}")
+                    else:
+                        logger.warning(f"Retriever {i} ({type(retriever).__name__}) does not support clearing")
+                except Exception as e:
+                    logger.error(f"Error clearing retriever {i} ({type(retriever).__name__}): {e}")
             
             # Reset stats
             self.stats = CorpusStats()
@@ -711,3 +880,61 @@ class CorpusManager:
         except Exception as e:
             logger.error(f"Error clearing corpus: {e}")
             raise
+    
+    def get_corpus_info(self) -> Dict[str, Any]:
+        """Get comprehensive information about the corpus manager
+        
+        コーパスマネージャーの包括的な情報を取得
+        
+        Returns:
+            Dictionary containing corpus manager information
+        """
+        info = {
+            "document_store": {
+                "type": type(self.document_store).__name__,
+                "module": type(self.document_store).__module__
+            },
+            "retrievers": [
+                {
+                    "index": i,
+                    "type": type(retriever).__name__,
+                    "module": type(retriever).__module__,
+                    "capabilities": self._get_retriever_capabilities(retriever)
+                }
+                for i, retriever in enumerate(self.retrievers)
+            ],
+            "stats": {
+                "total_files_processed": self.stats.total_files_processed,
+                "total_documents_created": self.stats.total_documents_created,
+                "total_chunks_created": self.stats.total_chunks_created,
+                "total_processing_time": self.stats.total_processing_time,
+                "pipeline_stages_executed": self.stats.pipeline_stages_executed,
+                "errors_encountered": self.stats.errors_encountered
+            }
+        }
+        return info
+    
+    def _get_retriever_capabilities(self, retriever) -> List[str]:
+        """Get capabilities of a retriever
+        
+        retrieverの機能を取得
+        """
+        capabilities = []
+        
+        # Check for vector capabilities
+        if hasattr(retriever, 'add_vector') and hasattr(retriever, 'search_similar'):
+            capabilities.append("vector_search")
+        
+        # Check for keyword capabilities
+        if hasattr(retriever, 'add_document') and hasattr(retriever, 'search'):
+            capabilities.append("keyword_search")
+        
+        # Check for indexing capabilities
+        if hasattr(retriever, 'build_index'):
+            capabilities.append("indexing")
+        
+        # Check for clearing capabilities
+        if any(hasattr(retriever, method) for method in ['clear_all_vectors', 'clear_all_documents', 'clear']):
+            capabilities.append("clearing")
+        
+        return capabilities

@@ -15,7 +15,6 @@ from typing import List, Optional, Dict, Any
 
 from refinire_rag.retrieval.base import KeywordSearch, SearchResult
 from refinire_rag.models.document import Document
-from ..plugins.plugin_config import PluginConfig
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ class TFIDFKeywordStore(KeywordSearch):
     scikit-learnのTfidfVectorizerを使用したシンプルな実装。
     """
     
-    def __init__(self, config: Optional[PluginConfig] = None):
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
         Initialize TF-IDF keyword store
         TF-IDFキーワードストアを初期化
@@ -37,7 +36,15 @@ class TFIDFKeywordStore(KeywordSearch):
             config: KeywordStore configuration
                    KeywordStore設定
         """
-        super().__init__(config or PluginConfig().for_plugin_type("keyword_store"))
+        super().__init__(config or {})
+        
+        # Create a config object with default values
+        self.config = type('Config', (), {
+            'top_k': (config or {}).get('top_k', 10),
+            'similarity_threshold': (config or {}).get('similarity_threshold', 0.0),
+            'enable_filtering': (config or {}).get('enable_filtering', True)
+        })()
+        
         self.documents: Dict[str, Document] = {}
         self.vectorizer = None
         self.tfidf_matrix = None

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "refinire-rag"
-version = "0.1.1"
+version = "0.1.2"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,8 +12,8 @@ dependencies = [
     "numpy>=1.20.0",
     "scikit-learn>=1.0.0",
     "nltk>=3.8",
-    "refinire>=0.2.2",
-    "oneenv>=0.2.0",
+    "refinire",
+    "oneenv",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +34,9 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["refinire_rag*"]
+
+[project.entry-points."oneenv.templates"]
+refinire_rag = "refinire_rag.env_template:refinire_rag_env_template"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

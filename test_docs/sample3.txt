@@ -1,0 +1,35 @@
+Data Science Workflow
+
+Data science is an interdisciplinary field that combines statistics, programming, and domain expertise to extract insights from data.
+
+The typical data science workflow includes:
+
+1. Problem Definition
+   - Understanding business requirements
+   - Defining success metrics
+   - Setting project scope
+
+2. Data Collection
+   - Gathering relevant datasets
+   - Ensuring data quality
+   - Handling missing values
+
+3. Data Exploration
+   - Statistical analysis
+   - Data visualization
+   - Pattern identification
+
+4. Data Preprocessing
+   - Cleaning and transformation
+   - Feature engineering
+   - Data normalization
+
+5. Model Development
+   - Algorithm selection
+   - Training and validation
+   - Hyperparameter tuning
+
+6. Evaluation and Deployment
+   - Performance assessment
+   - Model deployment
+   - Monitoring and maintenance

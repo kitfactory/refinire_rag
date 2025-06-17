@@ -8,6 +8,7 @@ QA pair generation, QueryEngine evaluation, and reporting.
 import logging
 import time
 import json
+import os
 from typing import List, Dict, Any, Optional, Union
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +21,7 @@ from ..processing.evaluator import Evaluator, EvaluatorConfig
 from ..processing.contradiction_detector import ContradictionDetector, ContradictionDetectorConfig
 from ..processing.insight_reporter import InsightReporter, InsightReporterConfig
 from .query_engine import QueryEngine
-from .corpus_manager import CorpusManager
+from .corpus_manager_new import CorpusManager
 from ..storage.evaluation_store import SQLiteEvaluationStore, EvaluationRun
 
 logger = logging.getLogger(__name__)
@@ -75,6 +76,52 @@ class QualityLabConfig:
         if self.reporter_config is None:
             self.reporter_config = InsightReporterConfig()
 
+    @classmethod
+    def from_env(cls) -> 'QualityLabConfig':
+        """Create QualityLabConfig from environment variables
+        環境変数からQualityLabConfigを作成
+        
+        Returns:
+            QualityLabConfig: Configuration loaded from environment
+                            環境変数から読み込まれた設定
+        """
+        # QA Generation settings
+        qa_generation_model = os.getenv("REFINIRE_RAG_QA_GENERATION_MODEL", "gpt-4o-mini")
+        qa_pairs_per_document = int(os.getenv("REFINIRE_RAG_QA_PAIRS_PER_DOCUMENT", "3"))
+        
+        question_types_str = os.getenv("REFINIRE_RAG_QUESTION_TYPES", "factual,conceptual,analytical,comparative")
+        question_types = [t.strip() for t in question_types_str.split(",") if t.strip()]
+        
+        # Evaluation settings
+        evaluation_timeout = float(os.getenv("REFINIRE_RAG_EVALUATION_TIMEOUT", "30.0"))
+        similarity_threshold = float(os.getenv("REFINIRE_RAG_SIMILARITY_THRESHOLD", "0.7"))
+        
+        # Reporting settings
+        output_format = os.getenv("REFINIRE_RAG_OUTPUT_FORMAT", "markdown")
+        include_detailed_analysis = os.getenv("REFINIRE_RAG_INCLUDE_DETAILED_ANALYSIS", "true").lower() == "true"
+        include_contradiction_detection = os.getenv("REFINIRE_RAG_INCLUDE_CONTRADICTION_DETECTION", "true").lower() == "true"
+        
+        # Create nested configs with defaults
+        test_suite_config = TestSuiteConfig()
+        evaluator_config = EvaluatorConfig()
+        contradiction_config = ContradictionDetectorConfig()
+        reporter_config = InsightReporterConfig()
+        
+        return cls(
+            qa_generation_model=qa_generation_model,
+            qa_pairs_per_document=qa_pairs_per_document,
+            question_types=question_types,
+            evaluation_timeout=evaluation_timeout,
+            similarity_threshold=similarity_threshold,
+            output_format=output_format,
+            include_detailed_analysis=include_detailed_analysis,
+            include_contradiction_detection=include_contradiction_detection,
+            test_suite_config=test_suite_config,
+            evaluator_config=evaluator_config,
+            contradiction_config=contradiction_config,
+            reporter_config=reporter_config
+        )
+
 
 class QualityLab:
     """RAG System Quality Assessment and Evaluation Lab
@@ -93,22 +140,33 @@ class QualityLab:
     """
     
     def __init__(self, 
-                 corpus_manager: CorpusManager,
+                 corpus_manager: Optional[CorpusManager] = None,
                  config: Optional[QualityLabConfig] = None,
                  evaluation_store: Optional[SQLiteEvaluationStore] = None):
         """Initialize QualityLab
         
         Args:
-            corpus_manager: CorpusManager instance for document retrieval
-                           文書取得用のCorpusManagerインスタンス
-            config: Configuration for the lab
-                   ラボの設定
-            evaluation_store: Optional evaluation data store for persistence
-                            評価データ永続化用のオプションストア
+            corpus_manager: CorpusManager instance for document retrieval (None for env creation)
+                           文書取得用のCorpusManagerインスタンス（環境変数作成の場合はNone）
+            config: Configuration for the lab (None for env creation)
+                   ラボの設定（環境変数作成の場合はNone）
+            evaluation_store: Optional evaluation data store for persistence (None for env creation)
+                            評価データ永続化用のオプションストア（環境変数作成の場合はNone）
         """
-        self.corpus_manager = corpus_manager
+        # Initialize from environment if components are None
+        if corpus_manager is None:
+            self.corpus_manager = CorpusManager.from_env()
+        else:
+            self.corpus_manager = corpus_manager
+            
         self.config = config or QualityLabConfig()
-        self.evaluation_store = evaluation_store
+        
+        if evaluation_store is None:
+            db_path = os.getenv("REFINIRE_RAG_EVALUATION_DB_PATH", "./data/evaluation.db")
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
+            self.evaluation_store = SQLiteEvaluationStore(db_path)
+        else:
+            self.evaluation_store = evaluation_store
         
         # Initialize processing components
         self.test_suite = TestSuite(self.config.test_suite_config)
@@ -125,6 +183,32 @@ class QualityLab:
         }
         
         logger.info(f"Initialized QualityLab with CorpusManager")
+    
+    @classmethod
+    def from_env(cls) -> 'QualityLab':
+        """Create QualityLab from environment variables
+        環境変数からQualityLabを作成
+        
+        Returns:
+            QualityLab: Lab instance configured from environment variables
+                       環境変数から設定されたLabインスタンス
+        """
+        logger.info("Creating QualityLab from environment variables")
+        
+        # Create all components from environment
+        corpus_manager = CorpusManager.from_env()
+        config = QualityLabConfig.from_env()
+        
+        # EvaluationStore path from environment
+        db_path = os.getenv("REFINIRE_RAG_EVALUATION_DB_PATH", "./data/evaluation.db")
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        evaluation_store = SQLiteEvaluationStore(db_path)
+        
+        return cls(
+            corpus_manager=corpus_manager,
+            config=config,
+            evaluation_store=evaluation_store
+        )
     
     def generate_qa_pairs(self, 
                          qa_set_name: str,

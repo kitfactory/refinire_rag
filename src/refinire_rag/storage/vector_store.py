@@ -105,7 +105,33 @@ class VectorStore(DocumentProcessor):
         Yields:
             Documents (unchanged, after embedding and storage)
         """
-        for document in documents:
+        documents_list = list(documents)  # Convert to list to allow multiple iterations
+        
+        # Check if we need to fit the embedder first (for TF-IDF)
+        if self._embedder and hasattr(self._embedder, 'is_fitted') and not self._embedder.is_fitted():
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Fitting embedder on {len(documents_list)} documents...")
+            
+            # Collect all texts for fitting
+            texts = [doc.content for doc in documents_list if doc.content.strip()]
+            if texts:
+                try:
+                    self._embedder.fit(texts)
+                    logger.info(f"Successfully fitted embedder on {len(texts)} texts")
+                except Exception as e:
+                    logger.error(f"Failed to fit embedder: {e}")
+                    # Continue without embedding
+                    for document in documents_list:
+                        yield document
+                    return
+            else:
+                logger.warning("No valid texts found for embedder fitting")
+                for document in documents_list:
+                    yield document
+                return
+        
+        for document in documents_list:
             try:
                 # Generate embedding if embedder is available
                 if self._embedder:

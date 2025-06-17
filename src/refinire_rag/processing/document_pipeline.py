@@ -79,7 +79,7 @@ class DocumentPipeline:
                 next_documents = []
                 for doc in current_documents:
                     try:
-                        processed_docs = processor.process(doc)
+                        processed_docs = list(processor.process([doc]))
                         next_documents.extend(processed_docs)
                     except Exception as e:
                         logger.error(f"Error in {processor_name} for document {doc.id}: {e}")

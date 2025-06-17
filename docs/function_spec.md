@@ -1,4 +1,152 @@
-# 機能仕様書
+# Refinire Orchestrator Agent 機能仕様書
+
+## UC-01: タスク分析
+
+### ユースケース手順
+1. ユーザーからの要望を受け取る
+2. 要望を分析し、必要なタスクに分解する
+3. タスク間の依存関係を特定する
+4. タスクの優先順位を設定する
+5. タスクリストを生成する
+
+### ユースケースフロー図
+```mermaid
+sequenceDiagram
+    participant User
+    participant Orchestrator
+    participant TaskAnalyzer
+    participant TaskManager
+
+    User->>Orchestrator: 要望を送信
+    Orchestrator->>TaskAnalyzer: 要望を分析
+    TaskAnalyzer->>TaskAnalyzer: タスク分解
+    TaskAnalyzer->>TaskAnalyzer: 依存関係分析
+    TaskAnalyzer->>TaskAnalyzer: 優先順位設定
+    TaskAnalyzer->>TaskManager: タスクリスト生成
+    TaskManager->>Orchestrator: タスクリスト返却
+    Orchestrator->>User: 分析結果返却
+```
+
+## UC-02: エージェント状態管理
+
+### ユースケース手順
+1. 各ワーカーエージェントの状態を監視
+2. エージェントの稼働状況を記録
+3. エージェントのパフォーマンスメトリクスを収集
+4. 異常を検知した場合に通知
+5. エージェントの状態を永続化
+
+### ユースケースフロー図
+```mermaid
+sequenceDiagram
+    participant Orchestrator
+    participant AgentManager
+    participant StateManager
+    participant Database
+
+    loop 定期的な監視
+        AgentManager->>StateManager: エージェント状態取得
+        StateManager->>StateManager: メトリクス計算
+        StateManager->>Database: 状態保存
+        StateManager->>Orchestrator: 異常検知通知
+    end
+```
+
+## UC-03: タスク割り当て
+
+### ユースケース手順
+1. 実行可能なタスクを特定
+2. 利用可能なエージェントを確認
+3. エージェントの能力とタスクの要件を照合
+4. 最適なエージェントを選択
+5. タスクを割り当て
+
+### ユースケースフロー図
+```mermaid
+sequenceDiagram
+    participant TaskManager
+    participant AgentManager
+    participant Orchestrator
+
+    TaskManager->>TaskManager: 実行可能タスク特定
+    AgentManager->>AgentManager: 利用可能エージェント確認
+    TaskManager->>Orchestrator: タスク割り当て要求
+    Orchestrator->>Orchestrator: 最適エージェント選択
+    Orchestrator->>AgentManager: タスク割り当て
+```
+
+## UC-04: 実行監視
+
+### ユースケース手順
+1. タスクの実行状況を監視
+2. 進捗状況を記録
+3. タイムアウトを検知
+4. 必要に応じて介入
+5. 実行結果を記録
+
+### ユースケースフロー図
+```mermaid
+sequenceDiagram
+    participant Orchestrator
+    participant TaskManager
+    participant AgentManager
+
+    loop 実行中
+        TaskManager->>AgentManager: 進捗確認
+        AgentManager->>TaskManager: 進捗報告
+        TaskManager->>Orchestrator: 状態更新
+        alt タイムアウト
+            Orchestrator->>AgentManager: タスク中断
+        end
+    end
+```
+
+## UC-05: エラー処理
+
+### ユースケース手順
+1. エラーを検知
+2. エラーの種類を特定
+3. リカバリー戦略を選択
+4. リカバリーを実行
+5. エラー情報を記録
+
+### ユースケースフロー図
+```mermaid
+sequenceDiagram
+    participant AgentManager
+    participant Orchestrator
+    participant TaskManager
+
+    AgentManager->>Orchestrator: エラー通知
+    Orchestrator->>Orchestrator: エラー分析
+    Orchestrator->>Orchestrator: リカバリー戦略選択
+    Orchestrator->>TaskManager: リカバリー実行
+    TaskManager->>Orchestrator: 結果報告
+```
+
+## UC-06: パフォーマンス最適化
+
+### ユースケース手順
+1. システム全体のパフォーマンスを監視
+2. ボトルネックを特定
+3. 最適化戦略を立案
+4. 最適化を実行
+5. 効果を測定
+
+### ユースケースフロー図
+```mermaid
+sequenceDiagram
+    participant Orchestrator
+    participant StateManager
+    participant AgentManager
+
+    loop 定期的な最適化
+        StateManager->>Orchestrator: パフォーマンスデータ
+        Orchestrator->>Orchestrator: ボトルネック分析
+        Orchestrator->>AgentManager: 最適化指示
+        AgentManager->>StateManager: 効果測定
+    end
+```
 
 ## 1. CorpusManager（文書コーパス管理）
 

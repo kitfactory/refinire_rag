@@ -1,350 +1,374 @@
 # CorpusManager - Document Corpus Management
 
-CorpusManager orchestrates the complete document processing pipeline from loading to embedding storage, built on the DocumentPipeline architecture.
+CorpusManager provides comprehensive document corpus construction and management with plugin-based multi-retriever support.
 
 ## Overview
 
-CorpusManager provides a unified interface for managing document corpora with the following capabilities:
+CorpusManager provides core operations for document corpus management with plugin integration:
 
-- **DocumentPipeline Integration** - Uses configurable DocumentProcessor chains
-- **Incremental Processing** - Efficient updates with IncrementalLoader
-- **Flexible Configuration** - Modular component composition
-- **Comprehensive Workflow** - Loading → Processing → Chunking → Embedding → Storage
+- **Document Import** - Import original documents from directories with incremental loading
+- **Corpus Rebuild** - Rebuild corpus from existing original documents using knowledge artifacts
+- **Multi-Retriever Support** - Support for multiple retrievers (VectorStore, KeywordSearch, etc.)
+- **Plugin Integration** - Automatic plugin discovery and environment-based configuration
+- **Corpus Management** - Clear and manage corpus state across all retrievers
 
 ```python
-from refinire_rag.application.corpus_manager import CorpusManager
-from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
-from refinire_rag.embedding import OpenAIEmbedder, OpenAIEmbeddingConfig
-from refinire_rag.processing import Normalizer, Chunker, ChunkingConfig
+from refinire_rag.application import CorpusManager
 
-# Initialize storage
+# Method 1: Create from environment variables (recommended)
+# Set environment: REFINIRE_RAG_RETRIEVERS=chroma,bm25s
+corpus_manager = CorpusManager.from_env()
+
+# Method 2: Manual initialization with specific retrievers
+from refinire_rag.storage import SQLiteStore
+
+document_store = SQLiteStore("corpus.db")
+retrievers = [vector_store, keyword_store]  # Multiple retrievers
+
+corpus_manager = CorpusManager(
+    document_store=document_store,
+    retrievers=retrievers
+)
+```
+
+## Public API Methods
+
+### import_original_documents
+
+Import original documents from a directory with incremental loading.
+
+```python
+# Basic document import
+stats = corpus_manager.import_original_documents(
+    corpus_name="product_docs",
+    directory="/path/to/documents"
+)
+
+print(f"Files processed: {stats.total_files_processed}")
+print(f"Documents created: {stats.total_documents_created}")
+```
+
+```python
+# Advanced import with options
+stats = corpus_manager.import_original_documents(
+    corpus_name="knowledge_base",
+    directory="/docs",
+    glob="**/*.{md,txt,pdf}",  # Filter file types
+    use_multithreading=True,
+    force_reload=False,  # Use incremental loading
+    additional_metadata={"project": "refinire"},
+    create_dictionary=True,  # Create domain dictionary
+    create_knowledge_graph=True,  # Create knowledge graph
+    dictionary_output_dir="./dictionaries",
+    graph_output_dir="./graphs"
+)
+```
+
+### rebuild_corpus_from_original
+
+Rebuild corpus from existing original documents using knowledge artifacts.
+
+```python
+# Rebuild with existing dictionary
+stats = corpus_manager.rebuild_corpus_from_original(
+    corpus_name="knowledge_base",
+    use_dictionary=True,  # Use existing dictionary for normalization
+    dictionary_file_path="./dictionaries/knowledge_base_dictionary.md"
+)
+
+print(f"Documents processed: {stats.total_documents_created}")
+print(f"Chunks created: {stats.total_chunks_created}")
+```
+
+```python
+# Rebuild with both dictionary and knowledge graph
+stats = corpus_manager.rebuild_corpus_from_original(
+    corpus_name="knowledge_base",
+    use_dictionary=True,
+    use_knowledge_graph=True,
+    dictionary_file_path="./dictionaries/knowledge_base_dictionary.md",
+    graph_file_path="./graphs/knowledge_base_knowledge_graph.md",
+    additional_metadata={"version": "2.0"}
+)
+```
+
+### clear_corpus
+
+Clear all documents from the corpus.
+
+```python
+# Clear all documents from both document and vector stores
+corpus_manager.clear_corpus()
+print("Corpus cleared successfully")
+```
+
+## Method Parameters Reference
+
+### import_original_documents Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `corpus_name` | `str` | Required | Name of the corpus (used in metadata and output filenames) |
+| `directory` | `str` | Required | Directory path to import from |
+| `glob` | `str` | `"**/*"` | Glob pattern to match files |
+| `use_multithreading` | `bool` | `True` | Whether to use multithreading for file processing |
+| `force_reload` | `bool` | `False` | Force reload all files ignoring incremental cache |
+| `additional_metadata` | `Optional[Dict[str, Any]]` | `None` | Additional metadata to add to all imported documents |
+| `tracking_file_path` | `Optional[str]` | `None` | Path to store file tracking data for incremental loading |
+| `create_dictionary` | `bool` | `False` | Whether to create domain dictionary after import |
+| `create_knowledge_graph` | `bool` | `False` | Whether to create knowledge graph after import |
+| `dictionary_output_dir` | `Optional[str]` | `None` | Directory to save dictionary file |
+| `graph_output_dir` | `Optional[str]` | `None` | Directory to save graph file |
+
+### rebuild_corpus_from_original Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `corpus_name` | `str` | Required | Name of the corpus for metadata |
+| `use_dictionary` | `bool` | `True` | Whether to use existing dictionary for normalization |
+| `use_knowledge_graph` | `bool` | `False` | Whether to use existing knowledge graph for normalization |
+| `dictionary_file_path` | `Optional[str]` | `None` | Path to existing dictionary file to use |
+| `graph_file_path` | `Optional[str]` | `None` | Path to existing knowledge graph file to use |
+| `additional_metadata` | `Optional[Dict[str, Any]]` | `None` | Additional metadata to add during rebuild |
+| `stage_configs` | `Optional[Dict[str, Any]]` | `None` | Configuration for each processing stage |
+
+## File Naming Convention
+
+CorpusManager follows a consistent file naming convention for tracking and knowledge artifacts:
+
+- **Tracking file**: `{corpus_name}_track.json`
+- **Dictionary file**: `{corpus_name}_dictionary.md`
+- **Knowledge graph file**: `{corpus_name}_knowledge_graph.md`
+
+### from_env (Class Method)
+
+Create CorpusManager from environment variables.
+
+```python
+# Set environment variables
+import os
+os.environ["REFINIRE_RAG_RETRIEVERS"] = "chroma,bm25s"
+os.environ["REFINIRE_RAG_DOCUMENT_STORES"] = "sqlite"
+
+# Create from environment
+corpus_manager = CorpusManager.from_env()
+```
+
+### get_corpus_info
+
+Get comprehensive information about the corpus manager configuration.
+
+```python
+info = corpus_manager.get_corpus_info()
+
+print(f"Document Store: {info['document_store']['type']}")
+print("Retrievers:")
+for retriever in info['retrievers']:
+    print(f"  - {retriever['type']}: {retriever['capabilities']}")
+print(f"Total documents: {info['stats']['total_documents_created']}")
+```
+
+### get_retrievers_by_type
+
+Get retrievers filtered by type.
+
+```python
+# Get vector-based retrievers
+vector_retrievers = corpus_manager.get_retrievers_by_type("vector")
+
+# Get keyword-based retrievers  
+keyword_retrievers = corpus_manager.get_retrievers_by_type("keyword")
+```
+
+### add_retriever
+
+Add a new retriever to the corpus manager.
+
+```python
+from refinire_rag.registry import PluginRegistry
+
+# Create and add new retriever
+new_retriever = PluginRegistry.create_plugin('retrievers', 'faiss')
+corpus_manager.add_retriever(new_retriever)
+```
+
+### remove_retriever
+
+Remove a retriever by index.
+
+```python
+# Remove retriever at index 1
+success = corpus_manager.remove_retriever(1)
+print(f"Removal successful: {success}")
+```
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REFINIRE_DIR` | `"./refinire"` | Base directory for Refinire files |
+| `REFINIRE_RAG_DOCUMENT_STORES` | `"sqlite"` | Document store plugins to use |
+| `REFINIRE_RAG_RETRIEVERS` | `"inmemory_vector"` | Retriever plugins to use (comma-separated) |
+
+## Multi-Retriever Support
+
+CorpusManager supports multiple retrievers simultaneously:
+
+```python
+# Environment-based configuration
+os.environ["REFINIRE_RAG_RETRIEVERS"] = "chroma,bm25s,faiss"
+
+corpus_manager = CorpusManager.from_env()
+
+# Check configured retrievers
+info = corpus_manager.get_corpus_info()
+print(f"Active retrievers: {len(info['retrievers'])}")
+
+# Import documents (processed by all retrievers)
+stats = corpus_manager.import_original_documents(
+    corpus_name="multi_retriever_corpus",
+    directory="./documents"
+)
+
+# Each retriever will process and store the documents according to its capabilities
+```
+
+## Plugin Integration
+
+CorpusManager automatically integrates with the plugin system:
+
+```python
+# List available retriever plugins
+from refinire_rag.registry import PluginRegistry
+available = PluginRegistry.list_available_plugins('retrievers')
+print(f"Available retriever plugins: {available}")
+
+# Create corpus manager with specific plugins
+os.environ["REFINIRE_RAG_RETRIEVERS"] = ",".join(available)
+corpus_manager = CorpusManager.from_env()
+```
+
+## CorpusStats Return Object
+
+The `import_original_documents` and `rebuild_corpus_from_original` methods return a `CorpusStats` object:
+
+```python
+@dataclass
+class CorpusStats:
+    total_files_processed: int = 0
+    total_documents_created: int = 0
+    total_chunks_created: int = 0
+    total_processing_time: float = 0.0
+    pipeline_stages_executed: int = 0
+    documents_by_stage: Dict[str, int] = None
+    errors_encountered: int = 0
+```
+
+### Usage Example
+
+```python
+stats = corpus_manager.import_original_documents(
+    corpus_name="docs",
+    directory="/path/to/docs"
+)
+
+print(f"Files processed: {stats.total_files_processed}")
+print(f"Documents created: {stats.total_documents_created}")
+print(f"Processing time: {stats.total_processing_time:.2f}s")
+print(f"Errors: {stats.errors_encountered}")
+```
+
+## Usage Patterns
+
+### Basic Document Import
+
+```python
+from refinire_rag.application import CorpusManager
+from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
+
+# Initialize CorpusManager
 doc_store = SQLiteDocumentStore("corpus.db")
 vector_store = InMemoryVectorStore()
+corpus_manager = CorpusManager(doc_store, vector_store)
 
-# Configure embedder and set to vector store (統合アーキテクチャ)
-embedder = OpenAIEmbedder(OpenAIEmbeddingConfig(model="text-embedding-ada-002"))
-vector_store.set_embedder(embedder)  # VectorStoreに直接設定
-
-# Create CorpusManager with integrated architecture
-corpus_manager = CorpusManager(
-    document_store=doc_store,
-    vector_store=vector_store  # VectorStoreを直接使用、ラッパー不要
-)
-```
-
-## Core Workflow Methods
-
-### process_corpus
-
-Complete corpus processing pipeline.
-
-```python
-# Process documents from sources
-results = corpus_manager.process_corpus([
-    "documents/", 
-    "data/manual.pdf",
-    "specs/technical_docs/"
-])
-
-print(f"Documents loaded: {results['documents_loaded']}")
-print(f"Documents processed: {results['documents_processed']}")
-print(f"Documents embedded: {results['documents_embedded']}")
-print(f"Total time: {results['total_processing_time']:.2f}s")
-```
-
-### load_documents
-
-Load documents from various sources.
-
-```python
-# Load from mixed sources
-documents = corpus_manager.load_documents([
-    "/path/to/single_file.txt",
-    "/path/to/directory/",
-    Path("another/directory")
-])
-
-print(f"Loaded {len(documents)} documents")
-```
-
-### process_documents
-
-Process documents through the configured pipeline.
-
-```python
-# Process with configured processors
-processed_docs = corpus_manager.process_documents(documents)
-
-# Includes normalization, chunking, etc. based on configuration
-```
-
-### embed_documents
-
-Generate embeddings and store in vector store.
-
-```python
-# Generate embeddings
-embedded_docs = corpus_manager.embed_documents(processed_docs)
-
-# Documents are automatically stored in vector store
-for doc, result in embedded_docs:
-    if result and result.success:
-        print(f"Embedded {doc.id}: {result.dimension}D vector")
-```
-
-## Incremental Processing
-
-CorpusManager integrates with IncrementalLoader for efficient large-scale document management.
-
-```python
-from refinire_rag.loaders.incremental_loader import IncrementalLoader
-
-# Setup incremental processing
-incremental_loader = IncrementalLoader(
-    document_store=corpus_manager._document_store,
-    base_loader=corpus_manager._loader,
-    cache_file=".corpus_cache.json"
+# Import documents
+stats = corpus_manager.import_original_documents(
+    corpus_name="knowledge_base",
+    directory="/path/to/documents"
 )
 
-# Process only changed files
-results = incremental_loader.process_incremental(
-    sources=["documents/"],
-    force_reload={"important_doc.txt"}
+print(f"Imported {stats.total_documents_created} documents")
+```
+
+### Advanced Workflow with Knowledge Artifacts
+
+```python
+# Step 1: Import with knowledge artifact creation
+stats = corpus_manager.import_original_documents(
+    corpus_name="tech_docs",
+    directory="/docs",
+    create_dictionary=True,
+    create_knowledge_graph=True
 )
 
-# Process through corpus manager pipeline
-if results['new'] or results['updated']:
-    # Process new/updated documents
-    processed = corpus_manager.process_documents(
-        results['new'] + results['updated']
-    )
-    
-    # Generate embeddings
-    corpus_manager.embed_documents(processed)
-
-print(f"New: {len(results['new'])}")
-print(f"Updated: {len(results['updated'])}")
-print(f"Skipped: {len(results['skipped'])}")
-```
-
-## Configuration Options
-
-### CorpusManagerConfig
-
-Complete configuration for CorpusManager behavior.
-
-```python
-from refinire_rag.application.corpus_manager import CorpusManagerConfig
-from refinire_rag.models.config import LoadingConfig
-
-config = CorpusManagerConfig(
-    # Document loading
-    loading_config=LoadingConfig(
-        skip_errors=True,
-        parallel=True,
-        max_workers=4
-    ),
-    
-    # Document processing pipeline
-    enable_processing=True,
-    processors=[
-        DictionaryMaker(dict_config),
-        Normalizer(norm_config),
-        TokenBasedChunker(chunk_config)
-    ],
-    
-    # Chunking
-    enable_chunking=True,
-    chunking_config=ChunkingConfig(
-        chunk_size=512,
-        overlap=50,
-        split_by_sentence=True
-    ),
-    
-    # Embedding
-    enable_embedding=True,
-    embedder=TFIDFEmbedder(embedding_config),
-    auto_fit_embedder=True,
-    
-    # Storage
-    document_store=SQLiteDocumentStore("corpus.db"),
-    vector_store=InMemoryVectorStore(),
-    store_intermediate_results=True,
-    
-    # Processing options
-    batch_size=100,
-    parallel_processing=False,
-    
-    # Error handling
-    fail_on_error=False,
-    max_errors=10,
-    
-    # Progress reporting
-    enable_progress_reporting=True,
-    progress_interval=10
-)
-```
-
-## Utility Methods
-
-### search_documents
-
-Search documents in the corpus.
-
-```python
-# Semantic search using embeddings
-results = corpus_manager.search_documents(
-    query="RAG implementation best practices",
-    limit=10,
-    use_semantic=True
+# Step 2: Later rebuild with improvements
+rebuild_stats = corpus_manager.rebuild_corpus_from_original(
+    corpus_name="tech_docs",
+    use_dictionary=True,
+    use_knowledge_graph=True
 )
 
-# Text search fallback
-results = corpus_manager.search_documents(
-    query="machine learning",
-    limit=5,
-    use_semantic=False
-)
-```
-
-### get_corpus_stats
-
-Get comprehensive corpus statistics.
-
-```python
-stats = corpus_manager.get_corpus_stats()
-
-print(f"Documents loaded: {stats['documents_loaded']}")
-print(f"Documents processed: {stats['documents_processed']}")
-print(f"Documents embedded: {stats['documents_embedded']}")
-print(f"Total processing time: {stats['total_processing_time']:.2f}s")
-print(f"Storage stats: {stats['storage_stats']}")
-print(f"Vector stats: {stats['vector_stats']}")
-```
-
-### get_document_lineage
-
-Track document processing lineage.
-
-```python
-# Get all versions/transformations of a document
-lineage = corpus_manager.get_document_lineage("document_123")
-
-for doc in lineage:
-    stage = doc.metadata.get("processing_stage", "original")
-    print(f"{doc.id}: {stage}")
-```
-
-### cleanup
-
-Clean up resources.
-
-```python
-# Close connections and clean up
-corpus_manager.cleanup()
-```
-
-## Integration Examples
-
-### Simple RAG Setup
-
-```python
-# Minimal configuration for basic RAG
-config = CorpusManagerConfig(
-    document_store=SQLiteDocumentStore("simple.db"),
-    vector_store=InMemoryVectorStore(),
-    embedder=TFIDFEmbedder(TFIDFEmbeddingConfig(min_df=1)),
-    processors=[TokenBasedChunker()],
-    enable_progress_reporting=True
-)
-
-corpus_manager = CorpusManager(config)
-
-# Process documents
-results = corpus_manager.process_corpus(["documents/"])
-```
-
-### Advanced RAG with Processing
-
-```python
-# Full processing pipeline
-config = CorpusManagerConfig(
-    document_store=SQLiteDocumentStore("advanced.db"),
-    vector_store=InMemoryVectorStore(),
-    embedder=TFIDFEmbedder(TFIDFEmbeddingConfig(
-        min_df=2, 
-        max_features=10000,
-        ngram_range=(1, 2)
-    )),
-    processors=[
-        DictionaryMaker(DictionaryMakerConfig(
-            dictionary_file_path="dictionary.md",
-            focus_on_technical_terms=True
-        )),
-        Normalizer(NormalizerConfig(
-            dictionary_file_path="dictionary.md",
-            whole_word_only=False
-        )),
-        TokenBasedChunker(ChunkingConfig(
-            chunk_size=512,
-            overlap=50,
-            split_by_sentence=True
-        ))
-    ],
-    batch_size=50,
-    fail_on_error=False
-)
-
-corpus_manager = CorpusManager(config)
-```
-
-## Error Handling
-
-```python
-from refinire_rag.exceptions import RefinireRAGError
-
-try:
-    results = corpus_manager.process_corpus(file_paths)
-    print(f"✅ Success: {results['documents_loaded']} documents processed")
-except RefinireRAGError as e:
-    print(f"❌ Processing error: {e}")
-    # Graceful degradation or retry logic
-except Exception as e:
-    print(f"💥 Unexpected error: {e}")
+print(f"Rebuilt {rebuild_stats.total_documents_created} documents")
 ```
 
 ## Best Practices
 
-1. **Start Simple**: Begin with basic configuration and add complexity incrementally
-2. **Monitor Performance**: Use progress reporting and statistics for optimization
-3. **Handle Errors Gracefully**: Configure appropriate error handling for production
-4. **Use Incremental Loading**: For large or frequently updated document collections
-5. **Optimize Embeddings**: Choose appropriate embedder and configuration for your use case
+1. **Use Incremental Loading**: Set `force_reload=False` for large document collections to enable incremental processing
+2. **Create Knowledge Artifacts**: Use `create_dictionary=True` and `create_knowledge_graph=True` for improved corpus quality
+3. **Monitor Progress**: Check `CorpusStats` for processing metrics and error counts
+4. **Handle File Patterns**: Use glob patterns to filter specific file types
+5. **Organize Output**: Specify custom directories for dictionaries and graphs
+
+## Complete Workflow Example
 
 ```python
-# Production-ready example with error handling
-def build_production_corpus(file_paths: List[str]) -> Dict[str, Any]:
-    config = CorpusManagerConfig(
-        fail_on_error=False,
-        max_errors=10,
-        enable_progress_reporting=True,
-        batch_size=100
-    )
-    
-    corpus_manager = CorpusManager(config)
+from refinire_rag.application import CorpusManager
+from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
+
+def build_knowledge_base():
+    # Initialize storage
+    doc_store = SQLiteDocumentStore("knowledge.db")
+    vector_store = InMemoryVectorStore()
+    corpus_manager = CorpusManager(doc_store, vector_store)
     
     try:
-        results = corpus_manager.process_corpus(file_paths)
+        # Initial import with knowledge artifacts
+        stats = corpus_manager.import_original_documents(
+            corpus_name="company_docs",
+            directory="/company/documents",
+            glob="**/*.{md,txt,pdf}",
+            create_dictionary=True,
+            create_knowledge_graph=True,
+            additional_metadata={"version": "1.0"}
+        )
         
-        # Log successful processing
-        logger.info(f"Corpus built successfully: {results['documents_loaded']} documents")
+        print(f"✅ Import complete: {stats.total_documents_created} documents")
         
-        return results
+        # Later: rebuild with improvements
+        if stats.errors_encountered == 0:
+            rebuild_stats = corpus_manager.rebuild_corpus_from_original(
+                corpus_name="company_docs",
+                use_dictionary=True,
+                use_knowledge_graph=True
+            )
+            print(f"✅ Rebuild complete: {rebuild_stats.total_documents_created} documents")
+        
+        return True
         
     except Exception as e:
-        logger.error(f"Corpus building failed: {e}")
-        raise
-    
-    finally:
-        corpus_manager.cleanup()
+        print(f"❌ Error: {e}")
+        return False
+
+# Run the workflow
+success = build_knowledge_base()
 ```

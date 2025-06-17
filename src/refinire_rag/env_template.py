@@ -515,6 +515,77 @@ def refinire_rag_env_template() -> EnvTemplate:
             example="0.7",
         ),
         
+        # QualityLab Configuration (QualityLab設定)
+        "REFINIRE_RAG_QA_GENERATION_MODEL": EnvVarConfig(
+            description="LLM model for QA pair generation",
+            required=False,
+            var_type="str",
+            default="gpt-4o-mini",
+            group="QualityLab Configuration",
+            importance="optional",
+            example="gpt-4o-mini",
+        ),
+        
+        "REFINIRE_RAG_QA_PAIRS_PER_DOCUMENT": EnvVarConfig(
+            description="Number of QA pairs to generate per document",
+            required=False,
+            var_type="int",
+            default="3",
+            group="QualityLab Configuration",
+            importance="optional",
+            example="3",
+        ),
+        
+        "REFINIRE_RAG_QUESTION_TYPES": EnvVarConfig(
+            description="Comma-separated list of question types to generate",
+            required=False,
+            var_type="str",
+            default="factual,conceptual,analytical,comparative",
+            group="QualityLab Configuration",
+            importance="optional",
+            example="factual,conceptual,analytical,comparative",
+        ),
+        
+        "REFINIRE_RAG_OUTPUT_FORMAT": EnvVarConfig(
+            description="Output format for evaluation reports",
+            required=False,
+            var_type="str",
+            default="markdown",
+            group="QualityLab Configuration",
+            importance="optional",
+            example="markdown",
+        ),
+        
+        "REFINIRE_RAG_INCLUDE_DETAILED_ANALYSIS": EnvVarConfig(
+            description="Include detailed analysis in evaluation reports",
+            required=False,
+            var_type="bool",
+            default="true",
+            group="QualityLab Configuration",
+            importance="optional",
+            example="true",
+        ),
+        
+        "REFINIRE_RAG_INCLUDE_CONTRADICTION_DETECTION": EnvVarConfig(
+            description="Enable contradiction detection in evaluations",
+            required=False,
+            var_type="bool",
+            default="true",
+            group="QualityLab Configuration",
+            importance="optional",
+            example="true",
+        ),
+        
+        "REFINIRE_RAG_EVALUATION_DB_PATH": EnvVarConfig(
+            description="Path to SQLite database for evaluation results",
+            required=False,
+            var_type="str",
+            default="./data/evaluation.db",
+            group="QualityLab Configuration",
+            importance="optional",
+            example="./data/evaluation.db",
+        ),
+        
         # Loader Configuration (ローダー設定)
         "REFINIRE_RAG_LOADERS": EnvVarConfig(
             description="Comma-separated list of loader plugins",

@@ -75,8 +75,21 @@ class Chunker(DocumentProcessor):
         """Get the configuration class for this processor"""
         return ChunkingConfig
     
-    def process(self, document: Document, config: Optional[ChunkingConfig] = None) -> List[Document]:
-        """Process document to create chunks
+    def process(self, documents, config: Optional[ChunkingConfig] = None):
+        """Process documents to create chunks
+        
+        Args:
+            documents: Input documents to chunk  
+            config: Optional configuration override
+            
+        Yields:
+            Chunk documents
+        """
+        for document in documents:
+            yield from self._process_single_document(document, config)
+    
+    def _process_single_document(self, document: Document, config: Optional[ChunkingConfig] = None) -> List[Document]:
+        """Process single document to create chunks
         
         Args:
             document: Input document to chunk
