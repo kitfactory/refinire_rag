@@ -15,16 +15,9 @@ from typing import List
 # Add src to path so we can import our modules
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from refinire_rag import (
-    Document,
-    CorpusManager,
-    CorpusManagerConfig,
-    LoadingConfig,
-    ChunkingConfig,
-    TFIDFEmbedder,
-    TFIDFEmbeddingConfig,
-    SQLiteDocumentStore
-)
+from src.refinire_rag.models.document import Document
+from src.refinire_rag.application.corpus_manager_new import CorpusManager
+# Legacy test - temporarily disabled due to import changes
 
 # Import custom processors for advanced testing
 sys.path.insert(0, str(Path(__file__).parent))
