@@ -45,11 +45,11 @@ class _VectorStoreRegistry:
         # Built-in mappings for standard implementations
         self._builtin_mappings = {
             "OpenAIVectorStore": {
-                "module": "refinire.rag.vectorstore.openai_vector_store",
+                "module": "refinire_rag.vectorstore.openai_vector_store",
                 "class": "OpenAIVectorStore"
             },
             "DefaultVectorStore": {
-                "module": "refinire.rag.vectorstore.openai_vector_store", 
+                "module": "refinire_rag.vectorstore.openai_vector_store", 
                 "class": "OpenAIVectorStore"
             }
         }

@@ -10,11 +10,14 @@ comprehensive search capabilities with result fusion and re-ranking.
 """
 
 import logging
+import os
 import time
 from typing import List, Optional, Dict, Any, Type
 from collections import defaultdict
 
 from .base import Retriever, RetrieverConfig, SearchResult
+from ..config import RefinireRAGConfig
+from ..registry.plugin_registry import PluginRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,7 @@ class HybridRetrieverConfig(RetrieverConfig):
                  fusion_method: str = "rrf",  # "rrf", "weighted", "max"
                  retriever_weights: Optional[List[float]] = None,
                  rrf_k: int = 60,
+                 retriever_names: Optional[List[str]] = None,
                  **kwargs):
         """
         Initialize HybridRetriever configuration
@@ -46,6 +50,8 @@ class HybridRetrieverConfig(RetrieverConfig):
                              各検索器の重み（重み付き統合用）
             rrf_k: Parameter for Reciprocal Rank Fusion
                   相互ランク統合のパラメータ
+            retriever_names: Names of retrievers to combine
+                           組み合わせる検索器の名前のリスト
         """
         super().__init__(top_k=top_k,
                         similarity_threshold=similarity_threshold,
@@ -53,10 +59,53 @@ class HybridRetrieverConfig(RetrieverConfig):
         self.fusion_method = fusion_method
         self.retriever_weights = retriever_weights
         self.rrf_k = rrf_k
+        self.retriever_names = retriever_names
         
         # Set additional attributes from kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
+    
+    @classmethod
+    def from_env(cls) -> "HybridRetrieverConfig":
+        """Create configuration from environment variables
+        
+        Creates a HybridRetrieverConfig instance from environment variables.
+        環境変数からHybridRetrieverConfigインスタンスを作成します。
+        
+        Returns:
+            HybridRetrieverConfig instance with values from environment
+        """
+        config = RefinireRAGConfig()
+        
+        # Get configuration values from environment
+        top_k = int(os.getenv("REFINIRE_RAG_RETRIEVER_TOP_K", "10"))
+        similarity_threshold = float(os.getenv("REFINIRE_RAG_RETRIEVER_SIMILARITY_THRESHOLD", "0.0"))
+        enable_filtering = os.getenv("REFINIRE_RAG_RETRIEVER_ENABLE_FILTERING", "true").lower() == "true"
+        fusion_method = os.getenv("REFINIRE_RAG_HYBRID_FUSION_METHOD", "rrf")
+        rrf_k = int(os.getenv("REFINIRE_RAG_HYBRID_RRF_K", "60"))
+        
+        # Parse retriever names from comma-separated list
+        retriever_names_str = os.getenv("REFINIRE_RAG_HYBRID_RETRIEVERS", "simple,tfidf_keyword")
+        retriever_names = [name.strip() for name in retriever_names_str.split(",") if name.strip()]
+        
+        # Parse weights if provided
+        weights_str = os.getenv("REFINIRE_RAG_HYBRID_RETRIEVER_WEIGHTS", "")
+        retriever_weights = None
+        if weights_str:
+            try:
+                retriever_weights = [float(w.strip()) for w in weights_str.split(",")]
+            except ValueError:
+                logger.warning(f"Failed to parse retriever weights: {weights_str}")
+        
+        return cls(
+            top_k=top_k,
+            similarity_threshold=similarity_threshold,
+            enable_filtering=enable_filtering,
+            fusion_method=fusion_method,
+            retriever_weights=retriever_weights,
+            rrf_k=rrf_k,
+            retriever_names=retriever_names
+        )
 
 
 class HybridRetriever(Retriever):
@@ -71,7 +120,7 @@ class HybridRetriever(Retriever):
     """
     
     def __init__(self, 
-                 retrievers: List[Retriever],
+                 retrievers: Optional[List[Retriever]] = None,
                  config: Optional[HybridRetrieverConfig] = None):
         """
         Initialize HybridRetriever
@@ -82,18 +131,50 @@ class HybridRetriever(Retriever):
             config: HybridRetriever configuration
                    HybridRetriever設定
         """
-        super().__init__(config or HybridRetrieverConfig())
-        self.retrievers = retrievers
+        # Create config from environment if not provided
+        if config is None and retrievers is None:
+            config = HybridRetrieverConfig.from_env()
+        else:
+            config = config or HybridRetrieverConfig()
+            
+        super().__init__(config)
+        
+        # Create retrievers from config if not provided
+        if retrievers is None and hasattr(config, 'retriever_names') and config.retriever_names:
+            retrievers = []
+            for retriever_name in config.retriever_names:
+                try:
+                    retriever = PluginRegistry.create_plugin('retrievers', retriever_name)
+                    retrievers.append(retriever)
+                except Exception as e:
+                    logger.warning(f"Failed to create retriever '{retriever_name}': {e}")
+                    
+        self.retrievers = retrievers or []
         
         # Initialize weights if not provided
         if self.config.retriever_weights is None:
-            self.config.retriever_weights = [1.0] * len(retrievers)
-        elif len(self.config.retriever_weights) != len(retrievers):
-            raise ValueError(f"Number of weights ({len(self.config.retriever_weights)}) "
-                           f"must match number of retrievers ({len(retrievers)})")
+            self.config.retriever_weights = [1.0] * len(self.retrievers)
+        elif len(self.config.retriever_weights) != len(self.retrievers):
+            logger.warning(f"Number of weights ({len(self.config.retriever_weights)}) "
+                         f"does not match number of retrievers ({len(self.retrievers)}). "
+                         f"Using equal weights.")
+            self.config.retriever_weights = [1.0] * len(self.retrievers)
         
-        logger.info(f"Initialized HybridRetriever with {len(retrievers)} retrievers "
+        logger.info(f"Initialized HybridRetriever with {len(self.retrievers)} retrievers "
                    f"using {self.config.fusion_method} fusion")
+    
+    @classmethod
+    def from_env(cls) -> "HybridRetriever":
+        """Create HybridRetriever instance from environment variables
+        
+        Creates a HybridRetriever with configuration and dependencies loaded from environment.
+        環境変数から設定と依存関係を読み込んでHybridRetrieverを作成します。
+        
+        Returns:
+            HybridRetriever instance configured from environment
+        """
+        config = HybridRetrieverConfig.from_env()
+        return cls(config=config)
     
     @classmethod
     def get_config_class(cls) -> Type[HybridRetrieverConfig]:

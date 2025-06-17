@@ -6,11 +6,13 @@ search results based on simple heuristics and score adjustments.
 """
 
 import logging
+import os
 import time
 import re
 from typing import List, Optional, Dict, Any, Type
 
 from .base import Reranker, RerankerConfig, SearchResult
+from ..config import RefinireRAGConfig
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +37,33 @@ class SimpleRerankerConfig(RerankerConfig):
         # Set additional attributes from kwargs
         for key, value in kwargs.items():
             setattr(self, key, value)
+    
+    @classmethod
+    def from_env(cls) -> "SimpleRerankerConfig":
+        """Create configuration from environment variables
+        
+        Creates a SimpleRerankerConfig instance from environment variables.
+        環境変数からSimpleRerankerConfigインスタンスを作成します。
+        
+        Returns:
+            SimpleRerankerConfig instance with values from environment
+        """
+        config = RefinireRAGConfig()
+        
+        # Get configuration values from environment
+        top_k = config.reranker_top_k  # Uses REFINIRE_RAG_QUERY_ENGINE_RERANKER_TOP_K
+        score_threshold = float(os.getenv("REFINIRE_RAG_RERANKER_SCORE_THRESHOLD", "0.0"))
+        boost_exact_matches = os.getenv("REFINIRE_RAG_RERANKER_BOOST_EXACT_MATCHES", "true").lower() == "true"
+        boost_recent_docs = os.getenv("REFINIRE_RAG_RERANKER_BOOST_RECENT_DOCS", "false").lower() == "true"
+        length_penalty_factor = float(os.getenv("REFINIRE_RAG_RERANKER_LENGTH_PENALTY_FACTOR", "0.1"))
+        
+        return cls(
+            top_k=top_k,
+            score_threshold=score_threshold,
+            boost_exact_matches=boost_exact_matches,
+            boost_recent_docs=boost_recent_docs,
+            length_penalty_factor=length_penalty_factor
+        )
 
 
 class SimpleReranker(Reranker):
@@ -52,9 +81,28 @@ class SimpleReranker(Reranker):
         Args:
             config: Reranker configuration
         """
-        super().__init__(config or SimpleRerankerConfig())
+        # Create config from environment if not provided
+        if config is None:
+            config = SimpleRerankerConfig.from_env()
+        else:
+            config = config or SimpleRerankerConfig()
+            
+        super().__init__(config)
         
         logger.info("Initialized SimpleReranker with heuristic scoring")
+    
+    @classmethod
+    def from_env(cls) -> "SimpleReranker":
+        """Create SimpleReranker instance from environment variables
+        
+        Creates a SimpleReranker with configuration loaded from environment.
+        環境変数から設定を読み込んでSimpleRerankerを作成します。
+        
+        Returns:
+            SimpleReranker instance configured from environment
+        """
+        config = SimpleRerankerConfig.from_env()
+        return cls(config=config)
     
     @classmethod
     def get_config_class(cls) -> Type[SimpleRerankerConfig]:

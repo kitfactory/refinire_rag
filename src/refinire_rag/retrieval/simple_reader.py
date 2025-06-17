@@ -4,12 +4,14 @@ A basic implementation of the AnswerSynthesizer interface that generates
 answers using OpenAI's GPT models.
 """
 
+import os
 import time
 from typing import List, Optional, Dict, Any, Type
 import logging
 
 from .base import AnswerSynthesizer, AnswerSynthesizerConfig, SearchResult
 from ..utils.model_config import get_default_llm_model
+from ..config import RefinireRAGConfig
 
 try:
     from refinire import LLMPipeline
@@ -67,6 +69,47 @@ class SimpleAnswerSynthesizerConfig(AnswerSynthesizerConfig):
         self.openai_api_key = openai_api_key
         self.openai_organization = openai_organization
         # Additional initialization can be added here if needed
+    
+    @classmethod
+    def from_env(cls) -> "SimpleAnswerSynthesizerConfig":
+        """Create configuration from environment variables
+        
+        Creates a SimpleAnswerSynthesizerConfig instance from environment variables.
+        環境変数からSimpleAnswerSynthesizerConfigインスタンスを作成します。
+        
+        Returns:
+            SimpleAnswerSynthesizerConfig instance with values from environment
+        """
+        config = RefinireRAGConfig()
+        
+        # Get configuration values from environment
+        max_context_length = int(os.getenv("REFINIRE_RAG_SYNTHESIZER_MAX_CONTEXT_LENGTH", "2000"))
+        llm_model = get_default_llm_model()  # Uses env vars hierarchy
+        temperature = float(os.getenv("REFINIRE_RAG_SYNTHESIZER_TEMPERATURE", "0.1"))
+        max_tokens = int(os.getenv("REFINIRE_RAG_SYNTHESIZER_MAX_TOKENS", "500"))
+        
+        generation_instructions = os.getenv(
+            "REFINIRE_RAG_SYNTHESIZER_GENERATION_INSTRUCTIONS",
+            "You are a helpful assistant that answers questions based on the provided context."
+        )
+        system_prompt = os.getenv(
+            "REFINIRE_RAG_SYNTHESIZER_SYSTEM_PROMPT", 
+            "You are a helpful assistant that answers questions based on the provided context."
+        )
+        
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        openai_organization = os.getenv("OPENAI_ORGANIZATION")
+        
+        return cls(
+            max_context_length=max_context_length,
+            llm_model=llm_model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            generation_instructions=generation_instructions,
+            system_prompt=system_prompt,
+            openai_api_key=openai_api_key,
+            openai_organization=openai_organization
+        )
 
 
 class SimpleAnswerSynthesizer(AnswerSynthesizer):
@@ -83,7 +126,13 @@ class SimpleAnswerSynthesizer(AnswerSynthesizer):
             config: Synthesizer configuration
                    合成器の設定
         """
-        super().__init__(config or SimpleAnswerSynthesizerConfig())
+        # Create config from environment if not provided
+        if config is None:
+            config = SimpleAnswerSynthesizerConfig.from_env()
+        else:
+            config = config or SimpleAnswerSynthesizerConfig()
+            
+        super().__init__(config)
         
         # Initialize Refinire LLM Pipeline (preferred) or fallback to OpenAI
         if LLMPipeline is not None:
@@ -115,6 +164,19 @@ class SimpleAnswerSynthesizer(AnswerSynthesizer):
         except ImportError:
             logger.error("Neither Refinire nor OpenAI is available. SimpleAnswerSynthesizer will not work.")
             self._use_refinire = None
+    
+    @classmethod
+    def from_env(cls) -> "SimpleAnswerSynthesizer":
+        """Create SimpleAnswerSynthesizer instance from environment variables
+        
+        Creates a SimpleAnswerSynthesizer with configuration loaded from environment.
+        環境変数から設定を読み込んでSimpleAnswerSynthesizerを作成します。
+        
+        Returns:
+            SimpleAnswerSynthesizer instance configured from environment
+        """
+        config = SimpleAnswerSynthesizerConfig.from_env()
+        return cls(config=config)
     
     @classmethod
     def get_config_class(cls) -> Type[SimpleAnswerSynthesizerConfig]:
