@@ -40,10 +40,10 @@ class TestTFIDFKeywordStoreInitialization:
         assert store.doc_ids == []
         assert store.index_built is False
         
-        # Check inherited processing stats from DocumentProcessor
+        # Check inherited processing stats from DocumentProcessor 
         assert "documents_processed" in store.processing_stats
         assert "total_processing_time" in store.processing_stats
-        assert "errors" in store.processing_stats
+        assert "errors_encountered" in store.processing_stats
         assert "documents_indexed" in store.processing_stats
         assert "searches_performed" in store.processing_stats
     
@@ -614,15 +614,13 @@ class TestTFIDFKeywordStoreRetrieve:
         store.processing_stats["queries_processed"] = 0
         
         initial_queries = store.processing_stats["queries_processed"]
-        # Note: retrieve method creates its own "processing_time" field
-        store.processing_stats["processing_time"] = 0.0
-        initial_time = store.processing_stats["processing_time"]
+        initial_time = store.processing_stats["total_processing_time"]
         
         with patch.object(store, '_search_index', return_value=[]):
             store.retrieve("test query")
             
             assert store.processing_stats["queries_processed"] == initial_queries + 1
-            assert store.processing_stats["processing_time"] > initial_time
+            assert store.processing_stats["total_processing_time"] > initial_time
     
     def test_retrieve_handles_error(self):
         """
@@ -793,7 +791,7 @@ class TestTFIDFKeywordStoreProcessingStats:
         
         # Check inherited stats
         assert "queries_processed" in stats
-        assert "processing_time" in stats
+        assert "total_processing_time" in stats  
         assert "errors_encountered" in stats
         
         # Check TF-IDF specific stats
@@ -817,11 +815,13 @@ class TestTFIDFKeywordStoreErrorHandling:
         文書インデックス時のエラー処理テスト
         """
         store = TFIDFKeywordStore()
+        document = Document(id="doc1", content="Test content", metadata={})
         
-        # Create a document that will cause issues
-        with patch.object(store.documents, '__setitem__', side_effect=RuntimeError("Index error")):
+        # Mock documents dictionary to raise error on assignment
+        with patch.object(store, 'documents', spec=dict) as mock_dict:
+            mock_dict.__setitem__ = Mock(side_effect=RuntimeError("Index error"))
+            
             with pytest.raises(RuntimeError):
-                document = Document(id="doc1", content="Test content", metadata={})
                 store.index_document(document)
     
     def test_index_documents_error(self):
@@ -832,7 +832,10 @@ class TestTFIDFKeywordStoreErrorHandling:
         store = TFIDFKeywordStore()
         documents = [Document(id="doc1", content="Content", metadata={})]
         
-        with patch.object(store.documents, '__setitem__', side_effect=RuntimeError("Batch index error")):
+        # Mock documents dictionary to raise error
+        with patch.object(store, 'documents', spec=dict) as mock_dict:
+            mock_dict.__setitem__ = Mock(side_effect=RuntimeError("Batch index error"))
+            
             with pytest.raises(RuntimeError):
                 store.index_documents(documents)
     
@@ -845,7 +848,11 @@ class TestTFIDFKeywordStoreErrorHandling:
         document = Document(id="doc1", content="Test content", metadata={})
         store.index_document(document)
         
-        with patch.object(store.documents, '__delitem__', side_effect=RuntimeError("Remove error")):
+        # Mock documents dictionary to raise error on deletion
+        with patch.object(store, 'documents', spec=dict) as mock_dict:
+            mock_dict.__contains__ = Mock(return_value=True)
+            mock_dict.__delitem__ = Mock(side_effect=RuntimeError("Remove error"))
+            
             result = store.remove_document("doc1")
             
             assert result is False
@@ -860,7 +867,12 @@ class TestTFIDFKeywordStoreErrorHandling:
         store.index_document(document)
         
         updated_doc = Document(id="doc1", content="Updated content", metadata={})
-        with patch.object(store.documents, '__setitem__', side_effect=RuntimeError("Update error")):
+        
+        # Mock documents dictionary to raise error on update
+        with patch.object(store, 'documents', spec=dict) as mock_dict:
+            mock_dict.__contains__ = Mock(return_value=True)
+            mock_dict.__setitem__ = Mock(side_effect=RuntimeError("Update error"))
+            
             result = store.update_document(updated_doc)
             
             assert result is False
@@ -872,7 +884,10 @@ class TestTFIDFKeywordStoreErrorHandling:
         """
         store = TFIDFKeywordStore()
         
-        with patch.object(store.documents, 'clear', side_effect=RuntimeError("Clear error")):
+        # Mock documents dictionary to raise error on clear
+        with patch.object(store, 'documents', spec=dict) as mock_dict:
+            mock_dict.clear = Mock(side_effect=RuntimeError("Clear error"))
+            
             with pytest.raises(RuntimeError):
                 store.clear_index()
 
@@ -1000,12 +1015,11 @@ class TestTFIDFKeywordStoreEdgeCases:
         store = TFIDFKeywordStore()
         store.index_built = True
         
-        store.processing_stats["processing_time"] = 0.0
-        start_time = store.processing_stats["processing_time"]
+        start_time = store.processing_stats["total_processing_time"]
         
         with patch.object(store, '_search_index', return_value=[]):
             with patch('time.time', side_effect=[1000.0, 1001.5]):  # 1.5 second duration
                 store.retrieve("test query")
         
         # Should have added 1.5 seconds to processing time
-        assert store.processing_stats["processing_time"] >= start_time + 1.5
+        assert store.processing_stats["total_processing_time"] >= start_time + 1.5

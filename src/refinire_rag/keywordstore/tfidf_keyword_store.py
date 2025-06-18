@@ -51,6 +51,12 @@ class TFIDFKeywordStore(KeywordSearch):
         self.doc_ids = []
         self.index_built = False
         
+        # Add TF-IDF specific stats
+        self.processing_stats.update({
+            "queries_processed": 0,
+            "errors_encountered": 0
+        })
+        
         logger.info("Initialized TFIDFKeywordStore")
     
     def retrieve(self, 
@@ -74,7 +80,11 @@ class TFIDFKeywordStore(KeywordSearch):
                                関連度でソートされた検索結果
         """
         start_time = time.time()
-        limit = limit or self.config.top_k
+        limit = limit if limit is not None else self.config.top_k
+        
+        # Return empty list if limit is 0
+        if limit == 0:
+            return []
         
         try:
             logger.debug(f"TF-IDF search for query: '{query}' (limit={limit})")
@@ -118,13 +128,17 @@ class TFIDFKeywordStore(KeywordSearch):
                 search_results.append(search_result)
                 
                 # Stop when we have enough results
-                if len(search_results) >= limit:
+                if limit > 0 and len(search_results) >= limit:
                     break
             
             # Update statistics
             processing_time = time.time() - start_time
             self.processing_stats["queries_processed"] += 1
-            self.processing_stats["processing_time"] += processing_time
+            # Use total_processing_time to match DocumentProcessor
+            if "total_processing_time" in self.processing_stats:
+                self.processing_stats["total_processing_time"] += processing_time
+            else:
+                self.processing_stats["processing_time"] = self.processing_stats.get("processing_time", 0.0) + processing_time
             
             logger.debug(f"TF-IDF search completed: {len(search_results)} results in {processing_time:.3f}s")
             return search_results
