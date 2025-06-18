@@ -298,27 +298,29 @@ class TestCorpusManagerBasic:
         Test _get_corpus_file_path with custom directory
         カスタムディレクトリでの_get_corpus_file_path テスト
         """
-        # Test with custom directory
-        track_path = CorpusManager._get_corpus_file_path('mycorpus', 'track', '/custom/dir')
-        
-        # Verify path
-        assert track_path == Path('/custom/dir/mycorpus_track.json')
+        with patch('refinire_rag.application.corpus_manager_new.Path.mkdir') as mock_mkdir:
+            # Test with custom directory
+            track_path = CorpusManager._get_corpus_file_path('mycorpus', 'track', '/custom/dir')
+            
+            # Verify path
+            assert track_path == Path('/custom/dir/mycorpus_track.json')
 
     def test_get_default_output_directory(self):
         """
         Test _get_default_output_directory functionality
         _get_default_output_directory機能のテスト
         """
-        with patch('refinire_rag.application.corpus_manager_new.CorpusManager._get_refinire_rag_dir') as mock_get_dir:
-            mock_get_dir.return_value = Path('/test/refinire/rag')
+        with patch('refinire_rag.application.corpus_manager_new.Path.home') as mock_home:
+            mock_home.return_value = Path('/test/home')
             
             with patch('refinire_rag.application.corpus_manager_new.Path.mkdir') as mock_mkdir:
-                # Test default output directory
+                # Test default output directory (no environment variable)
                 result = CorpusManager._get_default_output_directory('TEST_ENV_VAR', 'subdirectory')
                 
-                # Verify result (includes rag subdirectory)
-                expected_path = Path('/test/refinire/rag/subdirectory')
+                # Verify result (uses home/.refinire/subdirectory when no env var)
+                expected_path = Path('/test/home/.refinire/subdirectory')
                 assert result == expected_path
+                mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
     @patch.dict(os.environ, {'TEST_ENV_VAR': '/custom/output'})
     def test_get_default_output_directory_with_env_var(self):
@@ -351,8 +353,9 @@ class TestCorpusManagerBasic:
         
         # Verify config
         assert config is not None
-        assert hasattr(config, 'extensions')
-        assert 'txt' in config.extensions
+        assert hasattr(config, 'extension_filter')
+        assert config.extension_filter is not None
+        assert '.txt' in config.extension_filter.include_extensions
 
     @patch('refinire_rag.application.corpus_manager_new.PluginFactory')
     def test_create_filter_config_from_glob_invalid(self, mock_factory):
