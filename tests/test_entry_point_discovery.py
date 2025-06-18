@@ -15,7 +15,7 @@ from typing import Dict, Any
 # Import the modules to test
 from refinire_rag.plugins.auto_discovery import PluginAutoDiscovery, auto_discovery
 from refinire_rag.vectorstore import _VectorStoreRegistry
-from refinire_rag.retrieval.vector_store_base import VectorStore
+from refinire_rag.vectorstore.vector_store_base import VectorStore
 from refinire_rag.plugins.plugin_config import PluginConfig
 
 from refinire_rag import vectorstore

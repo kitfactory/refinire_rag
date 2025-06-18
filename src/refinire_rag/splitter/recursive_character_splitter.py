@@ -6,6 +6,7 @@ This module provides a recursive character-based text splitter that splits text 
 このモジュールは、複数レベルのセパレータ（例：段落、文、単語）を使ってテキストを再帰的に分割する文字ベースのテキスト分割プロセッサーを提供します。
 """
 
+import os
 from typing import Iterator, Iterable, Optional, Any, List
 from refinire_rag.splitter.splitter import Splitter
 from refinire_rag.models.document import Document
@@ -18,8 +19,8 @@ class RecursiveCharacterTextSplitter(Splitter):
     """
     def __init__(
         self,
-        chunk_size: int = 1000,
-        overlap_size: int = 0,
+        chunk_size: int = None,
+        overlap_size: int = None,
         separators: Optional[List[str]] = None
     ):
         """
@@ -27,20 +28,45 @@ class RecursiveCharacterTextSplitter(Splitter):
         再帰的文字分割プロセッサーを初期化
 
         Args:
-            chunk_size: Maximum number of characters per chunk
-            チャンクサイズ: 各チャンクの最大文字数
-            overlap_size: Number of characters to overlap between chunks
-            オーバーラップサイズ: チャンク間のオーバーラップ文字数
-            separators: List of separators to use for recursive splitting
-            セパレータリスト: 再帰的分割に使用するセパレータのリスト
+            chunk_size: Maximum number of characters per chunk. If None, reads from REFINIRE_RAG_RECURSIVE_CHUNK_SIZE environment variable (default: 1000)
+            チャンクサイズ: 各チャンクの最大文字数。Noneの場合、REFINIRE_RAG_RECURSIVE_CHUNK_SIZE環境変数から読み取り (デフォルト: 1000)
+            overlap_size: Number of characters to overlap between chunks. If None, reads from REFINIRE_RAG_RECURSIVE_OVERLAP environment variable (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップ文字数。Noneの場合、REFINIRE_RAG_RECURSIVE_OVERLAP環境変数から読み取り (デフォルト: 0)
+            separators: List of separators to use for recursive splitting. If None, reads from REFINIRE_RAG_RECURSIVE_SEPARATORS environment variable (default: ["\\n\\n", "\\n", ".", " ", ""])
+            セパレータリスト: 再帰的分割に使用するセパレータのリスト。Noneの場合、REFINIRE_RAG_RECURSIVE_SEPARATORS環境変数から読み取り (デフォルト: ["\\n\\n", "\\n", ".", " ", ""])
+
+        Environment variables:
+        環境変数:
+            REFINIRE_RAG_RECURSIVE_CHUNK_SIZE: Maximum number of characters per chunk (default: 1000)
+            チャンクサイズ: 各チャンクの最大文字数 (デフォルト: 1000)
+            REFINIRE_RAG_RECURSIVE_OVERLAP: Number of characters to overlap between chunks (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップ文字数 (デフォルト: 0)
+            REFINIRE_RAG_RECURSIVE_SEPARATORS: Comma-separated list of separators (default: "\\n\\n,\\n,., ,")
+            セパレータリスト: カンマ区切りのセパレータリスト (デフォルト: "\\n\\n,\\n,., ,")
         """
+        # Read from environment variables if arguments are not provided
+        # 引数が提供されていない場合は環境変数から読み取り
+        if chunk_size is None:
+            chunk_size = int(os.getenv('REFINIRE_RAG_RECURSIVE_CHUNK_SIZE', '1000'))
+        if overlap_size is None:
+            overlap_size = int(os.getenv('REFINIRE_RAG_RECURSIVE_OVERLAP', '0'))
         if separators is None:
-            separators = ["\n\n", "\n", ".", " ", ""]
+            separators_str = os.getenv('REFINIRE_RAG_RECURSIVE_SEPARATORS', '\\n\\n,\\n,., ,')
+            
+            # Parse separators from comma-separated string, handling escape sequences
+            separators = []
+            for sep in separators_str.split(','):
+                sep = sep.strip()
+                # Handle escape sequences
+                sep = sep.replace('\\n', '\n').replace('\\t', '\t')
+                separators.append(sep)
+            
         super().__init__({
             'chunk_size': chunk_size,
             'overlap_size': overlap_size,
             'separators': separators
         })
+
 
     def process(self, documents: Iterable[Document], config: Optional[Any] = None) -> Iterator[Document]:
         """

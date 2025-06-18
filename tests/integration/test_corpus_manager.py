@@ -15,8 +15,8 @@ from typing import List
 # Add src to path so we can import our modules
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from src.refinire_rag.models.document import Document
-from src.refinire_rag.application.corpus_manager_new import CorpusManager
+from refinire_rag.models.document import Document
+from refinire_rag.application.corpus_manager_new import CorpusManager
 # Legacy test - temporarily disabled due to import changes
 
 # Import custom processors for advanced testing

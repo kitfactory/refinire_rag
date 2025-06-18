@@ -12,7 +12,7 @@ Document data model for refinire-rag
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 
 @dataclass
@@ -22,7 +22,7 @@ class Document:
     / コンテンツとメタデータを持つ文書
     """
     id: str
-    content: str
+    content: Optional[str]
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -49,7 +49,7 @@ class Document:
                 elif field_name == "file_type":
                     self.metadata[field_name] = "unknown"
                 elif field_name == "size_bytes":
-                    self.metadata[field_name] = len(self.content.encode('utf-8'))
+                    self.metadata[field_name] = len(self.content.encode('utf-8')) if self.content else 0
                 elif field_name in ["created_at", "updated_at"]:
                     # If not provided, use current time
                     # / 提供されていない場合は現在時刻を使用

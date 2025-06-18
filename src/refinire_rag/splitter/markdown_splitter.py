@@ -6,6 +6,7 @@ markdown structure and formatting.
 """
 
 import logging
+import os
 from typing import List, Optional, Type, Any, Iterator, Dict
 import re
 
@@ -22,23 +23,43 @@ class MarkdownTextSplitter(Splitter):
     テキストを適切なサイズのチャンクに分割します。
     """
     
-    def __init__(self, chunk_size: int = 1000, overlap_size: int = 200):
+    def __init__(self, chunk_size: int = None, overlap_size: int = None):
         """
         Initialize the MarkdownTextSplitter
         MarkdownTextSplitterを初期化
         Args:
-            chunk_size: Maximum size of each chunk (in characters)
-            chunk_size: 各チャンクの最大サイズ（文字数）
-            overlap_size: Overlap size between chunks (in characters)
-            overlap_size: チャンク間のオーバーラップ（文字数）
+            chunk_size: Maximum size of each chunk (in characters). If None, reads from REFINIRE_RAG_MD_CHUNK_SIZE environment variable (default: 1000)
+            chunk_size: 各チャンクの最大サイズ（文字数）。Noneの場合、REFINIRE_RAG_MD_CHUNK_SIZE環境変数から読み取り（デフォルト: 1000）
+            overlap_size: Overlap size between chunks (in characters). If None, reads from REFINIRE_RAG_MD_OVERLAP environment variable (default: 200)
+            overlap_size: チャンク間のオーバーラップ（文字数）。Noneの場合、REFINIRE_RAG_MD_OVERLAP環境変数から読み取り（デフォルト: 200）
+
+        Environment variables:
+        環境変数:
+            REFINIRE_RAG_MD_CHUNK_SIZE: Maximum size of each chunk in characters (default: 1000)
+            チャンクサイズ: 各チャンクの最大サイズ（文字数）(デフォルト: 1000)
+            REFINIRE_RAG_MD_OVERLAP: Overlap size between chunks in characters (default: 200)
+            オーバーラップサイズ: チャンク間のオーバーラップ（文字数）(デフォルト: 200)
         """
-        super().__init__(chunk_size, overlap_size)
+        # Read from environment variables if arguments are not provided
+        # 引数が提供されていない場合は環境変数から読み取り
+        if chunk_size is None:
+            chunk_size = int(os.getenv('REFINIRE_RAG_MD_CHUNK_SIZE', '1000'))
+        if overlap_size is None:
+            overlap_size = int(os.getenv('REFINIRE_RAG_MD_OVERLAP', '200'))
+            
+        super().__init__({
+            'chunk_size': chunk_size,
+            'overlap_size': overlap_size
+        })
+        self.chunk_size = chunk_size
+        self.overlap_size = overlap_size
         self.processing_stats = {
             "headers_preserved": 0,
             "lists_preserved": 0,
             "code_blocks_preserved": 0,
             "tables_preserved": 0
         }
+
         
     def process(self, documents: List[Document]) -> Iterator[Document]:
         """

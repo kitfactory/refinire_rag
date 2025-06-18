@@ -37,14 +37,14 @@ def test_full_integration():
         try:
             # Test 1: Create CorpusManager
             print("\n1. Testing CorpusManager.from_env()...")
-            from src.refinire_rag.application.corpus_manager_new import CorpusManager
+            from refinire_rag.application.corpus_manager_new import CorpusManager
             
             corpus_manager = CorpusManager.from_env()
             print(f"✓ CorpusManager created: {type(corpus_manager).__name__}")
             
             # Test 2: Create QueryEngine
             print("\n2. Testing QueryEngine.from_env()...")
-            from src.refinire_rag.application.query_engine_new import QueryEngine
+            from refinire_rag.application.query_engine_new import QueryEngine
             
             query_engine = QueryEngine.from_env("integration_test_corpus")
             print(f"✓ QueryEngine created: {type(query_engine).__name__}")
@@ -54,7 +54,7 @@ def test_full_integration():
             
             # Test 3: Create QualityLab
             print("\n3. Testing QualityLab.from_env()...")
-            from src.refinire_rag.application.quality_lab import QualityLab
+            from refinire_rag.application.quality_lab import QualityLab
             
             quality_lab = QualityLab.from_env()
             print(f"✓ QualityLab created: {type(quality_lab).__name__}")

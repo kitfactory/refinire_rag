@@ -3,6 +3,7 @@ Size-based document splitting processor
 サイズベースの文書分割プロセッサー
 """
 
+import os
 import logging
 from typing import Iterator, Iterable, Optional, Any
 from refinire_rag.splitter.splitter import Splitter
@@ -17,22 +18,39 @@ class SizeSplitter(Splitter):
     
     def __init__(
         self,
-        chunk_size: int = 1024,  # 1KB default
-        overlap_size: int = 0    # No overlap by default
+        chunk_size: int = None,
+        overlap_size: int = None
     ):
         """Initialize size splitter
         サイズ分割プロセッサーを初期化
         
         Args:
-            chunk_size: Maximum size of each chunk in bytes
-            チャンクサイズ: 各チャンクの最大サイズ（バイト）
-            overlap_size: Size of overlap between chunks in bytes
-            オーバーラップサイズ: チャンク間のオーバーラップサイズ（バイト）
+            chunk_size: Maximum size of each chunk in bytes. If None, reads from REFINIRE_RAG_SIZE_CHUNK_SIZE environment variable (default: 1024)
+            チャンクサイズ: 各チャンクの最大サイズ（バイト）。Noneの場合、REFINIRE_RAG_SIZE_CHUNK_SIZE環境変数から読み取り（デフォルト: 1024）
+            overlap_size: Size of overlap between chunks in bytes. If None, reads from REFINIRE_RAG_SIZE_OVERLAP environment variable (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップサイズ（バイト）。Noneの場合、REFINIRE_RAG_SIZE_OVERLAP環境変数から読み取り（デフォルト: 0）
+
+        Environment variables:
+        環境変数:
+            REFINIRE_RAG_SIZE_CHUNK_SIZE: Maximum size of each chunk in characters (default: 1024)
+            チャンクサイズ: 各チャンクの最大サイズ（文字数） (デフォルト: 1024)
+            REFINIRE_RAG_SIZE_OVERLAP: Size of overlap between chunks in characters (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップサイズ（文字数） (デフォルト: 0)
         """
+        # Read from environment variables if arguments are not provided
+        # 引数が提供されていない場合は環境変数から読み取り
+        if chunk_size is None:
+            chunk_size = int(os.getenv('REFINIRE_RAG_SIZE_CHUNK_SIZE', '1024'))
+        if overlap_size is None:
+            overlap_size = int(os.getenv('REFINIRE_RAG_SIZE_OVERLAP', '0'))
+            
         super().__init__({
             'chunk_size': chunk_size,
             'overlap_size': overlap_size
         })
+        self.chunk_size = chunk_size
+        self.overlap_size = overlap_size
+
     
     def process(self, documents: Iterable[Document], config: Optional[Any] = None) -> Iterator[Document]:
         """Split documents into chunks based on size

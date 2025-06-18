@@ -6,6 +6,7 @@ This module provides an HTML-aware text splitter that splits text into chunks ba
 このモジュールは、HTML構造に基づいてテキストをチャンクに分割する分割プロセッサーを提供します。
 """
 
+import os
 import re
 from typing import Iterator, Iterable, Optional, Any, List
 from refinire_rag.splitter.splitter import Splitter
@@ -19,8 +20,8 @@ class HTMLTextSplitter(Splitter):
     """
     def __init__(
         self,
-        chunk_size: int = 1000,
-        overlap_size: int = 0,
+        chunk_size: int = None,
+        overlap_size: int = None,
         separator: str = "\n"
     ):
         """
@@ -28,18 +29,36 @@ class HTMLTextSplitter(Splitter):
         HTML分割プロセッサーを初期化
 
         Args:
-            chunk_size: Maximum number of characters per chunk
-            チャンクサイズ: 各チャンクの最大文字数
-            overlap_size: Number of characters to overlap between chunks
-            オーバーラップサイズ: チャンク間のオーバーラップ文字数
+            chunk_size: Maximum number of characters per chunk. If None, reads from REFINIRE_RAG_HTML_CHUNK_SIZE environment variable (default: 1000)
+            チャンクサイズ: 各チャンクの最大文字数。Noneの場合、REFINIRE_RAG_HTML_CHUNK_SIZE環境変数から読み取り（デフォルト: 1000）
+            overlap_size: Number of characters to overlap between chunks. If None, reads from REFINIRE_RAG_HTML_OVERLAP environment variable (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップ文字数。Noneの場合、REFINIRE_RAG_HTML_OVERLAP環境変数から読み取り（デフォルト: 0）
             separator: Separator for joining HTML blocks
             セパレータ: HTMLブロックを結合する区切り文字
+
+        Environment variables:
+        環境変数:
+            REFINIRE_RAG_HTML_CHUNK_SIZE: Maximum number of characters per chunk (default: 1000)
+            チャンクサイズ: 各チャンクの最大文字数 (デフォルト: 1000)
+            REFINIRE_RAG_HTML_OVERLAP: Number of characters to overlap between chunks (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップ文字数 (デフォルト: 0)
         """
+        # Read from environment variables if arguments are not provided
+        # 引数が提供されていない場合は環境変数から読み取り
+        if chunk_size is None:
+            chunk_size = int(os.getenv('REFINIRE_RAG_HTML_CHUNK_SIZE', '1000'))
+        if overlap_size is None:
+            overlap_size = int(os.getenv('REFINIRE_RAG_HTML_OVERLAP', '0'))
+            
         super().__init__({
             'chunk_size': chunk_size,
             'overlap_size': overlap_size,
             'separator': separator
         })
+        self.chunk_size = chunk_size
+        self.overlap_size = overlap_size
+        self.separator = separator
+
 
     def process(self, documents: Iterable[Document], config: Optional[Any] = None) -> Iterator[Document]:
         """

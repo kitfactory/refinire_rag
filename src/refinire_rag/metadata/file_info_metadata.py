@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 from enum import Enum, auto
 from .metadata import Metadata
-from ..document import Document
+from ..models.document import Document
 
 class FileAttribute(Enum):
     """

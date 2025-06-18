@@ -13,7 +13,7 @@ def test_quality_lab_basic_imports():
     print("=== Testing Basic Imports ===")
     
     try:
-        from src.refinire_rag.application.quality_lab import QualityLab, QualityLabConfig
+        from refinire_rag.application.quality_lab import QualityLab, QualityLabConfig
         print("✓ QualityLab and QualityLabConfig imported successfully")
     except Exception as e:
         print(f"✗ Import failed: {e}")

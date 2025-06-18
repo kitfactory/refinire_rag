@@ -6,6 +6,7 @@ This module provides a character-based text splitter that splits text into chunk
 このモジュールは、テキストを指定されたサイズのチャンクに分割する文字ベースのテキスト分割プロセッサーを提供します。
 """
 
+import os
 from typing import Iterator, Iterable, Optional, Any
 from refinire_rag.splitter.splitter import Splitter
 from refinire_rag.models.document import Document
@@ -18,19 +19,33 @@ class CharacterTextSplitter(Splitter):
     """
     def __init__(
         self,
-        chunk_size: int = 1000,
-        overlap_size: int = 0
+        chunk_size: int = None,
+        overlap_size: int = None
     ):
         """
         Initialize character splitter
         文字分割プロセッサーを初期化
 
         Args:
-            chunk_size: Maximum number of characters per chunk
-            チャンクサイズ: 各チャンクの最大文字数
-            overlap_size: Number of characters to overlap between chunks
-            オーバーラップサイズ: チャンク間のオーバーラップ文字数
+            chunk_size: Maximum number of characters per chunk. If None, reads from REFINIRE_RAG_CHARACTER_CHUNK_SIZE environment variable (default: 1000)
+            チャンクサイズ: 各チャンクの最大文字数。Noneの場合、REFINIRE_RAG_CHARACTER_CHUNK_SIZE環境変数から読み取り (デフォルト: 1000)
+            overlap_size: Number of characters to overlap between chunks. If None, reads from REFINIRE_RAG_CHARACTER_OVERLAP environment variable (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップ文字数。Noneの場合、REFINIRE_RAG_CHARACTER_OVERLAP環境変数から読み取り (デフォルト: 0)
+
+        Environment variables:
+        環境変数:
+            REFINIRE_RAG_CHARACTER_CHUNK_SIZE: Maximum number of characters per chunk (default: 1000)
+            チャンクサイズ: 各チャンクの最大文字数 (デフォルト: 1000)
+            REFINIRE_RAG_CHARACTER_OVERLAP: Number of characters to overlap between chunks (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップ文字数 (デフォルト: 0)
         """
+        # Read from environment variables if arguments are not provided
+        # 引数が提供されていない場合は環境変数から読み取り
+        if chunk_size is None:
+            chunk_size = int(os.getenv('REFINIRE_RAG_CHARACTER_CHUNK_SIZE', '1000'))
+        if overlap_size is None:
+            overlap_size = int(os.getenv('REFINIRE_RAG_CHARACTER_OVERLAP', '0'))
+            
         super().__init__({
             'chunk_size': chunk_size,
             'overlap_size': overlap_size

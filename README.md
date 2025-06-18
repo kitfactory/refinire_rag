@@ -171,11 +171,11 @@ Detailed API documentation for each module.
 ### 🏗️ Architecture & Design
 System design philosophy and implementation details.
 
-- [Architecture Overview](docs/architecture.md)
-- [Design Philosophy](docs/concept.md)
-- [Loader Implementation](docs/loader_implementation.md) - Detailed document loading guide
-- [Requirements](docs/requirements.md)
-- [Function Specifications](docs/function_spec.md)
+- [Design Philosophy & Concept](docs/concept.md) - **Core design principles and architecture**
+- [Architecture Overview](docs/design/architecture.md)
+- [Requirements](docs/design/requirements.md)
+- [Function Specifications](docs/design/function_spec.md)
+- [Loader Implementation](docs/implementation/loader_implementation.md) - Detailed document loading guide
 
 ## Key Features
 

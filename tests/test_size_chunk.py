@@ -4,7 +4,7 @@ SizeChunkProcessorのテスト
 """
 
 import pytest
-from refinire_rag.processor import SizeChunkProcessor
+from refinire_rag.splitter.size_splitter import SizeSplitter as SizeChunkProcessor
 from refinire_rag.models.document import Document
 
 def test_small_document():

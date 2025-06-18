@@ -6,6 +6,7 @@ This module provides a token-based text splitter that splits text into chunks ba
 このモジュールは、トークン数に基づいてテキストをチャンクに分割するトークンベースのテキスト分割プロセッサーを提供します。
 """
 
+import os
 from typing import Iterator, Iterable, Optional, Any, List
 from refinire_rag.splitter.splitter import Splitter
 from refinire_rag.models.document import Document
@@ -18,22 +19,40 @@ class TokenTextSplitter(Splitter):
     """
     def __init__(
         self,
-        chunk_size: int = 1000,
-        overlap_size: int = 0,
-        separator: str = " "
+        chunk_size: int = None,
+        overlap_size: int = None,
+        separator: str = None
     ):
         """
         Initialize token splitter
         トークン分割プロセッサーを初期化
 
         Args:
-            chunk_size: Maximum number of tokens per chunk
-            チャンクサイズ: 各チャンクの最大トークン数
-            overlap_size: Number of tokens to overlap between chunks
-            オーバーラップサイズ: チャンク間のオーバーラップトークン数
-            separator: Token separator
-            セパレータ: トークンの区切り文字
+            chunk_size: Maximum number of tokens per chunk. If None, reads from REFINIRE_RAG_TOKEN_CHUNK_SIZE environment variable (default: 1000)
+            チャンクサイズ: 各チャンクの最大トークン数。Noneの場合、REFINIRE_RAG_TOKEN_CHUNK_SIZE環境変数から読み取り (デフォルト: 1000)
+            overlap_size: Number of tokens to overlap between chunks. If None, reads from REFINIRE_RAG_TOKEN_OVERLAP environment variable (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップトークン数。Noneの場合、REFINIRE_RAG_TOKEN_OVERLAP環境変数から読み取り (デフォルト: 0)
+            separator: Token separator. If None, reads from REFINIRE_RAG_TOKEN_SEPARATOR environment variable (default: " ")
+            セパレータ: トークンの区切り文字。Noneの場合、REFINIRE_RAG_TOKEN_SEPARATOR環境変数から読み取り (デフォルト: " ")
+
+        Environment variables:
+        環境変数:
+            REFINIRE_RAG_TOKEN_CHUNK_SIZE: Maximum number of tokens per chunk (default: 1000)
+            チャンクサイズ: 各チャンクの最大トークン数 (デフォルト: 1000)
+            REFINIRE_RAG_TOKEN_OVERLAP: Number of tokens to overlap between chunks (default: 0)
+            オーバーラップサイズ: チャンク間のオーバーラップトークン数 (デフォルト: 0)
+            REFINIRE_RAG_TOKEN_SEPARATOR: Token separator (default: " ")
+            セパレータ: トークンの区切り文字 (デフォルト: " ")
         """
+        # Read from environment variables if arguments are not provided
+        # 引数が提供されていない場合は環境変数から読み取り
+        if chunk_size is None:
+            chunk_size = int(os.getenv('REFINIRE_RAG_TOKEN_CHUNK_SIZE', '1000'))
+        if overlap_size is None:
+            overlap_size = int(os.getenv('REFINIRE_RAG_TOKEN_OVERLAP', '0'))
+        if separator is None:
+            separator = os.getenv('REFINIRE_RAG_TOKEN_SEPARATOR', ' ')
+            
         super().__init__({
             'chunk_size': chunk_size,
             'overlap_size': overlap_size,
@@ -88,6 +107,10 @@ class TokenTextSplitter(Splitter):
         Returns:
             List of text chunks
         """
+        # Handle empty text
+        if not text:
+            return []
+            
         # Split text into tokens
         tokens = text.split(separator)
         if not tokens:
@@ -111,6 +134,7 @@ class TokenTextSplitter(Splitter):
             # Move to next chunk, considering overlap
             if end_idx == len(tokens):
                 break
-            start_idx = end_idx - overlap_size
+            # Ensure start_idx always advances to prevent infinite loops
+            start_idx = max(start_idx + 1, end_idx - overlap_size)
 
         return chunks 
