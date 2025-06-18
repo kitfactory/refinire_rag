@@ -297,9 +297,28 @@ class RecursiveChunker(DocumentProcessor):
         
         # Combine overlap with new split
         if config.keep_separator and separator:
-            return overlap_text + separator + new_split
+            combined = overlap_text + separator + new_split
         else:
-            return overlap_text + new_split
+            combined = overlap_text + new_split
+        
+        # If combined text exceeds chunk size, truncate overlap to fit
+        if len(combined) > config.chunk_size:
+            # Calculate how much overlap we can actually use
+            separator_len = len(separator) if config.keep_separator and separator else 0
+            max_overlap_len = config.chunk_size - len(new_split) - separator_len
+            
+            if max_overlap_len > 0:
+                # Truncate overlap text to fit
+                overlap_text = overlap_text[-max_overlap_len:]
+                if config.keep_separator and separator:
+                    combined = overlap_text + separator + new_split
+                else:
+                    combined = overlap_text + new_split
+            else:
+                # No room for overlap, just return new split
+                combined = new_split
+        
+        return combined
     
     def _create_chunk_documents(self, original_doc: Document, chunks: List[str], 
                                config: RecursiveChunkerConfig) -> List[Document]:
