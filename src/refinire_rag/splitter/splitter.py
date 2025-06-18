@@ -37,6 +37,6 @@ class Splitter(DocumentProcessor):
             分割後のDocumentのリスト
         """
         results = []
-        for doc in documents:
-            results.extend(self.process(doc))
+        # Pass the documents as an iterable to process method
+        results.extend(list(self.process(documents)))
         return results 

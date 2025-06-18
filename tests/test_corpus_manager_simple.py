@@ -250,8 +250,8 @@ class TestCorpusManagerBasic:
             # Call method
             result = CorpusManager._get_refinire_rag_dir()
             
-            # Verify result
-            expected_path = Path('./refinire')
+            # Verify result (implementation returns refinire/rag subdirectory)
+            expected_path = Path('./refinire/rag')
             assert result == expected_path
             mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
@@ -269,8 +269,8 @@ class TestCorpusManagerBasic:
             # Call method
             result = CorpusManager._get_refinire_rag_dir()
             
-            # Verify result
-            expected_path = Path('/custom/path')
+            # Verify result (implementation returns /custom/path/rag subdirectory)
+            expected_path = Path('/custom/path/rag')
             assert result == expected_path
             mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
@@ -280,17 +280,18 @@ class TestCorpusManagerBasic:
         _get_corpus_file_path機能のテスト
         """
         with patch('refinire_rag.application.corpus_manager_new.CorpusManager._get_refinire_rag_dir') as mock_get_dir:
-            mock_get_dir.return_value = Path('/test/refinire')
+            mock_get_dir.return_value = Path('/test/refinire/rag')
             
-            # Test different file types
-            track_path = CorpusManager._get_corpus_file_path('mycorpus', 'track')
-            dict_path = CorpusManager._get_corpus_file_path('mycorpus', 'dictionary')
-            kg_path = CorpusManager._get_corpus_file_path('mycorpus', 'knowledge_graph')
-            
-            # Verify paths
-            assert track_path == Path('/test/refinire/mycorpus_track.json')
-            assert dict_path == Path('/test/refinire/mycorpus_dictionary.md')
-            assert kg_path == Path('/test/refinire/mycorpus_knowledge_graph.md')
+            with patch('refinire_rag.application.corpus_manager_new.Path.mkdir') as mock_mkdir:
+                # Test different file types
+                track_path = CorpusManager._get_corpus_file_path('mycorpus', 'track')
+                dict_path = CorpusManager._get_corpus_file_path('mycorpus', 'dictionary')
+                kg_path = CorpusManager._get_corpus_file_path('mycorpus', 'knowledge_graph')
+                
+                # Verify paths (paths include rag subdirectory)
+                assert track_path == Path('/test/refinire/rag/mycorpus_track.json')
+                assert dict_path == Path('/test/refinire/rag/mycorpus_dictionary.md')
+                assert kg_path == Path('/test/refinire/rag/mycorpus_knowledge_graph.md')
 
     def test_get_corpus_file_path_custom_directory(self):
         """
@@ -309,14 +310,15 @@ class TestCorpusManagerBasic:
         _get_default_output_directory機能のテスト
         """
         with patch('refinire_rag.application.corpus_manager_new.CorpusManager._get_refinire_rag_dir') as mock_get_dir:
-            mock_get_dir.return_value = Path('/test/refinire')
+            mock_get_dir.return_value = Path('/test/refinire/rag')
             
-            # Test default output directory
-            result = CorpusManager._get_default_output_directory('TEST_ENV_VAR', 'subdirectory')
-            
-            # Verify result
-            expected_path = Path('/test/refinire/subdirectory')
-            assert result == expected_path
+            with patch('refinire_rag.application.corpus_manager_new.Path.mkdir') as mock_mkdir:
+                # Test default output directory
+                result = CorpusManager._get_default_output_directory('TEST_ENV_VAR', 'subdirectory')
+                
+                # Verify result (includes rag subdirectory)
+                expected_path = Path('/test/refinire/rag/subdirectory')
+                assert result == expected_path
 
     @patch.dict(os.environ, {'TEST_ENV_VAR': '/custom/output'})
     def test_get_default_output_directory_with_env_var(self):

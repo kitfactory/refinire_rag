@@ -84,7 +84,12 @@ def test_code_metadata_preservation():
         )
     ])
     assert len(docs) == 1
-    assert docs[0].metadata == metadata
+    # Original metadata should be preserved, plus additional chunk metadata
+    assert docs[0].metadata["language"] == "python"
+    assert docs[0].metadata["file"] == "test.py"
+    assert docs[0].metadata["chunk_index"] == 0
+    assert docs[0].metadata["origin_id"] == "test7"
+    assert docs[0].metadata["original_document_id"] == "test7"
 
 
 def test_language_specific_splitting():
