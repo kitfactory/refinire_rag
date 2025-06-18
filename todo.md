@@ -1,5 +1,124 @@
 # 実施事項
 
+## 0. LangChain同等機能実装（新規追加）
+
+### 0.1 Phase 1: コア8割対応（P0優先度）
+- [x] **PDFLoader**: PDF文書を読み込むLoaderを実装する（LangChain互換）- プラグイン開発中
+- [x] **ChromaVectorStore**: Chromaベクターストアを実装する（LangChain互換）- プラグイン開発中  
+- [x] **BM25Retriever**: BM25キーワード検索を実装する（LangChain互換）- プラグイン開発中
+
+**次の優先度: 以下を実装**
+
+- [x] **CSVLoader**: CSVファイルを読み込むLoaderを実装する（LangChain互換）- ✅ 実装済み
+  - ファイル: `src/refinire_rag/loader/csv_loader.py`
+  - 追加必要: 環境変数対応 (REFINIRE_RAG_CSV_DELIMITER, REFINIRE_RAG_CSV_ENCODING)
+
+- [x] **TextFileLoader**: テキストファイルを読み込むLoaderを実装する（LangChain互換）- ✅ 実装済み  
+  - ファイル: `src/refinire_rag/loader/text_loader.py`
+  - 追加必要: 環境変数対応 (REFINIRE_RAG_TEXT_ENCODING)
+
+- [x] **JSONLoader**: JSONファイルを読み込むLoaderを実装する（LangChain互換）- ✅ 実装済み
+  - ファイル: `src/refinire_rag/loader/json_loader.py`
+  - 追加必要: 環境変数対応
+
+- [x] **HTMLLoader**: HTMLファイルを読み込むLoaderを実装する（LangChain以上）- ✅ 実装済み
+  - ファイル: `src/refinire_rag/loader/html_loader.py`
+  - 優位性: LangChainより高機能
+
+- [x] **DirectoryLoader**: ディレクトリ内ファイル読み込みLoaderを実装する（LangChain互換）- ✅ 実装済み
+  - ファイル: `src/refinire_rag/loader/directory_loader.py`
+
+- [x] **RecursiveChunker**: 再帰的文字分割チャンカーを実装する（LangChain互換）- ✅ 実装完了
+  - ファイル: `src/refinire_rag/processing/recursive_chunker.py`
+  - 機能: 階層的分割、セパレータ設定、オーバーラップ制御、環境変数完全対応
+  - 環境変数: REFINIRE_RAG_CHUNK_SIZE, REFINIRE_RAG_CHUNK_OVERLAP, REFINIRE_RAG_SEPARATORS
+  - テスト: 15/15 PASSED (92%カバレッジ)
+
+- [ ] **HuggingFaceEmbedder**: HuggingFace埋め込みを実装する（LangChain互換）
+  - ファイル: `src/refinire_rag/processing/huggingface_embedder.py`
+  - 機能: HuggingFaceモデル統合、ローカル実行
+  - 環境変数: REFINIRE_RAG_HF_MODEL_NAME, REFINIRE_RAG_HF_DEVICE
+  - 優先度: 🔶 **高優先** (ユーザー需要75%)
+
+- [ ] **BufferMemory**: 会話履歴管理を実装する（LangChain互換）
+  - ファイル: `src/refinire_rag/memory/buffer_memory.py`
+  - 機能: 会話履歴保持、コンテキスト管理
+  - 環境変数: REFINIRE_RAG_MEMORY_MAX_TOKENS, REFINIRE_RAG_MEMORY_TYPE
+  - 優先度: 🔶 **高優先** (ユーザー需要80%)
+
+**P1優先度（後続実装）:**
+
+- [ ] **FaissVectorStore**: Faissベクターストアを実装する（LangChain互換）
+  - ファイル: `src/refinire_rag/storage/faiss_vector_store.py`
+  - 機能: Faiss統合、インデックス保存、高速検索
+  - 環境変数: REFINIRE_RAG_FAISS_INDEX_PATH, REFINIRE_RAG_FAISS_INDEX_TYPE
+  - 優先度: 🔸 **中優先** (ユーザー需要75%)
+
+**Splitter環境変数対応（LangChain完全互換のため）:**
+
+- [ ] **CharacterTextSplitter環境変数対応**: 文字分割の環境変数設定を追加
+  - ファイル: `src/refinire_rag/splitter/character_splitter.py`
+  - 環境変数: REFINIRE_RAG_CHARACTER_CHUNK_SIZE, REFINIRE_RAG_CHARACTER_OVERLAP
+  - 機能: from_env()メソッド、統一メタデータ
+
+- [ ] **TokenTextSplitter環境変数対応**: トークン分割の環境変数設定を追加
+  - ファイル: `src/refinire_rag/splitter/token_splitter.py` 
+  - 環境変数: REFINIRE_RAG_TOKEN_CHUNK_SIZE, REFINIRE_RAG_TOKEN_OVERLAP, REFINIRE_RAG_TOKEN_SEPARATOR
+  - 機能: from_env()メソッド、統一メタデータ
+
+- [ ] **MarkdownTextSplitter環境変数対応**: Markdown分割の環境変数設定を追加
+  - ファイル: `src/refinire_rag/splitter/markdown_splitter.py`
+  - 環境変数: REFINIRE_RAG_MD_CHUNK_SIZE, REFINIRE_RAG_MD_OVERLAP, REFINIRE_RAG_MD_HEADERS
+  - 機能: from_env()メソッド、見出し保持制御
+
+### 0.2 プラグインシステム拡張
+- [ ] **PluginFactory拡張**: 新規プラグインの自動登録機能を実装する
+  - ファイル: `src/refinire_rag/factories/plugin_factory.py`
+  - 機能: 環境変数からの自動プラグイン作成、設定管理
+
+- [ ] **PluginRegistry拡張**: LangChain互換プラグインの登録
+  - ファイル: `src/refinire_rag/registry/plugin_registry.py`
+  - 機能: 新規コンポーネントの登録、互換性管理
+
+### 0.3 環境変数設定システム
+- [ ] **環境変数設定ドキュメント**: 全環境変数の一覧と説明を作成
+  - ファイル: `docs/environment_variables.md`
+  - 内容: 全コンポーネントの環境変数、デフォルト値、設定例
+
+- [ ] **設定検証システム**: 環境変数の妥当性チェック機能を実装
+  - ファイル: `src/refinire_rag/config/env_validator.py`
+  - 機能: 型チェック、必須項目確認、設定ガイダンス
+
+### 0.4 Phase 1テスト実装
+- [ ] **PDFLoaderテスト**: PDFローダーのテストケースを作成
+  - ファイル: `tests/test_pdf_loader.py`
+  - 内容: PDF読み込み、エラーハンドリング、環境変数テスト
+
+- [ ] **ChromaVectorStoreテスト**: Chromaベクターストアのテストケースを作成
+  - ファイル: `tests/test_chroma_vector_store.py`
+  - 内容: 接続、データ保存、検索機能テスト
+
+- [ ] **RecursiveChunkerテスト**: 再帰的チャンカーのテストケースを作成
+  - ファイル: `tests/test_recursive_chunker.py`
+  - 内容: 分割ロジック、オーバーラップ、環境変数設定テスト
+
+- [ ] **BM25Retrieverテスト**: BM25検索のテストケースを作成
+  - ファイル: `tests/test_bm25_retriever.py`
+  - 内容: ランキング、パラメータ調整、検索精度テスト
+
+- [ ] **統合テスト**: Phase 1コンポーネントの統合テストを作成
+  - ファイル: `tests/integration/test_phase1_integration.py`
+  - 内容: エンドツーエンド動作、環境変数による動作制御確認
+
+### 0.5 LangChain移行ガイド
+- [ ] **移行ガイド作成**: LangChainからrefinire-ragへの移行手順を作成
+  - ファイル: `docs/migration_from_langchain.md`
+  - 内容: コンポーネント対応表、設定変換、コード例
+
+- [ ] **機能比較表**: LangChainとrefinire-ragの機能比較表を作成
+  - ファイル: `docs/langchain_comparison.md`
+  - 内容: 機能対応、性能比較、差別化ポイント
+
 ## 0. 例外設計とアーキテクチャ改善
 - [x] **例外クラス体系の整備**: refinire_rag全体で使用する例外クラスの階層構造を設計・実装する。
   - ファイル: `src/refinire_rag/exceptions.py`

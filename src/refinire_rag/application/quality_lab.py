@@ -23,6 +23,7 @@ from ..processing.insight_reporter import InsightReporter, InsightReporterConfig
 from .query_engine import QueryEngine
 from .corpus_manager_new import CorpusManager
 from ..storage.evaluation_store import SQLiteEvaluationStore, EvaluationRun
+from refinire import RefinireAgent
 
 logger = logging.getLogger(__name__)
 
@@ -297,8 +298,8 @@ class QualityLab:
     
     def _retrieve_corpus_documents(self, 
                                  corpus_name: str, 
-                                 document_filters: Optional[Dict[str, Any]], 
-                                 use_original_documents: bool) -> List[Document]:
+                                 document_filters: Optional[Dict[str, Any]] = None, 
+                                 use_original_documents: bool = True) -> List[Document]:
         """
         Retrieve documents from CorpusManager based on filters
         
@@ -317,38 +318,29 @@ class QualityLab:
                            取得された文書リスト
         """
         try:
-            # Build search filters
-            search_filters = {"corpus_name": corpus_name}
+            if not self.corpus_manager:
+                logger.warning("No corpus manager available")
+                return []
             
-            if use_original_documents:
-                search_filters["processing_stage"] = "original"
+            # Get documents by stage
+            stage = "original" if use_original_documents else "processed"
+            documents = self.corpus_manager.get_documents_by_stage(corpus_name, stage=stage)
             
+            # Apply additional metadata filters if provided
             if document_filters:
-                search_filters.update(document_filters)
+                filtered_documents = []
+                for doc in documents:
+                    if self._matches_filters(doc, document_filters):
+                        filtered_documents.append(doc)
+                return filtered_documents
             
-            # Use CorpusManager's search functionality
-            # Note: Assuming search_documents can accept metadata filters
-            # If not available, we may need to implement a new method in CorpusManager
-            search_query = f"corpus:{corpus_name}"
-            documents = self.corpus_manager.search_documents(
-                query=search_query,
-                limit=1000,  # Large limit to get all matching documents
-                use_semantic=False  # Use text search for metadata filtering
-            )
-            
-            # Additional filtering based on metadata if needed
-            filtered_documents = []
-            for doc in documents:
-                if self._matches_filters(doc, search_filters):
-                    filtered_documents.append(doc)
-            
-            return filtered_documents
+            return documents
             
         except Exception as e:
             logger.error(f"Failed to retrieve documents from corpus '{corpus_name}': {e}")
             return []
     
-    def _matches_filters(self, document: Document, filters: Dict[str, Any]) -> bool:
+    def _matches_filters(self, document: Document, filters: Optional[Dict[str, Any]]) -> bool:
         """
         Check if a document matches the given filters
         
@@ -364,6 +356,9 @@ class QualityLab:
             bool: True if document matches all filters
                  すべてのフィルタに一致する場合True
         """
+        if not filters:
+            return True
+            
         for key, value in filters.items():
             doc_value = document.metadata.get(key)
             
@@ -372,11 +367,15 @@ class QualityLab:
                 for op, op_value in value.items():
                     if op == "$in" and doc_value not in op_value:
                         return False
-                    elif op == "$gte" and doc_value < op_value:
+                    elif op == "$gte" and (doc_value is None or doc_value < op_value):
                         return False
-                    elif op == "$lte" and doc_value > op_value:
+                    elif op == "$lte" and (doc_value is None or doc_value > op_value):
                         return False
-                    elif op == "$contains" and op_value not in str(doc_value):
+                    elif op == "$gt" and (doc_value is None or doc_value <= op_value):
+                        return False
+                    elif op == "$lt" and (doc_value is None or doc_value >= op_value):
+                        return False
+                    elif op == "$contains" and op_value.lower() not in str(doc_value).lower():
                         return False
             else:
                 # Direct equality check
@@ -386,32 +385,74 @@ class QualityLab:
         return True
     
     def _generate_qa_pairs_for_document(self, document: Document, base_metadata: Dict[str, Any]) -> List[QAPair]:
-        """Generate QA pairs for a single document with enhanced metadata"""
-        # This would use LLM to generate questions and answers
-        # For now, return placeholder implementation
-        qa_pairs = []
+        """Generate QA pairs for a single document with enhanced metadata using RefinireAgent
         
-        for i in range(self.config.qa_pairs_per_document):
-            question_type = self.config.question_types[i % len(self.config.question_types)]
-            
-            # Combine base metadata with document-specific metadata
-            enhanced_metadata = {
-                **base_metadata,
-                "question_type": question_type,
-                "generated_from": document.id,
-                "document_metadata": document.metadata,
-                "pair_index": i
-            }
-            
-            qa_pair = QAPair(
-                question=f"What is discussed in document {document.id} regarding {question_type}?",
-                answer=f"Based on the document content: {document.content[:100]}...",
-                document_id=document.id,
-                metadata=enhanced_metadata
+        RefinireAgentを使用して単一ドキュメントから拡張メタデータ付きのQAペアを生成
+        """
+        try:
+            # Create RefinireAgent for QA generation
+            agent = RefinireAgent(
+                name="qa_generator",
+                generation_instructions=f"""
+                You are an expert QA pair generator. Generate high-quality question-answer pairs from the provided document content.
+                
+                Generate exactly {self.config.qa_pairs_per_document} QA pairs with the following question types: {', '.join(self.config.question_types)}
+                
+                Requirements:
+                - Questions should be clear, specific, and answerable from the document
+                - Answers should be accurate and directly based on the document content
+                - Vary question types across the specified types
+                - Return response in valid JSON format with "qa_pairs" array
+                - Each QA pair should have: question, answer, question_type
+                
+                Document content:
+                {document.content}
+                """,
+                model=self.config.qa_generation_model,
+                temperature=0.3,
+                max_tokens=2000
             )
-            qa_pairs.append(qa_pair)
-        
-        return qa_pairs
+            
+            # Generate QA pairs using RefinireAgent
+            prompt = f"Generate {self.config.qa_pairs_per_document} QA pairs from the document content above."
+            result = agent.run(prompt)
+            
+            # Parse the generated response
+            try:
+                qa_data = json.loads(result.generation)
+                generated_pairs = qa_data.get("qa_pairs", [])
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse QA generation response as JSON: {result.generation}")
+                generated_pairs = []
+            
+            # Convert to QAPair objects with enhanced metadata
+            qa_pairs = []
+            for i, pair_data in enumerate(generated_pairs):
+                question_type = pair_data.get("question_type", self.config.question_types[i % len(self.config.question_types)])
+                
+                # Combine base metadata with document-specific metadata
+                enhanced_metadata = {
+                    **base_metadata,
+                    "question_type": question_type,
+                    "generated_from": document.id,
+                    "document_metadata": document.metadata,
+                    "pair_index": i,
+                    "generation_method": "refinire_agent"
+                }
+                
+                qa_pair = QAPair(
+                    question=pair_data.get("question", f"Generated question {i+1}"),
+                    answer=pair_data.get("answer", f"Generated answer {i+1}"),
+                    document_id=document.id,
+                    metadata=enhanced_metadata
+                )
+                qa_pairs.append(qa_pair)
+            
+            return qa_pairs
+            
+        except Exception as e:
+            logger.error(f"Error generating QA pairs for document {document.id}: {e}")
+            return []  # Return empty list on error
     
     def evaluate_query_engine(self, 
                              query_engine: QueryEngine,
