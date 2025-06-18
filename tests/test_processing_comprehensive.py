@@ -10,13 +10,13 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict, Any
 
-from src.refinire_rag.models.document import Document
-from src.refinire_rag.processing.chunker import ChunkerConfig, Chunker
-from src.refinire_rag.processing.normalizer import NormalizerConfig, Normalizer
-from src.refinire_rag.processing.test_suite import TestSuite, TestSuiteConfig
-from src.refinire_rag.processing.evaluator import Evaluator, EvaluatorConfig
-from src.refinire_rag.processing.contradiction_detector import ContradictionDetector, ContradictionDetectorConfig
-from src.refinire_rag.processing.insight_reporter import InsightReporter, InsightReporterConfig
+from refinire_rag.models.document import Document
+from refinire_rag.processing.chunker import ChunkerConfig, Chunker
+from refinire_rag.processing.normalizer import NormalizerConfig, Normalizer
+from refinire_rag.processing.test_suite import TestSuite, TestSuiteConfig
+from refinire_rag.processing.evaluator import Evaluator, EvaluatorConfig
+from refinire_rag.processing.contradiction_detector import ContradictionDetector, ContradictionDetectorConfig
+from refinire_rag.processing.insight_reporter import InsightReporter, InsightReporterConfig
 
 
 class TestChunker:

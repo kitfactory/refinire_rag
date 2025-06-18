@@ -11,12 +11,12 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict, Any
 
-from src.refinire_rag.models.document import Document
-from src.refinire_rag.storage.vector_store import VectorStore
-from src.refinire_rag.storage.sqlite_store import SQLiteDocumentStore
-from src.refinire_rag.storage.evaluation_store import SQLiteEvaluationStore
-from src.refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
-from src.refinire_rag.storage.pickle_vector_store import PickleVectorStore
+from refinire_rag.models.document import Document
+from refinire_rag.storage.vector_store import VectorStore
+from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
+from refinire_rag.storage.evaluation_store import SQLiteEvaluationStore
+from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
+from refinire_rag.storage.pickle_vector_store import PickleVectorStore
 
 
 class TestVectorStore:

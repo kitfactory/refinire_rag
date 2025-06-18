@@ -9,11 +9,11 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from src.refinire_rag.application.quality_lab import QualityLab, QualityLabConfig
-from src.refinire_rag.application.corpus_manager_new import CorpusManager
-from src.refinire_rag.models.qa_pair import QAPair
-from src.refinire_rag.models.document import Document
-from src.refinire_rag.storage.evaluation_store import SQLiteEvaluationStore
+from refinire_rag.application.quality_lab import QualityLab, QualityLabConfig
+from refinire_rag.application.corpus_manager_new import CorpusManager
+from refinire_rag.models.qa_pair import QAPair
+from refinire_rag.models.document import Document
+from refinire_rag.storage.evaluation_store import SQLiteEvaluationStore
 
 
 class TestQualityLabConfig:

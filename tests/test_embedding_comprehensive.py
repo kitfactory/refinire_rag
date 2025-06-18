@@ -11,10 +11,10 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict, Any
 
-from src.refinire_rag.models.document import Document
-from src.refinire_rag.embedding.base import Embedder
-from src.refinire_rag.embedding.openai_embedder import OpenAIEmbedder, OpenAIEmbeddingConfig
-from src.refinire_rag.embedding.tfidf_embedder import TFIDFEmbedder, TFIDFEmbeddingConfig
+from refinire_rag.models.document import Document
+from refinire_rag.embedding.base import Embedder
+from refinire_rag.embedding.openai_embedder import OpenAIEmbedder, OpenAIEmbeddingConfig
+from refinire_rag.embedding.tfidf_embedder import TFIDFEmbedder, TFIDFEmbeddingConfig
 
 
 class TestEmbedderBase:

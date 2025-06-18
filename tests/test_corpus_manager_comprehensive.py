@@ -9,17 +9,17 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from src.refinire_rag.application.corpus_manager_new import CorpusManager, CorpusStats
-from src.refinire_rag.models.document import Document
-from src.refinire_rag.storage.document_store import DocumentStore
-from src.refinire_rag.storage.vector_store import VectorStore
-from src.refinire_rag.embedding.base import Embedder
+from refinire_rag.application.corpus_manager_new import CorpusManager, CorpusStats
+from refinire_rag.models.document import Document
+from refinire_rag.storage.document_store import DocumentStore
+from refinire_rag.storage.vector_store import VectorStore
+from refinire_rag.embedding.base import Embedder
 
 
 class TestCorpusManagerInitialization:
     """Test CorpusManager initialization scenarios"""
     
-    @patch('src.refinire_rag.application.corpus_manager_new.PluginRegistry')
+    @patch('refinire_rag.application.corpus_manager_new.PluginRegistry')
     def test_initialization_with_defaults(self, mock_registry):
         """Test initialization with default parameters"""
         # Mock plugin creation
@@ -36,7 +36,7 @@ class TestCorpusManagerInitialization:
         assert corpus_manager.retrievers is not None
         assert len(corpus_manager.retrievers) > 0
     
-    @patch('src.refinire_rag.application.corpus_manager_new.PluginRegistry')
+    @patch('refinire_rag.application.corpus_manager_new.PluginRegistry')
     def test_from_env_initialization(self, mock_registry):
         """Test initialization from environment variables"""
         # Set up environment
@@ -75,7 +75,7 @@ class TestCorpusManagerInitialization:
                 else:
                     os.environ[key] = value
     
-    @patch('src.refinire_rag.application.corpus_manager_new.PluginRegistry')
+    @patch('refinire_rag.application.corpus_manager_new.PluginRegistry')
     def test_no_args_initialization(self, mock_registry):
         """Test no-arguments initialization"""
         # Set up environment
