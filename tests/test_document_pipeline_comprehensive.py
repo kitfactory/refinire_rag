@@ -69,7 +69,24 @@ class MockDocumentProcessor(DocumentProcessor):
                 )
                 yield output_doc
     
-    # Remove the fake __class__ property that was causing isinstance issues
+    @property
+    def __class__(self):
+        """Return a mock class with custom name for pipeline display"""
+        # Create a dynamic class that properly inherits from MockDocumentProcessor
+        original_class = super().__class__
+        name = self.name
+        
+        # Create a unique class for this specific name
+        CustomNamedProcessor = type(
+            name,  # This becomes __name__
+            (original_class,),  # Inheritance
+            {
+                '__new__': lambda cls: self,  # Return the existing instance
+                '__module__': original_class.__module__
+            }
+        )
+        
+        return CustomNamedProcessor
     
     def get_processing_stats(self) -> Dict[str, Any]:
         """Get processing statistics"""
