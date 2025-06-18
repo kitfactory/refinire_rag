@@ -46,6 +46,16 @@ class DocumentProcessorConfig:
     # Metadata options
     preserve_metadata: bool = True  # Preserve original document metadata
     add_processor_metadata: bool = True  # Add processor-specific metadata
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert configuration to dictionary
+        設定を辞書に変換
+        
+        Returns:
+            Dictionary representation of the configuration
+        """
+        from dataclasses import asdict
+        return asdict(self)
 
 
 class DocumentProcessor(ABC):

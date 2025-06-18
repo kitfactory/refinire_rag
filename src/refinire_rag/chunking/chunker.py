@@ -9,14 +9,14 @@ from datetime import datetime
 from dataclasses import dataclass
 
 from refinire_rag.models.document import Document
-from refinire_rag.processing.document_processor import DocumentProcessor, DocumentProcessorConfig
+from refinire_rag.document_processor import DocumentProcessor, DocumentProcessorConfig
 
 print("[DEBUG] chunker.py import start")
 
 if TYPE_CHECKING:
     from refinire_rag.models.document import Document
 
-from refinire_rag.processing.document_processor import DocumentProcessor, DocumentProcessorConfig
+from refinire_rag.document_processor import DocumentProcessor, DocumentProcessorConfig
 
 print("[DEBUG] chunker.py import completed")
 
