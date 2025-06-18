@@ -20,7 +20,7 @@ from ..processing.test_suite import TestSuite, TestCase, TestResult, TestSuiteCo
 from ..processing.evaluator import Evaluator, EvaluatorConfig
 from ..processing.contradiction_detector import ContradictionDetector, ContradictionDetectorConfig
 from ..processing.insight_reporter import InsightReporter, InsightReporterConfig
-from .query_engine import QueryEngine
+from .query_engine_new import QueryEngine
 from .corpus_manager_new import CorpusManager
 from ..storage.evaluation_store import SQLiteEvaluationStore, EvaluationRun
 from refinire import RefinireAgent

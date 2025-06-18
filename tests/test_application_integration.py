@@ -18,7 +18,7 @@ import shutil
 from refinire_rag.application.corpus_manager_new import CorpusManager
 from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
 from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
-from refinire_rag.application.query_engine import QueryEngine, QueryEngineConfig
+from refinire_rag.application.query_engine_new import QueryEngine, QueryEngineConfig
 from refinire_rag.application.quality_lab import QualityLab, QualityLabConfig
 from refinire_rag.models.document import Document
 from refinire_rag.retrieval.simple_reader import SimpleAnswerSynthesizer, SimpleAnswerSynthesizerConfig

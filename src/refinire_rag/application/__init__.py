@@ -6,7 +6,7 @@ by combining various backend modules into complete workflows.
 """
 
 from .corpus_manager_new import CorpusManager
-from .query_engine import QueryEngine
+from .query_engine_new import QueryEngine
 from .quality_lab import QualityLab
 
 __all__ = [
