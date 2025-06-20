@@ -938,9 +938,18 @@ class TestInMemoryVectorStoreErrorHandling:
         Test that internal errors are wrapped in StorageError
         内部エラーがStorageErrorでラップされることのテスト
         """
-        # Mock an internal method to raise an exception
+        # Add a vector first so search_by_metadata has something to process
+        entry = VectorEntry(
+            document_id="test_doc",
+            embedding=np.array([1.0, 2.0, 3.0]),
+            content="Test content",
+            metadata={"key": "value"}
+        )
+        self.store.add_vector(entry)
+        
+        # Mock an internal method to raise an exception during processing
         with patch.object(self.store, '_matches_filters', side_effect=Exception("Internal error")):
-            with pytest.raises(StorageError):
+            with pytest.raises(StorageError, match="Failed to search by metadata"):
                 self.store.search_by_metadata({"key": "value"})
 
     def test_concurrent_access_safety(self):

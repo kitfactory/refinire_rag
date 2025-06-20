@@ -47,6 +47,10 @@ class Chunker(DocumentProcessor):
         Args:
             config: Optional chunking configuration
         """
+        # Create default config if none provided
+        if config is None:
+            config = ChunkingConfig()
+        
         super().__init__(config)
         
         logger.info(f"Initialized {self.__class__.__name__} with chunk_size={self.config.chunk_size}")

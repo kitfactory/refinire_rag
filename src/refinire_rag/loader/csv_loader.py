@@ -43,6 +43,13 @@ class CSVLoader(Loader):
                 continue
 
             try:
+                # First pass: count total rows
+                # 最初のパス：総行数をカウント
+                with open(file_path, 'r', encoding=self.encoding) as f:
+                    total_rows = sum(1 for _ in csv.DictReader(f))
+
+                # Second pass: process rows
+                # 二回目のパス：行を処理
                 with open(file_path, 'r', encoding=self.encoding) as f:
                     reader = csv.DictReader(f)
                     columns = reader.fieldnames
@@ -60,7 +67,7 @@ class CSVLoader(Loader):
                         metadata.update({
                             'columns': columns,
                             'row_index': i,
-                            'total_rows': sum(1 for _ in csv.DictReader(open(file_path, 'r', encoding=self.encoding)))
+                            'total_rows': total_rows
                         })
 
                         # コンテンツを作成

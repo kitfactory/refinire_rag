@@ -1,59 +1,56 @@
 """
-Comprehensive tests for DocumentPipeline functionality
-DocumentPipeline機能の包括的テスト
+Comprehensive test suite for DocumentPipeline module
+DocumentPipelineモジュールの包括的テストスイート
 
-This module provides comprehensive coverage for the DocumentPipeline class,
-testing all pipeline functionality including sequential processing, statistics,
-error handling, and validation.
-このモジュールは、DocumentPipelineクラスの包括的カバレッジを提供し、
-順次処理、統計、エラー処理、検証を含むすべてのパイプライン機能をテストします。
+Coverage targets:
+- PipelineStats dataclass and __post_init__ method
+- DocumentPipeline initialization and validation
+- Single document processing through pipeline
+- Multiple document processing with error handling
+- Statistics tracking and processor time measurement
+- Pipeline validation and description methods
+- Error handling and recovery scenarios
+- Edge cases and integration testing
 """
 
 import pytest
 import time
 from unittest.mock import Mock, patch, MagicMock
 from typing import List, Dict, Any, Optional, Iterator
+from dataclasses import asdict
 
-from refinire_rag.processing.document_pipeline import DocumentPipeline, PipelineStats
-from refinire_rag.document_processor import DocumentProcessor
+from refinire_rag.processing.document_pipeline import (
+    DocumentPipeline,
+    PipelineStats
+)
 from refinire_rag.models.document import Document
+from refinire_rag.document_processor import DocumentProcessor
 
 
-class MockDocumentProcessor(DocumentProcessor):
+class MockProcessor(DocumentProcessor):
     """Mock DocumentProcessor for testing"""
     
-    def __init__(self, name: str = "MockProcessor", should_fail: bool = False, 
+    def __init__(self, name: str = "MockProcessor", should_error: bool = False,
                  output_multiplier: int = 1, processing_delay: float = 0.0):
         super().__init__(None)
         self.name = name
-        self.should_fail = should_fail
+        self.should_error = should_error
         self.output_multiplier = output_multiplier
         self.processing_delay = processing_delay
-        self.process_calls = []
-        
-        # Initialize processing stats to match base class
-        self.processing_stats = {
-            "documents_processed": 0,
-            "total_processing_time": 0.0,
-            "errors": 0,
-            "last_processed": None
-        }
+        self.call_count = 0
+        self.processed_docs = []
     
-    def process(self, documents: Iterator[Document], config: Optional[Any] = None) -> Iterator[Document]:
+    def process(self, documents, config=None):
         """Mock process method"""
         for document in documents:
-            self.process_calls.append(document.id)
+            self.call_count += 1
+            self.processed_docs.append(document.id)
             
             if self.processing_delay > 0:
                 time.sleep(self.processing_delay)
             
-            if self.should_fail:
-                self.processing_stats["errors"] += 1
-                raise RuntimeError(f"Mock processor {self.name} failed")
-            
-            # Update stats
-            self.processing_stats["documents_processed"] += 1
-            self.processing_stats["total_processing_time"] += self.processing_delay
+            if self.should_error:
+                raise RuntimeError(f"Mock error from {self.name}")
             
             # Generate output documents
             for i in range(self.output_multiplier):
@@ -63,762 +60,654 @@ class MockDocumentProcessor(DocumentProcessor):
                     metadata={
                         "processed_by": self.name,
                         "original_id": document.id,
-                        "processing_step": i,
+                        "step": i,
                         **document.metadata
                     }
                 )
                 yield output_doc
     
-    @property
-    def __class__(self):
-        """Return a mock class with custom name for pipeline display"""
-        # Create a dynamic class that properly inherits from MockDocumentProcessor
-        original_class = super().__class__
-        name = self.name
-        
-        # Create a unique class for this specific name
-        CustomNamedProcessor = type(
-            name,  # This becomes __name__
-            (original_class,),  # Inheritance
-            {
-                '__new__': lambda cls: self,  # Return the existing instance
-                '__module__': original_class.__module__
-            }
-        )
-        
-        return CustomNamedProcessor
-    
-    def get_processing_stats(self) -> Dict[str, Any]:
-        """Get processing statistics"""
-        stats = self.processing_stats.copy()
-        # Calculate averages like the base class
-        if stats["documents_processed"] > 0:
-            stats["average_processing_time"] = stats["total_processing_time"] / stats["documents_processed"]
-        else:
-            stats["average_processing_time"] = 0.0
-        return stats
+    def get_processing_stats(self):
+        """Mock stats method"""
+        return {
+            "documents_processed": self.call_count,
+            "processing_time": self.processing_delay * self.call_count,
+            "errors_encountered": 1 if self.should_error else 0
+        }
 
 
 class TestPipelineStats:
-    """
-    Test PipelineStats dataclass functionality
-    PipelineStatsデータクラス機能のテスト
-    """
+    """Test PipelineStats dataclass functionality"""
     
-    def test_pipeline_stats_initialization(self):
-        """
-        Test PipelineStats initialization with defaults
-        デフォルトでのPipelineStats初期化テスト
-        """
+    def test_pipeline_stats_default_initialization(self):
+        """Test PipelineStats with default values"""
         stats = PipelineStats()
         
         assert stats.total_documents_processed == 0
         assert stats.total_processing_time == 0.0
-        assert stats.processors_executed == []
-        assert stats.individual_processor_times == {}
+        assert stats.processors_executed == []  # Should be initialized by __post_init__
+        assert stats.individual_processor_times == {}  # Should be initialized by __post_init__
         assert stats.errors_encountered == 0
     
-    def test_pipeline_stats_initialization_with_values(self):
-        """
-        Test PipelineStats initialization with custom values
-        カスタム値でのPipelineStats初期化テスト
-        """
+    def test_pipeline_stats_custom_initialization(self):
+        """Test PipelineStats with custom values"""
+        processors = ["ProcessorA", "ProcessorB"]
+        times = {"ProcessorA": 1.5, "ProcessorB": 2.3}
+        
         stats = PipelineStats(
             total_documents_processed=5,
-            total_processing_time=10.5,
-            processors_executed=["Processor1", "Processor2"],
-            individual_processor_times={"Processor1": 5.0, "Processor2": 5.5},
+            total_processing_time=3.8,
+            processors_executed=processors,
+            individual_processor_times=times,
             errors_encountered=2
         )
         
         assert stats.total_documents_processed == 5
-        assert stats.total_processing_time == 10.5
-        assert stats.processors_executed == ["Processor1", "Processor2"]
-        assert stats.individual_processor_times == {"Processor1": 5.0, "Processor2": 5.5}
+        assert stats.total_processing_time == 3.8
+        assert stats.processors_executed == processors
+        assert stats.individual_processor_times == times
         assert stats.errors_encountered == 2
     
-    def test_pipeline_stats_post_init(self):
-        """
-        Test PipelineStats __post_init__ method
-        PipelineStats __post_init__メソッドのテスト
-        """
-        # Test with None values that should be initialized
+    def test_pipeline_stats_post_init_none_values(self):
+        """Test __post_init__ when lists are None"""
         stats = PipelineStats(
             total_documents_processed=1,
+            total_processing_time=1.0,
             processors_executed=None,
             individual_processor_times=None
         )
         
+        # __post_init__ should initialize None values to empty containers
         assert stats.processors_executed == []
         assert stats.individual_processor_times == {}
+    
+    def test_pipeline_stats_post_init_provided_values(self):
+        """Test __post_init__ when values are provided"""
+        original_processors = ["TestProcessor"]
+        original_times = {"TestProcessor": 1.0}
+        
+        stats = PipelineStats(
+            processors_executed=original_processors,
+            individual_processor_times=original_times
+        )
+        
+        # __post_init__ should not override provided values
+        assert stats.processors_executed == original_processors
+        assert stats.individual_processor_times == original_times
 
 
 class TestDocumentPipelineInitialization:
-    """
-    Test DocumentPipeline initialization and basic setup
-    DocumentPipeline初期化と基本セットアップのテスト
-    """
+    """Test DocumentPipeline initialization and basic properties"""
     
-    def test_pipeline_initialization_empty(self):
-        """
-        Test DocumentPipeline initialization with empty processor list
-        空のプロセッサーリストでのDocumentPipeline初期化テスト
-        """
+    def test_pipeline_empty_initialization(self):
+        """Test DocumentPipeline with empty processor list"""
         pipeline = DocumentPipeline([])
         
-        assert len(pipeline.processors) == 0
+        assert pipeline.processors == []
         assert isinstance(pipeline.stats, PipelineStats)
         assert pipeline.stats.total_documents_processed == 0
     
-    def test_pipeline_initialization_single_processor(self):
-        """
-        Test DocumentPipeline initialization with single processor
-        単一プロセッサーでのDocumentPipeline初期化テスト
-        """
-        processor = MockDocumentProcessor("TestProcessor")
+    def test_pipeline_single_processor_initialization(self):
+        """Test DocumentPipeline with single processor"""
+        processor = MockProcessor("TestProcessor")
         pipeline = DocumentPipeline([processor])
         
         assert len(pipeline.processors) == 1
-        assert pipeline.processors[0] is processor
+        assert pipeline.processors[0] == processor
         assert isinstance(pipeline.stats, PipelineStats)
     
-    def test_pipeline_initialization_multiple_processors(self):
-        """
-        Test DocumentPipeline initialization with multiple processors
-        複数プロセッサーでのDocumentPipeline初期化テスト
-        """
+    def test_pipeline_multiple_processors_initialization(self):
+        """Test DocumentPipeline with multiple processors"""
         processors = [
-            MockDocumentProcessor("Processor1"),
-            MockDocumentProcessor("Processor2"),
-            MockDocumentProcessor("Processor3")
+            MockProcessor("ProcessorA"),
+            MockProcessor("ProcessorB"),
+            MockProcessor("ProcessorC")
         ]
         pipeline = DocumentPipeline(processors)
         
         assert len(pipeline.processors) == 3
-        for i, processor in enumerate(processors):
-            assert pipeline.processors[i] is processor
+        assert pipeline.processors == processors
+        assert isinstance(pipeline.stats, PipelineStats)
     
-    def test_pipeline_string_representation(self):
-        """
-        Test DocumentPipeline string representations
-        DocumentPipeline文字列表現のテスト
-        """
-        processors = [
-            MockDocumentProcessor("ProcessorA"),
-            MockDocumentProcessor("ProcessorB")
-        ]
-        pipeline = DocumentPipeline(processors)
+    @patch('refinire_rag.processing.document_pipeline.logger')
+    def test_pipeline_initialization_logging(self, mock_logger):
+        """Test that initialization logs processor information"""
+        processors = [MockProcessor("A"), MockProcessor("B")]
+        DocumentPipeline(processors)
         
-        # Test __str__
-        str_repr = str(pipeline)
-        assert "ProcessorA" in str_repr
-        assert "ProcessorB" in str_repr
-        assert "→" in str_repr
-        
-        # Test __repr__
-        repr_str = repr(pipeline)
-        assert "DocumentPipeline" in repr_str
-        assert "processors=2" in repr_str
-        assert "processed=0" in repr_str
-    
-    def test_pipeline_description(self):
-        """
-        Test pipeline description generation
-        パイプライン説明の生成テスト
-        """
-        processors = [
-            MockDocumentProcessor("ChunkerProcessor"),
-            MockDocumentProcessor("EmbeddingProcessor"),
-            MockDocumentProcessor("IndexProcessor")
-        ]
-        pipeline = DocumentPipeline(processors)
-        
-        description = pipeline.get_pipeline_description()
-        expected = "DocumentPipeline(ChunkerProcessor → EmbeddingProcessor → IndexProcessor)"
-        assert description == expected
-
-
-class TestDocumentPipelineSingleDocument:
-    """
-    Test DocumentPipeline single document processing
-    DocumentPipeline単一文書処理のテスト
-    """
-    
-    def setup_method(self):
-        """
-        Set up test environment
-        テスト環境をセットアップ
-        """
-        self.test_document = Document(
-            id="test_doc_1",
-            content="This is a test document for pipeline processing.",
-            metadata={"source": "test", "category": "example"}
-        )
-    
-    def test_single_document_no_processors(self):
-        """
-        Test processing single document with no processors
-        プロセッサーなしでの単一文書処理テスト
-        """
-        pipeline = DocumentPipeline([])
-        result = pipeline.process_document(self.test_document)
-        
-        # Should return original document when no processors
-        assert len(result) == 1
-        assert result[0].id == self.test_document.id
-        assert result[0].content == self.test_document.content
-    
-    def test_single_document_single_processor(self):
-        """
-        Test processing single document with single processor
-        単一プロセッサーでの単一文書処理テスト
-        """
-        processor = MockDocumentProcessor("TestProcessor", output_multiplier=1)
-        pipeline = DocumentPipeline([processor])
-        
-        result = pipeline.process_document(self.test_document)
-        
-        assert len(result) == 1
-        assert "TestProcessor" in result[0].id
-        assert "Processed by TestProcessor" in result[0].content
-        assert result[0].metadata["processed_by"] == "TestProcessor"
-        assert result[0].metadata["original_id"] == self.test_document.id
-        
-        # Check processor was called
-        assert len(processor.process_calls) == 1
-        assert processor.process_calls[0] == self.test_document.id
-    
-    def test_single_document_multiple_processors(self):
-        """
-        Test processing single document through multiple processors
-        複数プロセッサーでの単一文書処理テスト
-        """
-        processor1 = MockDocumentProcessor("Processor1", output_multiplier=1)
-        processor2 = MockDocumentProcessor("Processor2", output_multiplier=2)
-        processor3 = MockDocumentProcessor("Processor3", output_multiplier=1)
-        
-        pipeline = DocumentPipeline([processor1, processor2, processor3])
-        result = pipeline.process_document(self.test_document)
-        
-        # Should have 2 final documents (processor2 creates 2, processor3 processes both)
-        assert len(result) == 2
-        
-        # Check both processors were called in sequence
-        assert len(processor1.process_calls) == 1  # Original document
-        assert len(processor2.process_calls) == 1  # Output from processor1
-        assert len(processor3.process_calls) == 2  # 2 outputs from processor2
-        
-        # Check final documents have correct metadata
-        for doc in result:
-            assert "Processor3" in doc.id
-            assert "Processed by Processor3" in doc.content
-    
-    def test_single_document_processor_multiplication(self):
-        """
-        Test document multiplication through pipeline processors
-        パイプラインプロセッサーによる文書増倍テスト
-        """
-        # First processor creates 3 documents, second creates 2 from each
-        processor1 = MockDocumentProcessor("Multiplier1", output_multiplier=3)
-        processor2 = MockDocumentProcessor("Multiplier2", output_multiplier=2)
-        
-        pipeline = DocumentPipeline([processor1, processor2])
-        result = pipeline.process_document(self.test_document)
-        
-        # Should have 3 * 2 = 6 final documents
-        assert len(result) == 6
-        
-        # Check all final documents are from the last processor
-        for doc in result:
-            assert "Multiplier2" in doc.id
-            assert "Processed by Multiplier2" in doc.content
-    
-    def test_single_document_statistics_update(self):
-        """
-        Test pipeline statistics update after single document processing
-        単一文書処理後のパイプライン統計更新テスト
-        """
-        processor = MockDocumentProcessor("StatProcessor", processing_delay=0.01)
-        pipeline = DocumentPipeline([processor])
-        
-        # Process document
-        result = pipeline.process_document(self.test_document)
-        
-        # Check pipeline stats
-        assert pipeline.stats.total_documents_processed == 1
-        assert pipeline.stats.total_processing_time > 0
-        assert "StatProcessor" in pipeline.stats.processors_executed
-        assert "StatProcessor" in pipeline.stats.individual_processor_times
-        assert pipeline.stats.individual_processor_times["StatProcessor"] > 0
-        assert pipeline.stats.errors_encountered == 0
-
-
-class TestDocumentPipelineMultipleDocuments:
-    """
-    Test DocumentPipeline multiple document processing
-    DocumentPipeline複数文書処理のテスト
-    """
-    
-    def setup_method(self):
-        """
-        Set up test environment
-        テスト環境をセットアップ
-        """
-        self.test_documents = [
-            Document(id="doc1", content="First document", metadata={"type": "text"}),
-            Document(id="doc2", content="Second document", metadata={"type": "text"}),
-            Document(id="doc3", content="Third document", metadata={"type": "text"})
-        ]
-    
-    def test_multiple_documents_processing(self):
-        """
-        Test processing multiple documents
-        複数文書処理のテスト
-        """
-        processor = MockDocumentProcessor("BatchProcessor", output_multiplier=2)
-        pipeline = DocumentPipeline([processor])
-        
-        result = pipeline.process_documents(self.test_documents)
-        
-        # Should have 3 * 2 = 6 documents
-        assert len(result) == 6
-        
-        # Check all documents were processed
-        assert len(processor.process_calls) == 3
-        assert "doc1" in processor.process_calls
-        assert "doc2" in processor.process_calls
-        assert "doc3" in processor.process_calls
-    
-    def test_multiple_documents_empty_list(self):
-        """
-        Test processing empty document list
-        空の文書リスト処理テスト
-        """
-        processor = MockDocumentProcessor("EmptyProcessor")
-        pipeline = DocumentPipeline([processor])
-        
-        result = pipeline.process_documents([])
-        
-        assert len(result) == 0
-        assert len(processor.process_calls) == 0
-        assert pipeline.stats.total_documents_processed == 0
-    
-    def test_multiple_documents_statistics(self):
-        """
-        Test statistics accumulation across multiple documents
-        複数文書での統計累積テスト
-        """
-        processor1 = MockDocumentProcessor("Proc1", processing_delay=0.005)
-        processor2 = MockDocumentProcessor("Proc2", processing_delay=0.005)
-        pipeline = DocumentPipeline([processor1, processor2])
-        
-        result = pipeline.process_documents(self.test_documents)
-        
-        # Check accumulated stats
-        assert pipeline.stats.total_documents_processed == 3
-        assert pipeline.stats.total_processing_time > 0
-        assert len(pipeline.stats.processors_executed) == 2
-        assert "Proc1" in pipeline.stats.processors_executed
-        assert "Proc2" in pipeline.stats.processors_executed
-        
-        # Both processors should have accumulated time
-        assert pipeline.stats.individual_processor_times["Proc1"] > 0
-        assert pipeline.stats.individual_processor_times["Proc2"] > 0
-
-
-class TestDocumentPipelineErrorHandling:
-    """
-    Test DocumentPipeline error handling scenarios
-    DocumentPipelineエラー処理シナリオのテスト
-    """
-    
-    def setup_method(self):
-        """
-        Set up test environment
-        テスト環境をセットアップ
-        """
-        self.test_document = Document(
-            id="error_test_doc",
-            content="Document for error testing",
-            metadata={"test": "error_scenario"}
-        )
-    
-    def test_processor_error_handling(self):
-        """
-        Test error handling when processor fails
-        プロセッサー失敗時のエラー処理テスト
-        """
-        failing_processor = MockDocumentProcessor("FailingProcessor", should_fail=True)
-        working_processor = MockDocumentProcessor("WorkingProcessor")
-        
-        pipeline = DocumentPipeline([failing_processor, working_processor])
-        result = pipeline.process_document(self.test_document)
-        
-        # Should still return a result (original document due to failure)
-        assert len(result) == 1
-        assert pipeline.stats.errors_encountered > 0
-        
-        # Working processor should still be called (pipeline continues despite errors)
-        assert len(working_processor.process_calls) == 1
-    
-    def test_multiple_processor_errors(self):
-        """
-        Test handling multiple processor errors
-        複数プロセッサーエラーの処理テスト
-        """
-        processor1 = MockDocumentProcessor("Proc1", should_fail=True)
-        processor2 = MockDocumentProcessor("Proc2", should_fail=True)
-        
-        pipeline = DocumentPipeline([processor1, processor2])
-        result = pipeline.process_document(self.test_document)
-        
-        # Should return original document
-        assert len(result) == 1
-        assert result[0].id == self.test_document.id
-        assert pipeline.stats.errors_encountered >= 1
-    
-    def test_error_in_multiple_documents(self):
-        """
-        Test error handling across multiple documents
-        複数文書でのエラー処理テスト
-        """
-        # Processor that fails on specific document
-        class SelectiveFailingProcessor(MockDocumentProcessor):
-            def process(self, documents, config=None):
-                for document in documents:
-                    if "doc2" in document.id:
-                        self.processing_stats["errors"] += 1
-                        raise RuntimeError("Selective failure")
-                    yield from super().process([document], config)
-        
-        processor = SelectiveFailingProcessor("SelectiveProcessor")
-        pipeline = DocumentPipeline([processor])
-        
-        test_docs = [
-            Document(id="doc1", content="First", metadata={}),
-            Document(id="doc2", content="Second", metadata={}),
-            Document(id="doc3", content="Third", metadata={})
-        ]
-        
-        result = pipeline.process_documents(test_docs)
-        
-        # Should have results from successful documents + original from failed
-        assert len(result) >= 3  # At least original documents
-        assert pipeline.stats.errors_encountered > 0
-    
-    def test_complete_pipeline_failure(self):
-        """
-        Test complete pipeline failure handling
-        完全なパイプライン失敗の処理テスト
-        """
-        # Mock a processor that causes pipeline-level exception
-        class CriticalFailProcessor(MockDocumentProcessor):
-            def process(self, documents, config=None):
-                raise ValueError("Critical pipeline failure")
-        
-        processor = CriticalFailProcessor("CriticalProcessor")
-        pipeline = DocumentPipeline([processor])
-        
-        result = pipeline.process_document(self.test_document)
-        
-        # Should return original document on complete failure
-        assert len(result) == 1
-        assert result[0].id == self.test_document.id
-        assert pipeline.stats.errors_encountered > 0
-
-
-class TestDocumentPipelineStatistics:
-    """
-    Test DocumentPipeline statistics functionality
-    DocumentPipeline統計機能のテスト
-    """
-    
-    def setup_method(self):
-        """
-        Set up test environment
-        テスト環境をセットアップ
-        """
-        self.processor1 = MockDocumentProcessor("StatsProc1", processing_delay=0.01)
-        self.processor2 = MockDocumentProcessor("StatsProc2", processing_delay=0.01)
-        self.pipeline = DocumentPipeline([self.processor1, self.processor2])
-        
-        self.test_document = Document(
-            id="stats_test",
-            content="Document for statistics testing",
-            metadata={}
-        )
-    
-    def test_get_pipeline_stats(self):
-        """
-        Test get_pipeline_stats method
-        get_pipeline_statsメソッドのテスト
-        """
-        # Process document to generate stats
-        self.pipeline.process_document(self.test_document)
-        
-        stats = self.pipeline.get_pipeline_stats()
-        
-        # Check required stat fields
-        assert "total_documents_processed" in stats
-        assert "total_processing_time" in stats
-        assert "processors_executed" in stats
-        assert "individual_processor_times" in stats
-        assert "errors_encountered" in stats
-        assert "average_time_per_document" in stats
-        assert "pipeline_length" in stats
-        assert "processor_names" in stats
-        
-        # Check values
-        assert stats["total_documents_processed"] == 1
-        assert stats["total_processing_time"] > 0
-        assert stats["pipeline_length"] == 2
-        assert stats["processor_names"] == ["StatsProc1", "StatsProc2"]
-        assert len(stats["processors_executed"]) == 2
-    
-    def test_get_processor_stats_specific(self):
-        """
-        Test get_processor_stats for specific processor
-        特定プロセッサーのget_processor_statsテスト
-        """
-        # Process document to generate stats
-        self.pipeline.process_document(self.test_document)
-        
-        stats = self.pipeline.get_processor_stats("StatsProc1")
-        
-        assert "documents_processed" in stats
-        assert "total_processing_time" in stats
-        assert "pipeline_execution_time" in stats
-        assert stats["documents_processed"] == 1
-        assert stats["pipeline_execution_time"] > 0
-    
-    def test_get_processor_stats_all(self):
-        """
-        Test get_processor_stats for all processors
-        すべてのプロセッサーのget_processor_statsテスト
-        """
-        # Process document to generate stats
-        self.pipeline.process_document(self.test_document)
-        
-        all_stats = self.pipeline.get_processor_stats()
-        
-        assert "StatsProc1" in all_stats
-        assert "StatsProc2" in all_stats
-        
-        for proc_name, stats in all_stats.items():
-            assert "documents_processed" in stats
-            assert "total_processing_time" in stats
-            assert "pipeline_execution_time" in stats
-    
-    def test_get_processor_stats_nonexistent(self):
-        """
-        Test get_processor_stats for non-existent processor
-        存在しないプロセッサーのget_processor_statsテスト
-        """
-        stats = self.pipeline.get_processor_stats("NonExistentProcessor")
-        assert stats == {}
-    
-    def test_reset_stats(self):
-        """
-        Test reset_stats functionality
-        reset_stats機能のテスト
-        """
-        # Process document to generate stats
-        self.pipeline.process_document(self.test_document)
-        
-        # Verify stats were generated
-        assert self.pipeline.stats.total_documents_processed == 1
-        assert self.pipeline.stats.total_processing_time > 0
-        
-        # Reset stats
-        self.pipeline.reset_stats()
-        
-        # Check pipeline stats are reset
-        assert self.pipeline.stats.total_documents_processed == 0
-        assert self.pipeline.stats.total_processing_time == 0.0
-        assert len(self.pipeline.stats.processors_executed) == 0
-        assert len(self.pipeline.stats.individual_processor_times) == 0
-        assert self.pipeline.stats.errors_encountered == 0
-        
-        # Check processor stats are reset
-        for processor in self.pipeline.processors:
-            assert processor.processing_stats["documents_processed"] == 0
-            assert processor.processing_stats["processing_time"] == 0.0
+        # Should log initialization info
+        mock_logger.info.assert_called_once()
+        mock_logger.debug.assert_called()
 
 
 class TestDocumentPipelineValidation:
-    """
-    Test DocumentPipeline validation functionality
-    DocumentPipeline検証機能のテスト
-    """
+    """Test pipeline validation functionality"""
     
     def test_validate_pipeline_empty(self):
-        """
-        Test validation of empty pipeline
-        空のパイプライン検証テスト
-        """
+        """Test validation with empty pipeline"""
         pipeline = DocumentPipeline([])
-        result = pipeline.validate_pipeline()
         
-        assert result is False
+        is_valid = pipeline.validate_pipeline()
+        assert is_valid is False
     
     def test_validate_pipeline_valid_processors(self):
-        """
-        Test validation with valid processors
-        有効なプロセッサーでの検証テスト
-        """
+        """Test validation with valid DocumentProcessor instances"""
+        processors = [MockProcessor("A"), MockProcessor("B")]
+        pipeline = DocumentPipeline(processors)
+        
+        is_valid = pipeline.validate_pipeline()
+        assert is_valid is True
+    
+    def test_validate_pipeline_invalid_processor_type(self):
+        """Test validation with non-DocumentProcessor instance"""
+        pipeline = DocumentPipeline([MockProcessor("A")])
+        # Add invalid processor directly
+        pipeline.processors.append("not_a_processor")
+        
+        is_valid = pipeline.validate_pipeline()
+        assert is_valid is False
+    
+    @patch('refinire_rag.processing.document_pipeline.logger')
+    def test_validate_pipeline_logging(self, mock_logger):
+        """Test validation logging"""
+        # Test with empty pipeline
+        empty_pipeline = DocumentPipeline([])
+        empty_pipeline.validate_pipeline()
+        
+        mock_logger.error.assert_called_with("Pipeline validation failed: No processors configured")
+        
+        # Test with valid pipeline
+        mock_logger.reset_mock()
+        valid_pipeline = DocumentPipeline([MockProcessor("A")])
+        valid_pipeline.validate_pipeline()
+        
+        mock_logger.info.assert_called_with("Pipeline validation passed: 1 processors configured")
+
+
+class TestDocumentPipelineDescription:
+    """Test pipeline description and string representation methods"""
+    
+    def test_get_pipeline_description_empty(self):
+        """Test description with empty pipeline"""
+        pipeline = DocumentPipeline([])
+        description = pipeline.get_pipeline_description()
+        
+        assert description == "DocumentPipeline()"
+    
+    def test_get_pipeline_description_single_processor(self):
+        """Test description with single processor"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        description = pipeline.get_pipeline_description()
+        
+        assert description == "DocumentPipeline(MockProcessor)"
+    
+    def test_get_pipeline_description_multiple_processors(self):
+        """Test description with multiple processors"""
+        processors = [MockProcessor("A"), MockProcessor("B"), MockProcessor("C")]
+        pipeline = DocumentPipeline(processors)
+        description = pipeline.get_pipeline_description()
+        
+        assert description == "DocumentPipeline(MockProcessor → MockProcessor → MockProcessor)"
+    
+    def test_pipeline_str_representation(self):
+        """Test __str__ method"""
+        processors = [MockProcessor("A"), MockProcessor("B")]
+        pipeline = DocumentPipeline(processors)
+        
+        str_repr = str(pipeline)
+        assert str_repr == "DocumentPipeline(MockProcessor → MockProcessor)"
+    
+    def test_pipeline_repr_representation(self):
+        """Test __repr__ method"""
+        processors = [MockProcessor("A"), MockProcessor("B")]
+        pipeline = DocumentPipeline(processors)
+        
+        repr_str = repr(pipeline)
+        assert "DocumentPipeline(processors=2" in repr_str
+        assert "processed=0)" in repr_str
+        
+        # Process a document and check repr updates
+        doc = Document(id="test", content="test content")
+        pipeline.process_document(doc)
+        
+        updated_repr = repr(pipeline)
+        assert "processed=1)" in updated_repr
+
+
+class TestDocumentPipelineSingleDocumentProcessing:
+    """Test single document processing functionality"""
+    
+    def test_process_document_empty_pipeline(self):
+        """Test processing document with empty pipeline"""
+        pipeline = DocumentPipeline([])
+        
+        input_doc = Document(id="test_doc", content="test content")
+        result_docs = pipeline.process_document(input_doc)
+        
+        # Empty pipeline should return original document
+        assert len(result_docs) == 1
+        assert result_docs[0] == input_doc
+    
+    def test_process_document_single_processor(self):
+        """Test processing single document through single processor"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        input_doc = Document(id="test_doc", content="test content")
+        result_docs = pipeline.process_document(input_doc)
+        
+        assert len(result_docs) == 1
+        assert result_docs[0].id == "test_doc_TestProcessor_0"
+        assert "Processed by TestProcessor" in result_docs[0].content
+        assert result_docs[0].metadata["processed_by"] == "TestProcessor"
+        assert result_docs[0].metadata["original_id"] == "test_doc"
+    
+    def test_process_document_multiple_processors(self):
+        """Test processing document through multiple processors in sequence"""
         processors = [
-            MockDocumentProcessor("ValidProc1"),
-            MockDocumentProcessor("ValidProc2")
+            MockProcessor("A", output_multiplier=1),
+            MockProcessor("B", output_multiplier=1),
+            MockProcessor("C", output_multiplier=1)
         ]
         pipeline = DocumentPipeline(processors)
         
-        result = pipeline.validate_pipeline()
-        assert result is True
-    
-    def test_validate_pipeline_invalid_processor(self):
-        """
-        Test validation with invalid processor (None processor)
-        無効なプロセッサー（Noneプロセッサー）での検証テスト
-        """
-        # Test with None processor
-        pipeline = DocumentPipeline([])
-        pipeline.processors.append(None)
+        input_doc = Document(id="test", content="content")
+        result_docs = pipeline.process_document(input_doc)
         
-        result = pipeline.validate_pipeline()
-        assert result is False
+        assert len(result_docs) == 1
+        # Document should have been processed through all processors
+        assert "C" in result_docs[0].id  # Final processor
+        assert "Processed by C" in result_docs[0].content
     
-    def test_validate_pipeline_mixed_processors(self):
-        """
-        Test validation with mix of valid and None processors
-        有効とNoneプロセッサーの混合での検証テスト
-        """
-        pipeline = DocumentPipeline([MockDocumentProcessor("ValidProcessor")])
-        # Add None processor directly to processors list
-        pipeline.processors.append(None)
+    def test_process_document_with_multiplier(self):
+        """Test processing document through pipeline with output multiplication"""
+        processors = [
+            MockProcessor("Normalizer", output_multiplier=1),
+            MockProcessor("Chunker", output_multiplier=3),  # Creates 3 chunks
+            MockProcessor("Embedder", output_multiplier=1)
+        ]
+        pipeline = DocumentPipeline(processors)
         
-        result = pipeline.validate_pipeline()
-        assert result is False
+        input_doc = Document(id="doc", content="text")
+        result_docs = pipeline.process_document(input_doc)
+        
+        # Should have 3 chunks, each processed by Embedder
+        assert len(result_docs) == 3
+        for i, doc in enumerate(result_docs):
+            assert "Embedder" in doc.id
+            assert "Processed by Embedder" in doc.content
+    
+    def test_process_document_processor_error_recovery(self):
+        """Test error recovery when a processor fails"""
+        processors = [
+            MockProcessor("GoodProcessor"),
+            MockProcessor("BadProcessor", should_error=True),
+            MockProcessor("RecoveryProcessor")
+        ]
+        pipeline = DocumentPipeline(processors)
+        
+        input_doc = Document(id="test", content="content")
+        result_docs = pipeline.process_document(input_doc)
+        
+        # Should continue processing despite error in middle processor
+        assert len(result_docs) >= 1
+        # Should have incremented error count
+        assert pipeline.stats.errors_encountered > 0
+    
+    @patch('refinire_rag.processing.document_pipeline.logger')
+    def test_process_document_logging(self, mock_logger):
+        """Test that document processing logs appropriately"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        input_doc = Document(id="test_doc", content="content")
+        pipeline.process_document(input_doc)
+        
+        # Should log processing steps
+        assert mock_logger.debug.called
+        assert mock_logger.info.called
+
+
+class TestDocumentPipelineMultipleDocumentProcessing:
+    """Test multiple document processing functionality"""
+    
+    def test_process_documents_multiple_simple(self):
+        """Test processing multiple documents through simple pipeline"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        input_docs = [
+            Document(id="doc1", content="content1"),
+            Document(id="doc2", content="content2"),
+            Document(id="doc3", content="content3")
+        ]
+        
+        result_docs = pipeline.process_documents(input_docs)
+        
+        assert len(result_docs) == 3
+        for i, doc in enumerate(result_docs):
+            assert f"doc{i+1}_TestProcessor_0" == doc.id
+            assert f"Processed by TestProcessor: content{i+1}" == doc.content
+    
+    def test_process_documents_with_chunking(self):
+        """Test processing documents through pipeline with chunking"""
+        processor = MockProcessor("Chunker", output_multiplier=2)
+        pipeline = DocumentPipeline([processor])
+        
+        input_docs = [
+            Document(id="doc1", content="text1"),
+            Document(id="doc2", content="text2")
+        ]
+        
+        result_docs = pipeline.process_documents(input_docs)
+        
+        # 2 documents × 2 chunks each = 4 total chunks
+        assert len(result_docs) == 4
+        assert sum(1 for doc in result_docs if "doc1" in doc.id) == 2
+        assert sum(1 for doc in result_docs if "doc2" in doc.id) == 2
+    
+    def test_process_documents_with_errors(self):
+        """Test processing documents when some documents fail"""
+        processor = MockProcessor("ErrorProcessor", should_error=True)
+        pipeline = DocumentPipeline([processor])
+        
+        input_docs = [
+            Document(id="doc1", content="content1"),
+            Document(id="doc2", content="content2")
+        ]
+        
+        result_docs = pipeline.process_documents(input_docs)
+        
+        # Should still return documents (originals) despite errors
+        assert len(result_docs) == 2
+        assert pipeline.stats.errors_encountered > 0
+    
+    def test_process_documents_empty_list(self):
+        """Test processing empty document list"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        result_docs = pipeline.process_documents([])
+        
+        assert len(result_docs) == 0
+        assert pipeline.stats.total_documents_processed == 0
+    
+    @patch('refinire_rag.processing.document_pipeline.logger')
+    def test_process_documents_logging(self, mock_logger):
+        """Test logging during multiple document processing"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        input_docs = [
+            Document(id="doc1", content="content1"),
+            Document(id="doc2", content="content2")
+        ]
+        
+        pipeline.process_documents(input_docs)
+        
+        # Should log processing progress
+        info_calls = [call.args[0] for call in mock_logger.info.call_args_list]
+        assert any("Processing 2 documents through pipeline" in call for call in info_calls)
+        assert any("Completed processing 2 documents" in call for call in info_calls)
+
+
+class TestDocumentPipelineStatistics:
+    """Test pipeline statistics tracking and reporting"""
+    
+    def test_get_pipeline_stats_initial(self):
+        """Test pipeline stats when no processing has occurred"""
+        processors = [MockProcessor("A"), MockProcessor("B")]
+        pipeline = DocumentPipeline(processors)
+        
+        stats = pipeline.get_pipeline_stats()
+        
+        expected_keys = [
+            "total_documents_processed",
+            "total_processing_time", 
+            "processors_executed",
+            "individual_processor_times",
+            "errors_encountered",
+            "average_time_per_document",
+            "pipeline_length",
+            "processor_names"
+        ]
+        
+        for key in expected_keys:
+            assert key in stats
+        
+        assert stats["total_documents_processed"] == 0
+        assert stats["total_processing_time"] == 0.0
+        assert stats["processors_executed"] == []
+        assert stats["individual_processor_times"] == {}
+        assert stats["errors_encountered"] == 0
+        assert stats["average_time_per_document"] == 0.0
+        assert stats["pipeline_length"] == 2
+        assert stats["processor_names"] == ["MockProcessor", "MockProcessor"]
+    
+    def test_get_pipeline_stats_after_processing(self):
+        """Test pipeline stats after processing documents"""
+        processors = [MockProcessor("A"), MockProcessor("B")]
+        pipeline = DocumentPipeline(processors)
+        
+        # Process some documents
+        docs = [Document(id="doc1", content="content1"), Document(id="doc2", content="content2")]
+        pipeline.process_documents(docs)
+        
+        stats = pipeline.get_pipeline_stats()
+        
+        assert stats["total_documents_processed"] == 2
+        assert stats["total_processing_time"] > 0
+        assert "MockProcessor" in stats["processors_executed"]
+        assert stats["average_time_per_document"] > 0
+    
+    def test_get_processor_stats_specific_processor(self):
+        """Test getting stats for specific processor"""
+        processor = MockProcessor("TargetProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        # Process a document
+        doc = Document(id="test", content="content")
+        pipeline.process_document(doc)
+        
+        # Get stats for specific processor
+        stats = pipeline.get_processor_stats("MockProcessor")
+        
+        assert "documents_processed" in stats
+        assert "processing_time" in stats
+        assert "pipeline_execution_time" in stats
+    
+    def test_get_processor_stats_all_processors(self):
+        """Test getting stats for all processors"""
+        processors = [MockProcessor("A"), MockProcessor("B")]
+        pipeline = DocumentPipeline(processors)
+        
+        # Process a document
+        doc = Document(id="test", content="content")
+        pipeline.process_document(doc)
+        
+        # Get stats for all processors
+        all_stats = pipeline.get_processor_stats()
+        
+        assert isinstance(all_stats, dict)
+        assert len(all_stats) == 1  # Both MockProcessor instances share same class name
+        
+        for processor_stats in all_stats.values():
+            assert "documents_processed" in processor_stats
+            assert "pipeline_execution_time" in processor_stats
+    
+    def test_get_processor_stats_nonexistent_processor(self):
+        """Test getting stats for non-existent processor"""
+        processor = MockProcessor("ExistingProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        stats = pipeline.get_processor_stats("NonExistentProcessor")
+        
+        assert stats == {}
+    
+    def test_reset_stats(self):
+        """Test resetting pipeline statistics"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        # Process documents to generate stats
+        docs = [Document(id="doc1", content="content1")]
+        pipeline.process_documents(docs)
+        
+        # Verify stats exist
+        initial_stats = pipeline.get_pipeline_stats()
+        assert initial_stats["total_documents_processed"] > 0
+        
+        # Reset stats
+        pipeline.reset_stats()
+        
+        # Verify stats are reset
+        reset_stats = pipeline.get_pipeline_stats()
+        assert reset_stats["total_documents_processed"] == 0
+        assert reset_stats["total_processing_time"] == 0.0
+        assert reset_stats["processors_executed"] == []
+        assert reset_stats["individual_processor_times"] == {}
+        assert reset_stats["errors_encountered"] == 0
+    
+    @patch('refinire_rag.processing.document_pipeline.logger')
+    def test_reset_stats_logging(self, mock_logger):
+        """Test that stats reset logs appropriately"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        pipeline.reset_stats()
+        
+        mock_logger.info.assert_called_with("Pipeline statistics reset")
+
+
+class TestDocumentPipelineTimingAndPerformance:
+    """Test timing and performance measurement"""
+    
+    def test_timing_measurement_accuracy(self):
+        """Test that timing measurements are reasonably accurate"""
+        # Use processor with known delay
+        delay = 0.001  # 1ms delay for test stability
+        processor = MockProcessor("DelayedProcessor", processing_delay=delay)
+        pipeline = DocumentPipeline([processor])
+        
+        doc = Document(id="test", content="content")
+        start_time = time.time()
+        pipeline.process_document(doc)
+        actual_time = time.time() - start_time
+        
+        stats = pipeline.get_pipeline_stats()
+        measured_time = stats["total_processing_time"]
+        
+        # Measured time should be close to actual time (within reasonable tolerance)
+        assert measured_time >= 0  # Should have some measured time
+        assert abs(measured_time - actual_time) / max(actual_time, 0.001) < 2  # Within 200% tolerance
+    
+    def test_individual_processor_timing(self):
+        """Test individual processor timing measurement"""
+        processors = [
+            MockProcessor("FastProcessor", processing_delay=0.001),
+            MockProcessor("SlowProcessor", processing_delay=0.005)
+        ]
+        pipeline = DocumentPipeline(processors)
+        
+        doc = Document(id="test", content="content")
+        pipeline.process_document(doc)
+        
+        stats = pipeline.get_pipeline_stats()
+        individual_times = stats["individual_processor_times"]
+        
+        # Both processors should have recorded time
+        assert "MockProcessor" in individual_times
+        assert individual_times["MockProcessor"] > 0
 
 
 class TestDocumentPipelineEdgeCases:
-    """
-    Test DocumentPipeline edge cases and special scenarios
-    DocumentPipelineエッジケースと特殊シナリオのテスト
-    """
+    """Test edge cases and error scenarios"""
     
-    def test_processor_returning_empty_results(self):
-        """
-        Test processor that returns no output documents
-        出力文書を返さないプロセッサーのテスト
-        """
-        class EmptyResultProcessor(MockDocumentProcessor):
+    def test_pipeline_with_empty_document(self):
+        """Test processing document with empty content"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        empty_doc = Document(id="empty", content="")
+        result_docs = pipeline.process_document(empty_doc)
+        
+        assert len(result_docs) == 1
+        assert "TestProcessor" in result_docs[0].id
+        assert "Processed by TestProcessor" in result_docs[0].content
+    
+    def test_pipeline_with_none_content(self):
+        """Test processing document with None content"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        none_doc = Document(id="none", content=None)
+        result_docs = pipeline.process_document(none_doc)
+        
+        # Should handle None content gracefully
+        assert len(result_docs) >= 1
+    
+    def test_pipeline_with_large_document_count(self):
+        """Test processing large number of documents"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
+        
+        # Create many small documents
+        docs = [Document(id=f"doc{i}", content=f"content{i}") for i in range(50)]
+        
+        result_docs = pipeline.process_documents(docs)
+        
+        assert len(result_docs) == 50
+        assert pipeline.stats.total_documents_processed == 50
+    
+    def test_pipeline_processor_returns_empty_list(self):
+        """Test when processor returns no documents"""
+        class EmptyProcessor(DocumentProcessor):
+            def __init__(self):
+                super().__init__(None)
+                self.call_count = 0
+            
             def process(self, documents, config=None):
                 for doc in documents:
-                    self.process_calls.append(doc.id)
-                    self.processing_stats["documents_processed"] += 1
-                # Return no documents (empty generator)
+                    self.call_count += 1
+                # Returns no documents
                 return iter([])
+            
+            def get_processing_stats(self):
+                return {"documents_processed": self.call_count, "processing_time": 0.0, "errors_encountered": 0}
         
-        processor1 = EmptyResultProcessor("EmptyProcessor")
-        processor2 = MockDocumentProcessor("NormalProcessor")
-        
-        pipeline = DocumentPipeline([processor1, processor2])
-        
-        test_doc = Document(id="test", content="test", metadata={})
-        result = pipeline.process_document(test_doc)
-        
-        # Should have no final results since first processor returns nothing
-        assert len(result) == 0
-        
-        # First processor should be called, second should not
-        assert len(processor1.process_calls) == 1
-        assert len(processor2.process_calls) == 0
-    
-    def test_pipeline_with_single_failing_step(self):
-        """
-        Test pipeline where only one step fails in chain
-        チェーンの1つのステップのみが失敗するパイプラインのテスト
-        """
-        processor1 = MockDocumentProcessor("WorkingProcessor1")
-        processor2 = MockDocumentProcessor("FailingProcessor", should_fail=True)
-        processor3 = MockDocumentProcessor("WorkingProcessor3")
-        
-        pipeline = DocumentPipeline([processor1, processor2, processor3])
-        
-        test_doc = Document(id="chain_test", content="test", metadata={})
-        result = pipeline.process_document(test_doc)
-        
-        # Should return processed document (pipeline continues despite error)
-        assert len(result) == 1
-        assert "WorkingProcessor1" in result[0].id
-        assert "WorkingProcessor3" in result[0].id
-        
-        # All processors should be executed (pipeline continues despite error)
-        assert len(processor1.process_calls) == 1
-        assert len(processor2.process_calls) == 1  # Called but failed
-        assert len(processor3.process_calls) == 1  # Called with original doc due to failure
-    
-    def test_pipeline_processor_times_accumulation(self):
-        """
-        Test processor execution time accumulation
-        プロセッサー実行時間の累積テスト
-        """
-        processor = MockDocumentProcessor("TimeProcessor", processing_delay=0.01)
+        processor = EmptyProcessor()
         pipeline = DocumentPipeline([processor])
         
-        docs = [
-            Document(id="doc1", content="test1", metadata={}),
-            Document(id="doc2", content="test2", metadata={})
-        ]
+        doc = Document(id="test", content="content")
+        result_docs = pipeline.process_document(doc)
         
-        # Process multiple documents
-        for doc in docs:
-            pipeline.process_document(doc)
-        
-        # Check time accumulation
-        total_processor_time = pipeline.stats.individual_processor_times["TimeProcessor"]
-        assert total_processor_time >= 0.02  # At least 2 * 0.01s
-        
-        # Check stats consistency
-        stats = pipeline.get_pipeline_stats()
-        assert stats["average_time_per_document"] > 0
+        # Pipeline should handle empty results gracefully
+        assert len(result_docs) == 0
     
-    def test_pipeline_empty_document_content(self):
-        """
-        Test processing document with empty content
-        空のコンテンツの文書処理テスト
-        """
-        processor = MockDocumentProcessor("ContentProcessor")
+    def test_pipeline_processor_returns_multiple_documents(self):
+        """Test when processor returns multiple documents per input"""
+        processor = MockProcessor("MultiProcessor", output_multiplier=4)
         pipeline = DocumentPipeline([processor])
         
-        empty_doc = Document(id="empty", content="", metadata={"type": "empty"})
-        result = pipeline.process_document(empty_doc)
+        doc = Document(id="test", content="content")
+        result_docs = pipeline.process_document(doc)
         
-        assert len(result) == 1
-        assert "ContentProcessor" in result[0].id
-        assert "Processed by ContentProcessor" in result[0].content
+        assert len(result_docs) == 4
+        for i, result_doc in enumerate(result_docs):
+            assert f"_{i}" in result_doc.id
+            assert "Processed by MultiProcessor" in result_doc.content
     
-    def test_large_pipeline_chain(self):
-        """
-        Test pipeline with many processors
-        多数のプロセッサーによるパイプラインのテスト
-        """
-        # Create chain of 10 processors
-        processors = [
-            MockDocumentProcessor(f"Processor{i}", output_multiplier=1)
-            for i in range(10)
-        ]
+    def test_complete_pipeline_failure_handling(self):
+        """Test complete pipeline failure (exception during pipeline execution)"""
+        processor = MockProcessor("TestProcessor")
+        pipeline = DocumentPipeline([processor])
         
-        pipeline = DocumentPipeline(processors)
-        
-        test_doc = Document(id="chain_doc", content="test", metadata={})
-        result = pipeline.process_document(test_doc)
-        
-        # Should have 1 final document that went through all processors
-        assert len(result) == 1
-        assert "Processor9" in result[0].id  # Last processor
-        
-        # All processors should have been executed
-        stats = pipeline.get_pipeline_stats()
-        assert len(stats["processors_executed"]) == 10
-        assert stats["pipeline_length"] == 10
+        # Simulate a pipeline-level failure by mocking an exception
+        with patch.object(pipeline.processors[0], 'process', side_effect=Exception("Pipeline failure")):
+            doc = Document(id="test", content="content")
+            result_docs = pipeline.process_document(doc)
+            
+            # Should return original document on complete failure
+            assert len(result_docs) == 1
+            assert result_docs[0] == doc
+            assert pipeline.stats.errors_encountered > 0

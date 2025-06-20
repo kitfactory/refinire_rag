@@ -1,0 +1,432 @@
+=== Test Execution Summary ===
+
+Total chunks executed: 11
+Total execution time: 1040.70s
+
+=== Test Results ===
+Passed:  1721
+Failed:  283
+Skipped: 7
+Errors:  27
+Total:   2038
+
+=== Coverage ===
+Overall coverage: 31.0%
+
+=== Failed Tests ===
+  tests/test_application_integration.py::TestApplicationIntegration::test_query_engine_to_quality_lab_integration
+  tests/test_application_integration.py::TestApplicationIntegration::test_three_way_integration_workflow
+  tests/test_application_integration.py::TestApplicationIntegration::test_integration_with_different_corpus_names
+  tests/test_chunking_comprehensive.py::TestChunkerBase::test_initialization_without_config
+  tests/test_chunking_comprehensive.py::TestTokenBasedChunker::test_initialization
+  tests/test_chunking_comprehensive.py::TestTokenBasedChunker::test_create_overlapping_chunks
+  tests/test_chunking_comprehensive.py::TestChunkingIntegration::test_chunking_preserves_document_lineage
+  tests/test_chunking_comprehensive.py::TestChunkingIntegration::test_multiple_chunkers_different_configs
+  tests/test_contradiction_detector_comprehensive.py::TestContradictionDetector::test_extract_claims_basic
+  tests/test_contradiction_detector_comprehensive.py::TestContradictionDetector::test_extract_claims_with_patterns
+  tests/test_contradiction_detector_comprehensive.py::TestContradictionDetector::test_perform_nli_contradiction
+  tests/test_contradiction_detector_comprehensive.py::TestContradictionDetectorIntegration::test_full_contradiction_detection_workflow
+  tests/test_contradiction_detector_comprehensive.py::TestContradictionDetectorIntegration::test_comprehensive_claim_type_extraction
+  tests/test_corpus_manager_advanced.py::TestCorpusManagerRetrieverManagement::test_get_vector_store_from_retrievers_found
+  tests/test_corpus_manager_advanced.py::TestCorpusManagerFilePathMethods::test_get_refinire_rag_dir_default
+  tests/test_corpus_manager_advanced.py::TestCorpusManagerFilePathMethods::test_get_refinire_rag_dir_from_env
+  tests/test_corpus_manager_advanced.py::TestCorpusManagerFilePathMethods::test_get_corpus_file_path_track
+  tests/test_corpus_manager_advanced.py::TestCorpusManagerFilePathMethods::test_get_corpus_file_path_dictionary
+  tests/test_corpus_manager_advanced.py::TestCorpusManagerFilePathMethods::test_get_corpus_file_path_knowledge_graph
+  tests/test_corpus_manager_advanced.py::TestCorpusManagerFilePathMethods::test_get_corpus_file_path_with_custom_dir
+  tests/test_corpus_manager_advanced.py::TestCorpusManagerLoggingAndBackwardCompatibility::test_vector_store_backward_compatibility
+  tests/test_corpus_manager_complete.py::TestCorpusManagerImportDocumentsFull::test_import_original_documents_full_workflow
+  tests/test_corpus_manager_complete.py::TestCorpusManagerImportDocumentsFull::test_import_original_documents_with_errors
+  tests/test_corpus_manager_complete.py::TestCorpusManagerImportDocumentsFull::test_import_original_documents_loader_exception
+  tests/test_corpus_manager_complete.py::TestCorpusManagerImportDocumentsFull::test_import_original_documents_sync_exception
+  tests/test_corpus_manager_complete.py::TestCorpusManagerImportDocumentsFull::test_import_with_knowledge_creation
+  tests/test_corpus_manager_complete.py::TestCorpusManagerImportDocumentsFull::test_import_default_tracking_file_path
+  tests/test_corpus_manager_complete.py::TestCorpusManagerKnowledgeArtifacts::test_create_knowledge_artifacts_dictionary_only
+  tests/test_corpus_manager_complete.py::TestCorpusManagerKnowledgeArtifacts::test_create_knowledge_artifacts_graph_only
+  tests/test_corpus_manager_complete.py::TestCorpusManagerKnowledgeArtifacts::test_create_knowledge_artifacts_both
+  tests/test_corpus_manager_complete.py::TestCorpusManagerRebuildCorpus::test_rebuild_corpus_finds_default_files
+  tests/test_corpus_manager_complete.py::TestCorpusManagerRebuildCorpus::test_rebuild_corpus_missing_default_files_warning
+  tests/test_corpus_manager_complete.py::TestCorpusManagerUtilityMethods::test_get_documents_by_stage
+  tests/test_corpus_manager_complete.py::TestCorpusManagerUtilityMethods::test_get_documents_by_stage_with_corpus_filter
+  tests/test_corpus_manager_complete.py::TestCorpusManagerRealIntegration::test_get_documents_by_stage_real_store
+  tests/test_corpus_manager_complete.py::TestCorpusManagerRealIntegration::test_get_corpus_info_real_data
+  tests/test_corpus_manager_complete.py::TestCorpusManagerRealIntegration::test_clear_corpus_real_data
+  tests/test_corpus_manager_complete.py::TestCorpusManagerRealIntegration::test_clear_corpus_partial_failure_real_data
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerImportMethods::test_import_original_documents_basic
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerImportMethods::test_import_original_documents_with_options
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerImportMethods::test_get_default_output_directory_fallback
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerAdvancedMethods::test_get_corpus_info_basic
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerAdvancedMethods::test_get_corpus_info_with_storage_error
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerAdvancedMethods::test_clear_corpus_basic
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerAdvancedMethods::test_clear_corpus_with_deletion_errors
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerAdvancedMethods::test_clear_corpus_no_documents
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerAdvancedMethods::test_clear_corpus_with_search_error
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerConfigurationMethods::test_get_refinire_rag_dir_from_env
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerConfigurationMethods::test_get_refinire_rag_dir_default
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerDocumentProcessing::test_get_corpus_info_with_real_store
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerDocumentProcessing::test_clear_corpus_with_real_store
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerErrorHandling::test_import_documents_with_loader_error
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerErrorHandling::test_import_documents_with_metadata_error
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerErrorHandling::test_get_corpus_info_with_count_error
+  tests/test_corpus_manager_core_methods.py::TestCorpusManagerErrorHandling::test_clear_corpus_with_search_timeout
+  tests/test_corpus_manager_final.py::TestCorpusManagerGetDocumentsByStage::test_get_documents_by_stage_with_corpus_name
+  tests/test_corpus_manager_final.py::TestCorpusManagerClearCorpusMethod::test_clear_corpus_with_clear_all_documents
+  tests/test_corpus_manager_final.py::TestCorpusManagerClearCorpusMethod::test_clear_corpus_without_clear_all_documents
+  tests/test_corpus_manager_final.py::TestCorpusManagerClearCorpusMethod::test_clear_corpus_retriever_without_clear_methods
+  tests/test_corpus_manager_final.py::TestCorpusManagerClearCorpusMethod::test_clear_corpus_retriever_error
+  tests/test_corpus_manager_final.py::TestCorpusManagerGetCorpusInfoMethod::test_get_corpus_info_basic
+  tests/test_corpus_manager_final.py::TestCorpusManagerGetCorpusInfoMethod::test_get_corpus_info_with_custom_config
+  tests/test_corpus_manager_final.py::TestCorpusManagerCorpusInfoWithCorpusName::test_get_corpus_info_with_corpus_name
+  tests/test_corpus_manager_final.py::TestCorpusManagerCorpusInfoWithCorpusName::test_get_corpus_info_with_storage_error
+  tests/test_corpus_manager_final.py::TestCorpusManagerCorpusInfoWithCorpusName::test_get_corpus_info_with_count_error
+  tests/test_corpus_manager_final.py::TestCorpusManagerClearCorpusWithCorpusName::test_clear_corpus_with_corpus_name_success
+  tests/test_corpus_manager_final.py::TestCorpusManagerClearCorpusWithCorpusName::test_clear_corpus_with_partial_failures
+  tests/test_corpus_manager_final.py::TestCorpusManagerClearCorpusWithCorpusName::test_clear_corpus_no_documents_found
+  tests/test_corpus_manager_final.py::TestCorpusManagerClearCorpusWithCorpusName::test_clear_corpus_search_error
+  tests/test_corpus_manager_final.py::TestCorpusManagerRealStoreIntegration::test_get_documents_by_stage_real_store
+  tests/test_corpus_manager_final.py::TestCorpusManagerRealStoreIntegration::test_get_corpus_info_real_data
+  tests/test_corpus_manager_final.py::TestCorpusManagerRealStoreIntegration::test_clear_corpus_real_data
+  tests/test_corpus_manager_final.py::TestCorpusManagerRealStoreIntegration::test_get_corpus_info_without_corpus_name_real_data
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerImport::test_import_original_documents_basic
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerImport::test_import_original_documents_with_glob
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerImport::test_import_original_documents_nonexistent_directory
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerImport::test_import_original_documents_with_error_handling
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerImport::test_create_knowledge_artifacts_basic
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerImport::test_create_knowledge_artifacts_with_output_directories
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerRebuild::test_rebuild_corpus_from_original_basic
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerRebuild::test_get_documents_by_stage
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerRebuild::test_get_documents_by_stage_no_matches
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerRebuild::test_get_documents_by_stage_missing_metadata
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerFactoryMethods::test_create_document_store_from_env
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerFactoryMethods::test_create_retrievers_from_env
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerFactoryMethods::test_create_multiple_retrievers_from_env
+  tests/test_corpus_manager_import_rebuild.py::TestCorpusManagerFactoryMethods::test_from_env_classmethod
+  tests/test_corpus_manager_integration.py::TestCorpusManagerFileOperations::test_import_original_documents_basic
+  tests/test_corpus_manager_integration.py::TestCorpusManagerFileOperations::test_import_original_documents_with_glob
+  tests/test_corpus_manager_integration.py::TestCorpusManagerFileOperations::test_import_original_documents_with_metadata
+  tests/test_corpus_manager_integration.py::TestCorpusManagerIntegrationWorkflows::test_complete_corpus_building_workflow
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_corpus_info_empty_corpus
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_corpus_info_with_documents
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_clear_corpus
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_vector_store_from_retrievers
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_vector_store_from_retrievers_none_found
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_refinire_rag_dir_default
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_refinire_rag_dir_custom
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_corpus_file_path
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_corpus_file_path_custom_directory
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_default_output_directory
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_create_filter_config_from_glob_simple
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_create_filter_config_from_glob_complex
+  tests/test_corpus_manager_methods.py::TestCorpusManagerMethods::test_get_retriever_capabilities
+  tests/test_corpus_manager_plugin_integration.py::TestCorpusManagerPluginIntegration::test_document_import_with_multiple_retrievers
+  tests/test_corpus_manager_plugin_integration.py::TestCorpusManagerPluginIntegration::test_corpus_clearing_with_multiple_retrievers
+  tests/test_document_store_loader.py::TestDocumentStoreLoaderAdvanced::test_document_validation_no_content_or_metadata
+  tests/test_e2e_realistic_scenario.py::TestRealisticE2EScenario::test_realistic_ai_knowledge_base_workflow
+  tests/test_embedding_comprehensive.py::TestEmbedderBase::test_embedder_interface
+  tests/test_embedding_comprehensive.py::TestEmbedderBase::test_embedder_config_validation
+  tests/test_embedding_comprehensive.py::TestTFIDFEmbedder::test_fit_and_transform
+  tests/test_embedding_comprehensive.py::TestTFIDFEmbedder::test_embed_single_text
+  tests/test_embedding_comprehensive.py::TestTFIDFEmbedder::test_embed_batch_texts
+  tests/test_embedding_comprehensive.py::TestTFIDFEmbedder::test_embed_documents
+  tests/test_embedding_comprehensive.py::TestTFIDFEmbedder::test_similarity_computation
+  tests/test_embedding_comprehensive.py::TestTFIDFEmbedder::test_stopword_removal
+  tests/test_embedding_comprehensive.py::TestEmbeddingComparison::test_tfidf_vs_dimensions
+  tests/test_embedding_comprehensive.py::TestEmbeddingComparison::test_embedding_normalization
+  tests/test_embedding_comprehensive.py::TestEmbeddingErrorHandling::test_tfidf_empty_corpus
+  tests/test_embedding_comprehensive.py::TestEmbeddingErrorHandling::test_tfidf_unfitted_model
+  tests/test_embedding_comprehensive.py::TestEmbeddingErrorHandling::test_openai_invalid_api_key
+  tests/test_embedding_comprehensive.py::TestEmbeddingErrorHandling::test_openai_network_error
+  tests/test_embedding_comprehensive.py::TestEmbeddingIntegration::test_document_embedding_pipeline
+  tests/test_embedding_comprehensive.py::TestEmbeddingIntegration::test_hybrid_embedding_comparison
+  tests/test_embedding_comprehensive.py::TestEmbeddingIntegration::test_batch_processing_efficiency
+  tests/test_entry_point_discovery.py::TestPluginAutoDiscovery::test_scan_entry_points_with_plugins
+  tests/test_entry_point_discovery.py::TestPluginAutoDiscovery::test_scan_installed_packages
+  tests/test_entry_point_discovery.py::TestPluginAutoDiscovery::test_discover_all_plugins_integration
+  tests/test_entry_point_discovery.py::TestUnifiedImportSystem::test_dynamic_dir
+  tests/test_entry_point_discovery.py::TestIntegration::test_full_plugin_lifecycle
+  tests/test_env_template.py::TestEnvTemplate::test_template_creation
+  tests/test_env_template.py::TestDotenvIntegration::test_generated_env_example_loading
+  tests/test_evaluator_comprehensive.py::TestEvaluator::test_compute_metrics_basic_calculation
+  tests/test_evaluator_comprehensive.py::TestEvaluator::test_categorize_result
+  tests/test_evaluator_comprehensive.py::TestEvaluator::test_process_with_category_analysis_disabled
+  tests/test_evaluator_comprehensive.py::TestEvaluatorEdgeCases::test_all_failed_tests
+  tests/test_evaluator_comprehensive.py::TestEvaluatorEdgeCases::test_missing_metadata_fields
+  tests/test_evaluator_comprehensive.py::TestEvaluatorIntegration::test_multiple_document_processing
+  tests/test_improved_query_engine.py::TestImprovedQueryEngine::test_query_method_basic
+  tests/test_improved_query_engine.py::TestImprovedQueryEngine::test_manual_normalizer_setting
+  tests/test_improved_query_engine.py::TestImprovedQueryEngine::test_context_parameters
+  tests/test_improved_query_engine.py::TestImprovedQueryEngine::test_retriever_management
+  tests/test_improved_query_engine.py::TestImprovedQueryEngine::test_comprehensive_stats
+  tests/test_in_memory_vector_store_additional.py::TestInMemoryVectorStoreAdditionalCoverage::test_update_vector_invalid_embedding_error
+  tests/test_in_memory_vector_store_additional.py::TestInMemoryVectorStoreAdditionalCoverage::test_clear_error_handling
+  tests/test_in_memory_vector_store_comprehensive.py::TestInMemoryVectorStoreCRUD::test_add_vector_invalid_embedding
+  tests/test_in_memory_vector_store_coverage_final.py::TestInMemoryVectorStoreFinalCoverage::test_delete_vector_exception_coverage
+  tests/test_in_memory_vector_store_coverage_final.py::TestInMemoryVectorStoreFinalCoverage::test_get_stats_exception_coverage
+  tests/test_in_memory_vector_store_coverage_final.py::TestInMemoryVectorStoreFinalCoverage::test_clear_exception_coverage
+  tests/test_in_memory_vector_store_coverage_final.py::TestInMemoryVectorStoreFinalCoverage::test_none_embedding_handling
+  tests/test_models.py::test_document_creation
+  tests/test_pickle_vector_store_comprehensive.py::TestPickleVectorStorePersistence::test_operations_since_save_counter
+  tests/test_pickle_vector_store_comprehensive.py::TestPickleVectorStoreFileInfo::test_get_file_info_with_operations_count
+  tests/test_pickle_vector_store_comprehensive.py::TestPickleVectorStoreStats::test_get_stats_with_file_size
+  tests/test_quality_lab.py::TestQualityLab::test_quality_lab_initialization
+  tests/test_quality_lab.py::TestQualityLab::test_qa_pair_generation
+  tests/test_quality_lab.py::TestQualityLab::test_qa_pair_generation_with_limit
+  tests/test_quality_lab.py::TestQualityLab::test_query_engine_evaluation
+  tests/test_quality_lab.py::TestQualityLab::test_evaluation_report_generation
+  tests/test_quality_lab.py::TestQualityLab::test_evaluation_report_with_file_output
+  tests/test_quality_lab.py::TestQualityLab::test_full_evaluation_workflow
+  tests/test_quality_lab.py::TestQualityLab::test_lab_statistics
+  tests/test_quality_lab.py::TestQualityLab::test_error_handling_in_evaluation
+  tests/test_quality_lab_component_analysis.py::TestQualityLabComponentAnalysis::test_component_analysis_with_multiple_retrievers
+  tests/test_quality_lab_component_analysis.py::TestQualityLabComponentAnalysis::test_get_component_performance_summary
+  tests/test_quality_lab_component_analysis.py::TestQualityLabComponentAnalysis::test_retriever_capture_rate_analysis
+  tests/test_quality_lab_comprehensive.py::TestQualityLabInitialization::test_no_args_initialization
+  tests/test_quality_lab_comprehensive.py::TestQualityLabInitialization::test_from_env_initialization
+  tests/test_quality_lab_comprehensive.py::TestQualityLabQAPairGeneration::test_retrieve_corpus_documents
+  tests/test_quality_lab_comprehensive.py::TestQualityLabEvaluation::test_evaluate_query_engine_basic
+  tests/test_quality_lab_comprehensive.py::TestQualityLabReporting::test_create_fallback_report
+  tests/test_quality_lab_evaluation.py::TestQualityLabEvaluation::test_evaluate_query_engine_basic_success
+  tests/test_quality_lab_evaluation.py::TestQualityLabEvaluation::test_evaluate_query_engine_performance_metrics
+  tests/test_quality_lab_evaluation.py::TestQualityLabEvaluation::test_evaluate_query_engine_with_test_suite_integration
+  tests/test_quality_lab_evaluation.py::TestQualityLabEvaluation::test_evaluate_query_engine_batch_processing
+  tests/test_quality_lab_evaluation.py::TestQualityLabEvaluation::test_evaluate_query_engine_with_filtering
+  tests/test_quality_lab_evaluation.py::TestQualityLabEvaluation::test_create_evaluation_run_metadata
+  tests/test_quality_lab_evaluation.py::TestQualityLabEvaluation::test_evaluation_summary_generation
+  tests/test_quality_lab_evaluation.py::TestQualityLabEvaluation::test_save_evaluation_results_to_store
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_generate_qa_pairs_basic_success
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_generate_qa_pairs_with_filters
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_retrieve_corpus_documents_basic
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_retrieve_corpus_documents_with_filters
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_retrieve_corpus_documents_empty_result
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_retrieve_corpus_documents_no_corpus_manager
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_generate_qa_pairs_for_document
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_generate_qa_pairs_for_document_with_custom_config
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_generate_qa_pairs_multiple_documents
+  tests/test_quality_lab_qa_generation.py::TestQualityLabQAGeneration::test_generate_qa_pairs_no_documents
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_generate_evaluation_report_basic
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_generate_evaluation_report_with_file_output
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_generate_evaluation_report_custom_format
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_compute_evaluation_metrics
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_generate_performance_insights
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_format_report_sections
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_export_evaluation_data
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_generate_comparison_report
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_aggregate_metrics_across_runs
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_generate_real_time_monitoring_report
+  tests/test_quality_lab_reporting.py::TestQualityLabReporting::test_custom_report_templates
+  tests/test_quality_lab_storage.py::TestQualityLabStorage::test_save_qa_pairs_to_store
+  tests/test_quality_lab_storage.py::TestQualityLabStorage::test_retrieve_qa_pairs_from_store
+  tests/test_quality_lab_storage.py::TestQualityLabStorage::test_storage_error_handling
+  tests/test_quality_lab_storage.py::TestQualityLabStorage::test_evaluation_store_integration_with_quality_lab
+  tests/test_recursive_character_splitter.py::test_multiple_documents
+  tests/test_simple_reranker_comprehensive.py::TestSimpleRerankerReranking::test_rerank_length_adjustment
+  tests/test_simple_reranker_comprehensive.py::TestSimpleRerankerEdgeCases::test_rerank_unicode_query
+  tests/test_simple_retriever_comprehensive.py::TestSimpleRetrieverRetrieval::test_retrieve_without_embedder_uses_default
+  tests/test_simple_retriever_comprehensive.py::TestSimpleRetrieverEdgeCases::test_zero_limit_parameter
+  tests/test_simple_working.py::TestBasicFunctionality::test_document_metadata_operations
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreBasicOperations::test_document_exists
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreListOperations::test_clear_all_documents
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreSearchOperations::test_search_by_content_basic
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreErrorHandling::test_store_document_database_error
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreErrorHandling::test_get_document_database_error
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreErrorHandling::test_search_metadata_database_error
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreErrorHandling::test_search_content_database_error
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreFTSOperations::test_fts_search_functionality
+  tests/test_sqlite_store_comprehensive.py::TestSQLiteDocumentStoreUtilityMethods::test_get_storage_stats
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreComplexSearches::test_search_by_metadata_no_json_extension
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreComplexSearches::test_search_with_like_fallback_in
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreLineageAndAdvanced::test_get_documents_by_lineage_json_disabled
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_storage_stats_error_handling
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_count_documents_error_handling
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_update_document_error_handling
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_delete_document_error_handling
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_list_documents_error_handling
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_get_documents_by_lineage_error_handling
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_fts_initialization_failure
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_schema_initialization_warnings
+  tests/test_sqlite_store_extended.py::TestSQLiteDocumentStoreErrorScenarios::test_schema_initialization_unexpected_error
+  tests/test_storage_comprehensive.py::TestVectorStore::test_vector_store_interface
+  tests/test_storage_comprehensive.py::TestVectorStore::test_vector_store_config_validation
+  tests/test_storage_comprehensive.py::TestInMemoryVectorStore::test_store_and_retrieve_embeddings
+  tests/test_storage_comprehensive.py::TestInMemoryVectorStore::test_similarity_search
+  tests/test_storage_comprehensive.py::TestInMemoryVectorStore::test_delete_embedding
+  tests/test_storage_comprehensive.py::TestInMemoryVectorStore::test_clear_all_embeddings
+  tests/test_storage_comprehensive.py::TestInMemoryVectorStore::test_metadata_filtering
+  tests/test_storage_comprehensive.py::TestPickleVectorStore::test_pickle_persistence
+  tests/test_storage_comprehensive.py::TestPickleVectorStore::test_automatic_persistence
+  tests/test_storage_comprehensive.py::TestSQLiteDocumentStore::test_document_exists
+  tests/test_storage_comprehensive.py::TestSQLiteDocumentStore::test_search_documents
+  tests/test_storage_comprehensive.py::TestSQLiteDocumentStore::test_delete_document
+  tests/test_storage_comprehensive.py::TestSQLiteDocumentStore::test_get_document_count
+  tests/test_storage_comprehensive.py::TestSQLiteDocumentStore::test_clear_all_documents
+  tests/test_storage_comprehensive.py::TestSQLiteDocumentStore::test_batch_operations
+  tests/test_storage_comprehensive.py::TestSQLiteDocumentStore::test_database_constraints
+  tests/test_storage_comprehensive.py::TestSQLiteEvaluationStore::test_store_and_retrieve_evaluation
+  tests/test_storage_comprehensive.py::TestSQLiteEvaluationStore::test_store_and_retrieve_qa_pair
+  tests/test_storage_comprehensive.py::TestSQLiteEvaluationStore::test_list_evaluations
+  tests/test_storage_comprehensive.py::TestSQLiteEvaluationStore::test_list_qa_pairs
+  tests/test_storage_comprehensive.py::TestSQLiteEvaluationStore::test_delete_evaluation
+  tests/test_storage_comprehensive.py::TestSQLiteEvaluationStore::test_get_evaluation_statistics
+  tests/test_storage_comprehensive.py::TestSQLiteEvaluationStore::test_clear_all_data
+  tests/test_storage_comprehensive.py::TestStorageErrorHandling::test_vector_store_dimension_mismatch
+  tests/test_storage_comprehensive.py::TestStorageIntegration::test_document_and_vector_integration
+  tests/test_storage_comprehensive.py::TestStorageIntegration::test_evaluation_workflow_integration
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderSimple::test_fit_and_embed
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderSimple::test_embed_documents
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderSimple::test_similarity_calculation
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderSimple::test_batch_embedding
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderSimple::test_save_and_load
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderSimple::test_empty_text_handling
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderSimple::test_normalization
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderAdvanced::test_stopword_removal
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderError::test_embed_before_fit
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderError::test_fit_empty_corpus
+  tests/test_tfidf_embedder_simple.py::TestTFIDFEmbedderError::test_fit_with_empty_strings
+  tests/unit/test_corpus_manager.py::test_corpus_manager_basic
+  tests/unit/test_corpus_simple_embedder.py::test_corpus_manager_manual_embedder
+  tests/unit/test_corpus_with_embedder.py::test_corpus_manager_with_embedder
+  tests/unit/test_env_template.py::test_env_template
+  tests/unit/test_env_template.py::test_config
+  tests/unit/test_loaders_detailed.py::test_text_loader
+  tests/unit/test_loaders_detailed.py::test_markdown_loader
+  tests/unit/test_loaders_detailed.py::test_json_loader
+  tests/unit/test_loaders_detailed.py::test_html_loader
+  tests/unit/test_loaders_detailed.py::test_universal_loader_integration
+  tests/unit/test_loaders_detailed.py::test_batch_loading
+  tests/unit/test_loaders_detailed.py::test_error_handling
+  tests/unit/test_plugin_config.py::TestPluginConfig::test_default_initialization
+  tests/unit/test_plugin_config.py::TestPluginConfig::test_custom_initialization
+  tests/unit/test_plugin_config.py::TestPluginConfig::test_get_set_methods
+  tests/unit/test_plugin_config.py::TestPluginConfig::test_update_method
+  tests/unit/test_plugin_config.py::TestPluginConfig::test_validation
+  tests/unit/test_plugin_config.py::TestPluginConfig::test_for_plugin_type
+  tests/unit/test_plugin_config.py::TestPluginConfig::test_to_dict
+  tests/unit/test_plugin_config.py::TestPluginConfig::test_from_dict
+  tests/unit/test_plugin_config.py::TestYAMLSerialization::test_yaml_round_trip
+  tests/unit/test_plugin_config.py::TestYAMLSerialization::test_yaml_file_not_found
+  tests/unit/test_plugin_config.py::TestYAMLSerialization::test_yaml_content_validation
+  tests/unit/test_plugin_config.py::TestConfigManager::test_config_manager_initialization
+  tests/unit/test_plugin_config.py::TestConfigManager::test_save_and_load_config
+  tests/unit/test_plugin_config.py::TestConfigManager::test_create_template
+  tests/unit/test_plugin_config.py::TestConfigManager::test_list_configs
+  tests/unit/test_plugin_config.py::TestIntegration::test_realistic_plugin_configuration
+
+=== Per-Chunk Results ===
+Chunk 1: 172P/8F/7S/6E (98.1s)
+Chunk 2: 196P/65F/0S/0E (95.1s)
+Chunk 3: 123P/33F/0S/0E (70.5s)
+Chunk 4: 337P/26F/0S/12E (89.7s)
+Chunk 5: 1P/0F/0S/0E (112.0s)
+Chunk 6: 123P/6F/0S/4E (98.1s)
+Chunk 7: 176P/38F/0S/0E (122.5s)
+Chunk 8: 145P/16F/0S/0E (92.3s)
+Chunk 9: 199P/52F/0S/0E (88.4s)
+Chunk 10: 248P/12F/0S/3E (85.7s)
+Chunk 11: 1P/27F/0S/2E (88.3s)
+
+=== Individual File Execution Times ===
+   30.99s  tests/test_quality_lab_comprehensive.py
+   15.87s  tests/test_improved_query_engine.py
+   13.97s  tests/test_application_integration.py
+    6.88s  tests/test_evaluation_store_comprehensive.py
+    6.30s  tests/test_embedding_comprehensive.py
+    5.88s  tests/unit/test_corpus_simple_embedder.py
+    5.69s  tests/test_tfidf_embedder_comprehensive.py
+    3.29s  tests/test_plugin_registry_comprehensive.py
+    2.69s  tests/test_entry_point_discovery.py
+    2.51s  tests/test_corpus_manager_plugin_integration.py
+    2.07s  tests/test_storage_comprehensive.py
+    1.79s  tests/test_quality_lab_storage.py
+    1.48s  tests/test_quality_lab_storage_simple.py
+    1.38s  tests/test_corpus_manager_integration.py
+    1.36s  tests/test_components_comprehensive.py
+    1.18s  tests/test_corpus_manager_comprehensive.py
+    1.15s  tests/test_query_engine_integration.py
+    0.92s  tests/test_quality_lab_qa_generation.py
+    0.81s  tests/unit/test_corpus_with_embedder.py
+    0.70s  tests/test_no_args_constructors.py
+    0.68s  tests/test_quality_lab.py
+    0.50s  tests/test_quality_lab_component_analysis.py
+    0.34s  tests/test_corpus_manager_import_rebuild.py
+    0.31s  tests/unit/test_corpus_manager.py
+    0.27s  tests/test_sqlite_store_comprehensive.py
+    0.25s  tests/test_simple_retriever_comprehensive.py
+    0.25s  tests/test_simple_working.py
+    0.23s  tests/test_utils_comprehensive.py
+    0.21s  tests/test_pickle_vector_store_comprehensive.py
+    0.18s  tests/test_sqlite_store_extended.py
+    0.17s  tests/test_corpusstore.py
+    0.16s  tests/test_quality_lab_evaluation_simple.py
+    0.14s  tests/test_query_engine_query.py
+    0.11s  tests/test_quality_lab_evaluation.py
+    0.10s  tests/test_file_info_metadata.py
+    0.10s  tests/test_corpus_manager_complete.py
+    0.10s  tests/test_quality_lab_core.py
+    0.08s  tests/integration/plugins/test_plugin_loader.py
+    0.08s  tests/test_corpus_manager_advanced.py
+    0.08s  tests/test_quality_lab_reporting.py
+    0.07s  tests/test_directory_loader.py
+    0.06s  tests/test_corpus_manager_core_methods.py
+    0.05s  tests/test_text_loader.py
+    0.05s  tests/unit/test_loaders_detailed.py
+    0.04s  tests/test_evaluator_comprehensive.py
+    0.04s  tests/test_in_memory_vector_store_comprehensive.py
+    0.03s  tests/test_contradiction_detector_comprehensive.py
+    0.03s  tests/test_corpus_manager_final.py
+    0.03s  tests/test_dictionary_maker_comprehensive.py
+    0.03s  tests/test_document_processor_comprehensive.py
+    0.03s  tests/test_in_memory_vector_store_coverage_final.py
+    0.03s  tests/test_json_loader.py
+    0.02s  tests/test_code_splitter.py
+    0.02s  tests/test_config_comprehensive.py
+    0.02s  tests/test_document_pipeline_comprehensive.py
+    0.02s  tests/test_graph_builder_comprehensive.py
+    0.02s  tests/test_in_memory_vector_store_additional.py
+    0.02s  tests/test_integration_full_workflow.py
+    0.02s  tests/test_recursive_chunker_comprehensive.py
+    0.02s  tests/test_simple_reader_comprehensive.py
+    0.02s  tests/test_simple_reranker_comprehensive.py
+    0.02s  tests/test_tfidf_embedder_simple.py
+    0.02s  tests/unit/test_plugin_config.py
+    0.01s  tests/integration/test_corpus_manager.py
+    0.01s  tests/test_document_store_processor_comprehensive.py
+    0.01s  tests/test_env_template.py
+    0.01s  tests/test_exceptions_comprehensive.py
+    0.01s  tests/test_html_loader.py
+    0.01s  tests/test_hybrid_retriever_comprehensive.py
+    0.01s  tests/test_query_engine_methods.py
+    0.00s  tests/integration/test_query_engine.py
+    0.00s  tests/test_answer_synthesizer_instructions.py
+    0.00s  tests/test_base_evaluator_comprehensive.py
+    0.00s  tests/test_character_splitter.py
+    0.00s  tests/test_character_splitter_process.py
+    0.00s  tests/test_chunker_comprehensive.py
+    0.00s  tests/test_chunking_comprehensive.py
+    0.00s  tests/test_constant_metadata.py
+    0.00s  tests/test_corpus_manager_methods.py
+    0.00s  tests/test_corpus_manager_simple.py
+    0.00s  tests/test_csv_loader.py
+    0.00s  tests/test_dictionary_maker.py
+    0.00s  tests/test_document_store_loader.py
+    0.00s  tests/test_document_store_loader_comprehensive.py
+    0.00s  tests/test_e2e_realistic_scenario.py
+    0.00s  tests/test_graph_builder.py
+    0.00s  tests/test_html_splitter.py
+    0.00s  tests/test_incremental_loader.py
+    0.00s  tests/test_markdown_splitter.py
+    0.00s  tests/test_metadata_comprehensive.py
+    0.00s  tests/test_models.py
+    0.00s  tests/test_path_map_metadata.py
+    0.00s  tests/test_plugin_loader_comprehensive.py
+    0.00s  tests/test_recursive_character_splitter.py
+    0.00s  tests/test_recursive_character_splitter_process.py
+    0.00s  tests/test_recursive_chunker.py
+    0.00s  tests/test_size_chunk.py
+    0.00s  tests/test_size_splitter.py
+    0.00s  tests/test_splitter_environment_variables.py
+    0.00s  tests/test_tfidf_keyword_store_comprehensive.py
+    0.00s  tests/test_token_splitter.py
+    0.00s  tests/test_token_splitter_process.py
+    0.00s  tests/test_utils_model_config_comprehensive.py
+    0.00s  tests/test_vector_store_comprehensive.py
+    0.00s  tests/unit/test_env_template.py

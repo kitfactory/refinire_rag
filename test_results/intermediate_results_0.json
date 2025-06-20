@@ -1,0 +1,46 @@
+[
+  {
+    "chunk_id": 0,
+    "test_files": [
+      "tests/integration/plugins/test_plugin_loader.py",
+      "tests/integration/test_corpus_manager.py",
+      "tests/integration/test_query_engine.py",
+      "tests/test_answer_synthesizer_instructions.py",
+      "tests/test_application_integration.py",
+      "tests/test_base_evaluator_comprehensive.py",
+      "tests/test_character_splitter.py",
+      "tests/test_character_splitter_process.py",
+      "tests/test_chunker_comprehensive.py",
+      "tests/test_chunking_comprehensive.py"
+    ],
+    "passed": 172,
+    "failed": 8,
+    "skipped": 7,
+    "errors": 6,
+    "execution_time": 98.1495475769043,
+    "coverage_file": "test_results/coverage_chunk_0.xml",
+    "failed_tests": [
+      "tests/test_application_integration.py::TestApplicationIntegration::test_query_engine_to_quality_lab_integration",
+      "tests/test_application_integration.py::TestApplicationIntegration::test_three_way_integration_workflow",
+      "tests/test_application_integration.py::TestApplicationIntegration::test_integration_with_different_corpus_names",
+      "tests/test_chunking_comprehensive.py::TestChunkerBase::test_initialization_without_config",
+      "tests/test_chunking_comprehensive.py::TestTokenBasedChunker::test_initialization",
+      "tests/test_chunking_comprehensive.py::TestTokenBasedChunker::test_create_overlapping_chunks",
+      "tests/test_chunking_comprehensive.py::TestChunkingIntegration::test_chunking_preserves_document_lineage",
+      "tests/test_chunking_comprehensive.py::TestChunkingIntegration::test_multiple_chunkers_different_configs"
+    ],
+    "error_output": "Process exited with code 1",
+    "file_execution_times": {
+      "tests/integration/plugins/test_plugin_loader.py": 0.08,
+      "tests/integration/test_corpus_manager.py": 0.01,
+      "tests/integration/test_query_engine.py": 0.0,
+      "tests/test_answer_synthesizer_instructions.py": 0.0,
+      "tests/test_application_integration.py": 13.969999999999999,
+      "tests/test_base_evaluator_comprehensive.py": 0.0,
+      "tests/test_character_splitter.py": 0.0,
+      "tests/test_character_splitter_process.py": 0.0,
+      "tests/test_chunker_comprehensive.py": 0.0,
+      "tests/test_chunking_comprehensive.py": 0.0
+    }
+  }
+]

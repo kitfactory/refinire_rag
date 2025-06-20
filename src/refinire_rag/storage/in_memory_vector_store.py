@@ -43,7 +43,7 @@ class InMemoryVectorStore(VectorStore):
         
         try:
             # Validate embedding
-            if entry.embedding is None or len(entry.embedding) == 0:
+            if entry.embedding is None or entry.embedding.size == 0:
                 raise ValueError("Entry must have a valid embedding")
             
             # Store the entry
@@ -93,7 +93,7 @@ class InMemoryVectorStore(VectorStore):
                 return False
             
             # Validate embedding
-            if entry.embedding is None or len(entry.embedding) == 0:
+            if entry.embedding is None or entry.embedding.size == 0:
                 raise ValueError("Entry must have a valid embedding")
             
             self._vectors[entry.document_id] = entry

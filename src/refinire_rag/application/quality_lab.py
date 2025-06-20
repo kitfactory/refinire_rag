@@ -324,7 +324,7 @@ class QualityLab:
             
             # Get documents by stage
             stage = "original" if use_original_documents else "processed"
-            documents = self.corpus_manager.get_documents_by_stage(corpus_name, stage=stage)
+            documents = self.corpus_manager._get_documents_by_stage(stage)
             
             # Apply additional metadata filters if provided
             if document_filters:
@@ -419,10 +419,18 @@ class QualityLab:
             
             # Parse the generated response
             try:
-                qa_data = json.loads(result.generation)
+                # Strip markdown code blocks if present
+                content = result.content.strip()
+                if content.startswith('```json'):
+                    content = content[7:]  # Remove ```json
+                if content.endswith('```'):
+                    content = content[:-3]  # Remove ```
+                content = content.strip()
+                
+                qa_data = json.loads(content)
                 generated_pairs = qa_data.get("qa_pairs", [])
             except json.JSONDecodeError:
-                logger.warning(f"Failed to parse QA generation response as JSON: {result.generation}")
+                logger.warning(f"Failed to parse QA generation response as JSON: {result.content}")
                 generated_pairs = []
             
             # Convert to QAPair objects with enhanced metadata

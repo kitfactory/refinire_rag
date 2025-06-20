@@ -1,4 +1,5 @@
 import pytest
+import ast
 from pathlib import Path
 from refinire_rag.loader.csv_loader import CSVLoader
 from refinire_rag.models.document import Document
@@ -52,7 +53,7 @@ def test_csv_loader_loads_file(csv_loader, csv_file):
 
     # Check content of first row
     # 最初の行の内容を確認
-    first_row = eval(loaded_docs[0].content)  # str(dict)をdictに変換
+    first_row = ast.literal_eval(loaded_docs[0].content)  # str(dict)をdictに変換
     assert first_row['name'] == 'John'
     assert first_row['age'] == '30'
     assert first_row['city'] == 'Tokyo'
@@ -101,7 +102,7 @@ def test_csv_loader_custom_encoding(tmp_path):
     # Check results
     # 結果を確認
     assert len(loaded_docs) == 3
-    first_row = eval(loaded_docs[0].content)
+    first_row = ast.literal_eval(loaded_docs[0].content)
     assert first_row['name'] == '山田'
     assert first_row['city'] == '東京'
 

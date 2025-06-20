@@ -7,11 +7,10 @@ Evaluator - Metrics Aggregation
 
 from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field
-from dataclasses import field
+from dataclasses import dataclass, field
 import json
 import statistics
 from pathlib import Path
-from dataclasses import dataclass
 
 from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
@@ -55,6 +54,7 @@ class CategoryMetrics(BaseModel):
     common_failures: List[str] = field(default_factory=list)
 
 
+@dataclass
 class EvaluatorConfig(DocumentProcessorConfig):
     """Evaluator設定"""
     

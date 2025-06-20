@@ -759,3 +759,31 @@ class SQLiteEvaluationStore(BaseEvaluationStore):
                 stats["by_type_and_corpus"][key] = count
         
         return stats
+    
+    def close(self):
+        """Close the evaluation store / 評価ストアを閉じる"""
+        # SQLite connections are closed automatically in context manager
+        # This method is provided for compatibility with test teardown
+        pass
+    
+    def clear_all_data(self) -> None:
+        """Clear all data from the store / ストアからすべてのデータを削除"""
+        with self._get_connection() as conn:
+            conn.execute("DELETE FROM evaluation_scores")
+            conn.execute("DELETE FROM test_results")
+            conn.execute("DELETE FROM test_cases")
+            conn.execute("DELETE FROM qa_pairs")
+            conn.execute("DELETE FROM evaluation_runs")
+            conn.commit()
+    
+    def delete_evaluation_run(self, run_id: str) -> bool:
+        """Delete evaluation run and all related data / 評価実行とすべての関連データを削除"""
+        with self._get_connection() as conn:
+            # Delete in reverse dependency order
+            conn.execute("DELETE FROM evaluation_scores WHERE run_id = ?", (run_id,))
+            conn.execute("DELETE FROM test_results WHERE run_id = ?", (run_id,))
+            conn.execute("DELETE FROM test_cases WHERE run_id = ?", (run_id,))
+            conn.execute("DELETE FROM qa_pairs WHERE run_id = ?", (run_id,))
+            cursor = conn.execute("DELETE FROM evaluation_runs WHERE id = ?", (run_id,))
+            conn.commit()
+            return cursor.rowcount > 0

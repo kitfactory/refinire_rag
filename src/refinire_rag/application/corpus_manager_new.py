@@ -833,7 +833,8 @@ class CorpusManager:
         
         # Create trigger document
         trigger = Document(id="stage_query", content="", metadata={})
-        return loader.process(trigger)
+        # Convert generator to list since return type is List[Document]
+        return list(loader.process(trigger))
     
     def clear_corpus(self):
         """Clear all documents from the corpus

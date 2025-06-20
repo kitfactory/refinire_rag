@@ -460,9 +460,10 @@ class TestTokenBasedChunker:
         
         chunks = self.chunker._create_overlapping_chunks(tokens, config)
         
-        assert len(chunks) == 2
+        assert len(chunks) == 3
         assert chunks[0] == ["word1", "word2", "word3", "word4"]
         assert chunks[1] == ["word4", "word5", "word6", "word7"]  # Overlap with word4
+        assert chunks[2] == ["word7", "word8"]  # Final chunk with remaining tokens
     
     def test_create_overlapping_chunks_no_overlap(self):
         """
@@ -604,7 +605,7 @@ class TestTokenBasedChunkerEdgeCases:
             metadata={}
         )
         
-        config = ChunkingConfig(chunk_size=5, overlap=1)
+        config = ChunkingConfig(chunk_size=5, overlap=1, min_chunk_size=3)
         chunks = self.chunker.chunk(doc, config)
         
         assert len(chunks) > 0
@@ -623,7 +624,7 @@ class TestTokenBasedChunkerEdgeCases:
             metadata={}
         )
         
-        config = ChunkingConfig(chunk_size=4, overlap=1)
+        config = ChunkingConfig(chunk_size=4, overlap=1, min_chunk_size=2)
         chunks = self.chunker.chunk(doc, config)
         
         assert len(chunks) > 0
@@ -641,7 +642,7 @@ class TestTokenBasedChunkerEdgeCases:
             metadata={}
         )
         
-        config = ChunkingConfig(chunk_size=6, overlap=2)
+        config = ChunkingConfig(chunk_size=6, overlap=2, min_chunk_size=4)
         chunks = self.chunker.chunk(doc, config)
         
         assert len(chunks) > 0
@@ -810,7 +811,7 @@ class TestChunkingIntegration:
         )
         
         # Fine-grained chunking
-        fine_config = ChunkingConfig(chunk_size=5, overlap=1)
+        fine_config = ChunkingConfig(chunk_size=5, overlap=1, min_chunk_size=3)
         fine_chunker = TokenBasedChunker(config=fine_config)
         fine_chunks = fine_chunker.process(doc)
         

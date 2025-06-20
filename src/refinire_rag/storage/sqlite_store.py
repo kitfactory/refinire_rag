@@ -91,8 +91,25 @@ class SQLiteDocumentStore(DocumentStore):
                     CREATE INDEX IF NOT EXISTS idx_size_bytes ON documents (size_bytes);
                 """
         
-        # FTS5 for full-text search
-        schema_sql += """
+        # FTS5 initialization will be done lazily when needed
+        self.fts_initialized = False
+        
+        try:
+            self.conn.executescript(schema_sql)
+            self.conn.commit()
+            logger.info("Database schema initialized successfully")
+        except sqlite3.OperationalError as e:
+            # Handle case where some operations fail
+            if "duplicate column name" not in str(e) and "already exists" not in str(e):
+                raise StorageError(f"Failed to initialize database schema: {e}") from e
+            logger.debug(f"Schema initialization warning (expected): {e}")
+    
+    def _init_fts(self):
+        """Initialize FTS5 search (lazy initialization)"""
+        if self.fts_initialized:
+            return
+            
+        fts_sql = """
             CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
                 id UNINDEXED,
                 content,
@@ -116,14 +133,13 @@ class SQLiteDocumentStore(DocumentStore):
         """
         
         try:
-            self.conn.executescript(schema_sql)
+            self.conn.executescript(fts_sql)
             self.conn.commit()
-            logger.info("Database schema initialized successfully")
+            self.fts_initialized = True
+            logger.info("FTS5 search initialized")
         except sqlite3.OperationalError as e:
-            # Handle case where some operations fail
-            if "duplicate column name" not in str(e) and "already exists" not in str(e):
-                raise StorageError(f"Failed to initialize database schema: {e}") from e
-            logger.debug(f"Schema initialization warning (expected): {e}")
+            logger.warning(f"FTS5 initialization failed: {e}")
+            self.fts_initialized = False
     
     def store_document(self, document: Document) -> str:
         """Store a document in SQLite"""
@@ -228,6 +244,9 @@ class SQLiteDocumentStore(DocumentStore):
         offset: int = 0
     ) -> List[SearchResult]:
         """Full-text search using FTS5"""
+        
+        # Initialize FTS5 if not already done
+        self._init_fts()
         
         try:
             cursor = self.conn.execute(
@@ -549,6 +568,15 @@ class SQLiteDocumentStore(DocumentStore):
         if self.conn:
             self.conn.close()
             logger.info("Database connection closed")
+    
+    def __enter__(self):
+        """Context manager entry"""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit"""
+        self.close()
+        return False
     
     def __del__(self):
         """Cleanup on deletion"""

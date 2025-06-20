@@ -20,6 +20,8 @@ from refinire_rag.exceptions import (
 )
 
 
+
+
 class TestDocumentLoadConfig:
     """Test DocumentLoadConfig functionality"""
     
@@ -186,7 +188,8 @@ class TestDocumentStoreLoaderBasic:
         """Set up test fixtures"""
         self.temp_dir = tempfile.mkdtemp()
         self.db_path = Path(self.temp_dir) / "test.db"
-        self.document_store = SQLiteDocumentStore(str(self.db_path))
+        # Use in-memory database for faster testing
+        self.document_store = SQLiteDocumentStore(":memory:")
         
         # Create test documents
         self.test_docs = [
@@ -253,7 +256,8 @@ class TestDocumentStoreLoaderStrategies:
         """Set up test fixtures"""
         self.temp_dir = tempfile.mkdtemp()
         self.db_path = Path(self.temp_dir) / "test.db"
-        self.document_store = SQLiteDocumentStore(str(self.db_path))
+        # Use in-memory database for faster testing
+        self.document_store = SQLiteDocumentStore(":memory:")
         
         # Create test documents with different metadata
         self.test_docs = [
@@ -389,7 +393,8 @@ class TestDocumentStoreLoaderAdvanced:
             Document(id="doc2", content="Content 2", metadata={})
         ]
         
-        self.mock_store.list_documents.return_value = test_docs
+        # Mock with side_effect to return documents first time, empty list second time
+        self.mock_store.list_documents.side_effect = [test_docs, []]
         
         loader = DocumentStoreLoader(self.mock_store, self.config)
         result = loader.load_all()
@@ -404,7 +409,8 @@ class TestDocumentStoreLoaderAdvanced:
         # Create document with missing ID
         invalid_doc = Document(id="", content="Content", metadata={})
         
-        self.mock_store.list_documents.return_value = [invalid_doc]
+        # Mock with side_effect to return invalid document first time, empty list second time
+        self.mock_store.list_documents.side_effect = [[invalid_doc], []]
         
         config = DocumentLoadConfig(validate_documents=True)
         loader = DocumentStoreLoader(self.mock_store, config)
