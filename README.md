@@ -156,9 +156,20 @@ stats = corpus_manager.get_corpus_stats()
 ### 🎯 Tutorials
 Learn how to build RAG systems step by step - from simple prototypes to enterprise deployment.
 
-- [Tutorial Overview](docs/tutorials/tutorial_overview.md)
-- [Tutorial 1: Basic RAG Pipeline](docs/tutorials/tutorial_01_basic_rag.md)
-- [Tutorial 6: Incremental Document Loading](docs/tutorials/tutorial_06_incremental_loading.md)
+#### **🚀 Core Tutorial Series (Start Here!)**
+Complete 3-part tutorial series covering the entire RAG workflow:
+
+- **[Part 1: Corpus Creation](docs/tutorials/tutorial_part1_corpus_creation.md)** - Document processing & indexing
+- **[Part 2: Query Engine](docs/tutorials/tutorial_part2_query_engine.md)** - Search & answer generation  
+- **[Part 3: Evaluation](docs/tutorials/tutorial_part3_evaluation.md)** - Performance assessment & optimization
+- **[Complete Integration Tutorial](examples/complete_rag_tutorial.py)** - End-to-end workflow
+
+#### **📖 Additional Tutorials**
+- [Tutorial Overview](docs/tutorials/tutorial_overview.md) - Complete tutorial index
+- [Tutorial 1: Basic RAG Pipeline](docs/tutorials/tutorial_01_basic_rag.md) - Quick start guide
+- [Tutorial 5: Enterprise Usage](docs/tutorials/tutorial_05_enterprise_usage.md) - Production patterns
+- [Tutorial 6: Incremental Document Loading](docs/tutorials/tutorial_06_incremental_loading.md) - Efficient updates
+- [Tutorial 7: RAG Evaluation](docs/tutorials/tutorial_07_rag_evaluation.md) - Advanced evaluation
 
 ### 📖 API Reference
 Detailed API documentation for each module.
