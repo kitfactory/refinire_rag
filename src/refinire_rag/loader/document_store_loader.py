@@ -492,7 +492,16 @@ class DocumentStoreLoader(Loader):
             if not document.id:
                 raise ValidationError("Document missing ID")
             
-            if not document.content and not document.metadata:
+            # Check if document has meaningful content
+            has_content = document.content and document.content.strip()
+            
+            # Check if document has meaningful metadata (excluding auto-generated metadata)
+            auto_generated_keys = {'id', 'created_at', 'modified_at', 'updated_at', 'document_id', 'path', 'file_type', 'size_bytes'}
+            meaningful_metadata = {k: v for k, v in document.metadata.items() 
+                                 if k not in auto_generated_keys and v is not None and str(v).strip()}
+            has_meaningful_metadata = bool(meaningful_metadata)
+            
+            if not has_content and not has_meaningful_metadata:
                 raise ValidationError("Document has no content or metadata")
             
             return True

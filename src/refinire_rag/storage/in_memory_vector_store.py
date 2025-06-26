@@ -38,12 +38,51 @@ class InMemoryVectorStore(VectorStore):
         
         logger.info(f"Initialized InMemoryVectorStore with {similarity_metric} similarity")
     
+    def store_embedding(self, document_id: str, embedding: np.ndarray, metadata: Optional[Dict[str, Any]] = None) -> str:
+        """Store an embedding with document ID and metadata (for test compatibility)
+        テスト互換性のための埋め込み保存メソッド"""
+        entry = VectorEntry(
+            document_id=document_id,
+            content="",  # Empty content for test compatibility
+            embedding=embedding,
+            metadata=metadata or {}
+        )
+        return self.add_vector(entry)
+    
+    def get_embedding(self, document_id: str) -> Optional[np.ndarray]:
+        """Get embedding by document ID (for test compatibility)
+        テスト互換性のためのドキュメントID別埋め込み取得"""
+        entry = self._vectors.get(document_id)
+        return entry.embedding if entry else None
+    
+    def get_embedding_count(self) -> int:
+        """Get total number of stored embeddings (for test compatibility)
+        テスト互換性のための保存埋め込み数取得"""
+        return len(self._vectors)
+    
+    def delete_embedding(self, document_id: str) -> bool:
+        """Delete embedding by document ID (for test compatibility)
+        テスト互換性のためのドキュメントID別埋め込み削除"""
+        return self.delete_vector(document_id)
+    
+    def clear_all_embeddings(self) -> bool:
+        """Clear all embeddings (for test compatibility)
+        テスト互換性のための全埋め込みクリア"""
+        return self.clear()
+    
+    def clear_all(self) -> bool:
+        """Clear all embeddings (alias for clear_all_embeddings)
+        全埋め込みクリア（clear_all_embeddingsのエイリアス）"""
+        return self.clear()
+    
     def add_vector(self, entry: VectorEntry) -> str:
         """Add a vector entry to the store"""
         
         try:
             # Validate embedding
-            if entry.embedding is None or entry.embedding.size == 0:
+            if (entry.embedding is None or 
+                entry.embedding.size == 0 or 
+                (entry.embedding.size == 1 and entry.embedding.item() is None)):
                 raise ValueError("Entry must have a valid embedding")
             
             # Store the entry
@@ -64,7 +103,9 @@ class InMemoryVectorStore(VectorStore):
             
             for entry in entries:
                 # Validate embedding
-                if entry.embedding is None or len(entry.embedding) == 0:
+                if (entry.embedding is None or 
+                    len(entry.embedding) == 0 or 
+                    (entry.embedding.size == 1 and entry.embedding.item() is None)):
                     logger.warning(f"Skipping document {entry.document_id} - invalid embedding")
                     continue
                 
@@ -93,7 +134,9 @@ class InMemoryVectorStore(VectorStore):
                 return False
             
             # Validate embedding
-            if entry.embedding is None or entry.embedding.size == 0:
+            if (entry.embedding is None or 
+                entry.embedding.size == 0 or 
+                (entry.embedding.size == 1 and entry.embedding.item() is None)):
                 raise ValueError("Entry must have a valid embedding")
             
             self._vectors[entry.document_id] = entry
@@ -253,7 +296,8 @@ class InMemoryVectorStore(VectorStore):
                 total_vectors=total_vectors,
                 vector_dimension=vector_dimension,
                 storage_size_bytes=storage_size,
-                index_type="exact_memory"
+                index_type="exact_memory",
+                similarity_metric=self.similarity_metric
             )
             
         except Exception as e:

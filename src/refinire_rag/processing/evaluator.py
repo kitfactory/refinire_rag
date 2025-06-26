@@ -111,10 +111,11 @@ class Evaluator(DocumentProcessor):
         test_results = self._parse_test_results(document)
         self.evaluation_results.extend(test_results)
         
-        # メトリクスを計算
-        metrics = self._compute_metrics(test_results)
+        # メトリクスを計算（累積データ使用）
+        metrics = self._compute_metrics(self.evaluation_results)
         
         # カテゴリ別分析
+        category_analysis = {}
         if self.config.include_category_analysis:
             category_analysis = self._analyze_by_category(test_results)
             self.category_metrics.update(category_analysis)
@@ -195,10 +196,14 @@ class Evaluator(DocumentProcessor):
         
         # メタデータから統計情報も抽出
         doc_metadata = document.metadata
+        
+        # 常にdocument_idを追加
+        for result in results:
+            result["document_id"] = doc_metadata.get("source_document_id", "unknown")
+            
         if "tests_run" in doc_metadata:
             # メタデータベースの統計を結果に統合
             for result in results:
-                result["document_id"] = doc_metadata.get("source_document_id", "unknown")
                 result["success_rate"] = doc_metadata.get("success_rate", 0.0)
         
         return results
@@ -555,8 +560,8 @@ class Evaluator(DocumentProcessor):
         
         report = {
             "overall_score": self._compute_overall_score(metrics),
-            "metrics": metrics.dict(),
-            "category_analysis": {k: v.dict() for k, v in category_analysis.items()},
+            "metrics": metrics.model_dump(),
+            "category_analysis": {k: v.model_dump() for k, v in category_analysis.items()},
             "failure_analysis": failure_analysis,
             "recommendations": self._generate_recommendations(metrics),
             "thresholds": {

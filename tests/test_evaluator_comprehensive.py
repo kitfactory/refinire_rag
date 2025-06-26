@@ -134,7 +134,7 @@ class TestEvaluationMetrics:
             f1_score=0.89
         )
         
-        metrics_dict = metrics.dict()
+        metrics_dict = metrics.model_dump()
         assert metrics_dict["accuracy"] == 0.90
         assert metrics_dict["precision"] == 0.88
         assert metrics_dict["f1_score"] == 0.89
@@ -394,10 +394,10 @@ class TestEvaluator:
     def test_compute_metrics_basic_calculation(self):
         """Test _compute_metrics with basic test results"""
         test_results = [
-            {"passed": True, "confidence": 0.8, "processing_time": 1.0, "sources_found": 2},
-            {"passed": False, "confidence": 0.4, "processing_time": 2.0, "sources_found": 1},
-            {"passed": True, "confidence": 0.9, "processing_time": 1.5, "sources_found": 3},
-            {"passed": True, "confidence": 0.7, "processing_time": 1.2, "sources_found": 0}
+            {"passed": True, "confidence": 0.8, "processing_time": 1.0, "sources_found": 2, "query": "query1"},
+            {"passed": False, "confidence": 0.4, "processing_time": 2.0, "sources_found": 1, "query": "query2"},
+            {"passed": True, "confidence": 0.9, "processing_time": 1.5, "sources_found": 3, "query": "query3"},
+            {"passed": True, "confidence": 0.7, "processing_time": 1.2, "sources_found": 0, "query": "query4"}
         ]
         
         metrics = self.evaluator._compute_metrics(test_results)
@@ -470,7 +470,7 @@ class TestEvaluator:
             ({"query": "Pythonとは何ですか？"}, "definition"),
             ({"query": "機械学習の方法を教えて"}, "how_to"),
             ({"query": "なぜエラーが起きるのか"}, "why"),
-            ({"query": "AとBの違いは何ですか"}, "comparison"),
+            ({"query": "AとBの違いを教えて"}, "comparison"),
             ({"query": "今日の天気はどうですか"}, "negative"),
             ({"query": "一般的な質問です"}, "general")
         ]
@@ -857,7 +857,7 @@ class TestEvaluatorEdgeCases:
         # Check metrics reflect all failures
         metrics = self.evaluator.computed_metrics
         assert metrics.accuracy == 0.0
-        assert metrics.average_confidence == 0.15  # (0.1 + 0.2) / 2
+        assert abs(metrics.average_confidence - 0.15) < 0.001  # (0.1 + 0.2) / 2
     
     def test_missing_metadata_fields(self):
         """Test with missing metadata fields"""

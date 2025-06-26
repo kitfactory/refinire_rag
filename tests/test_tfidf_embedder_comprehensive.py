@@ -1116,7 +1116,8 @@ class TestTFIDFEmbedderAdvancedFeatures:
         
         # Note: TF-IDF with L2 norm should be close to 1.0
         assert abs(norm_normalized - 1.0) < 0.1  # Allow some tolerance
-        assert norm_unnormalized != norm_normalized
+        # Unnormalized should have different (typically larger) norm
+        assert norm_unnormalized > norm_normalized or abs(norm_unnormalized - norm_normalized) > 0.01
     
     def test_tfidf_options(self):
         """

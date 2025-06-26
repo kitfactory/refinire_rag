@@ -14,6 +14,7 @@ from .base import Retriever, RetrieverConfig, SearchResult
 from ..models.document import Document
 from ..config import RefinireRAGConfig
 from ..registry.plugin_registry import PluginRegistry
+from ..embedding.tfidf_embedder import TFIDFEmbedder
 
 logger = logging.getLogger(__name__)
 
@@ -153,14 +154,11 @@ class SimpleRetriever(Retriever):
             # Generate query embedding
             if self.embedder:
                 # Use provided embedder
-                query_result = self.embedder.embed_text(query)
-                query_vector = query_result.vector
+                query_vector = self.embedder.embed_text(query)
             else:
                 # Create default TF-IDF embedder for query
-                from ..embedding import TFIDFEmbedder
                 default_embedder = TFIDFEmbedder()
-                query_result = default_embedder.embed_text(query)
-                query_vector = query_result.vector
+                query_vector = default_embedder.embed_text(query)
             
             # Perform similarity search
             similar_docs = self.vector_store.search_similar(

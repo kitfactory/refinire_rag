@@ -119,9 +119,14 @@ class TestQualityLabInitialization:
             assert lab.contradiction_detector is not None
             assert lab.insight_reporter is not None
     
-    @patch('src.refinire_rag.application.quality_lab.CorpusManager')
-    @patch('src.refinire_rag.application.quality_lab.SQLiteEvaluationStore')
-    def test_no_args_initialization(self, mock_eval_store, mock_corpus_manager):
+    @patch('refinire_rag.application.quality_lab.CorpusManager')
+    @patch('refinire_rag.application.quality_lab.SQLiteEvaluationStore')
+    @patch('refinire_rag.application.quality_lab.TestSuite')
+    @patch('refinire_rag.application.quality_lab.Evaluator')
+    @patch('refinire_rag.application.quality_lab.ContradictionDetector')
+    @patch('refinire_rag.application.quality_lab.InsightReporter')
+    def test_no_args_initialization(self, mock_reporter, mock_detector, mock_evaluator, 
+                                   mock_test_suite, mock_eval_store, mock_corpus_manager):
         """Test no-arguments initialization"""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Set up environment
@@ -145,10 +150,15 @@ class TestQualityLabInitialization:
                 os.environ.pop("REFINIRE_RAG_DATA_DIR", None)
                 os.environ.pop("REFINIRE_RAG_EVALUATION_DB_PATH", None)
     
-    @patch('src.refinire_rag.application.quality_lab.CorpusManager')
-    @patch('src.refinire_rag.application.quality_lab.QualityLabConfig')
-    @patch('src.refinire_rag.application.quality_lab.SQLiteEvaluationStore')
-    def test_from_env_initialization(self, mock_eval_store, mock_config, mock_corpus_manager):
+    @patch('refinire_rag.application.quality_lab.CorpusManager')
+    @patch('refinire_rag.application.quality_lab.QualityLabConfig')
+    @patch('refinire_rag.application.quality_lab.SQLiteEvaluationStore')
+    @patch('refinire_rag.application.quality_lab.TestSuite')
+    @patch('refinire_rag.application.quality_lab.Evaluator')
+    @patch('refinire_rag.application.quality_lab.ContradictionDetector')
+    @patch('refinire_rag.application.quality_lab.InsightReporter')
+    def test_from_env_initialization(self, mock_reporter, mock_detector, mock_evaluator, mock_test_suite,
+                                    mock_eval_store, mock_config, mock_corpus_manager):
         """Test from_env class method"""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Configure mocks
@@ -252,11 +262,12 @@ class TestQualityLabQAPairGeneration:
     
     def test_retrieve_corpus_documents(self):
         """Test corpus document retrieval"""
-        # Mock search_documents method
-        self.corpus_manager.search_documents = Mock(return_value=[
+        # Mock the _get_documents_by_stage method to return test documents
+        test_documents = [
             Document(id="doc1", content="Test", metadata={"processing_stage": "original"}),
             Document(id="doc2", content="Test", metadata={"processing_stage": "processed"})
-        ])
+        ]
+        self.lab.corpus_manager._get_documents_by_stage = Mock(return_value=test_documents)
         
         documents = self.lab._retrieve_corpus_documents(
             corpus_name="test_corpus",
@@ -264,7 +275,7 @@ class TestQualityLabQAPairGeneration:
             use_original_documents=True
         )
         
-        self.corpus_manager.search_documents.assert_called_once()
+        self.lab.corpus_manager._get_documents_by_stage.assert_called_once_with("original")
         # Should filter to only original documents
         filtered_docs = [doc for doc in documents if doc.metadata.get("processing_stage") == "original"]
         assert len(filtered_docs) >= 0
@@ -299,11 +310,17 @@ class TestQualityLabEvaluation:
         self.config = QualityLabConfig()
         self.evaluation_store = Mock(spec=SQLiteEvaluationStore)
         
-        self.lab = QualityLab(
-            corpus_manager=self.corpus_manager,
-            config=self.config,
-            evaluation_store=self.evaluation_store
-        )
+        # Patch backend components like successful tests
+        with patch('refinire_rag.application.quality_lab.TestSuite'), \
+             patch('refinire_rag.application.quality_lab.Evaluator'), \
+             patch('refinire_rag.application.quality_lab.ContradictionDetector'), \
+             patch('refinire_rag.application.quality_lab.InsightReporter'):
+            
+            self.lab = QualityLab(
+                corpus_manager=self.corpus_manager,
+                config=self.config,
+                evaluation_store=self.evaluation_store
+            )
     
     def test_evaluate_query_engine_basic(self):
         """Test basic QueryEngine evaluation"""
@@ -326,26 +343,36 @@ class TestQualityLabEvaluation:
         # Mock QueryEngine
         query_engine = Mock()
         
-        # Mock internal methods
-        self.lab._qa_pairs_to_test_cases = Mock(return_value=[Mock(id="test1"), Mock(id="test2")])
-        self.lab._evaluate_single_case = Mock(return_value=Mock(
-            test_case_id="test1",
-            passed=True,
-            confidence=0.8,
-            processing_time=1.0
-        ))
-        self.lab._compile_evaluation_summary = Mock(return_value={
-            "total_tests": 2,
-            "passed_tests": 2,
-            "success_rate": 1.0
-        })
-        self.lab._detect_contradictions = Mock(return_value={
-            "contradictions_found": 0
+        # Mock the evaluator process method to return Documents with proper metadata
+        from refinire_rag.models.document import Document
+        mock_eval_result = Document(
+            id="eval_result",
+            content="Mock evaluation result",
+            metadata={
+                "accuracy": 0.85,
+                "precision": 0.80,
+                "recall": 0.75
+            }
+        )
+        self.lab.evaluator.process.return_value = [mock_eval_result]
+        
+        # Mock the _evaluate_with_component_analysis method
+        self.lab._evaluate_with_component_analysis = Mock(return_value={
+            "answer": "Mock answer",
+            "confidence": 0.8,
+            "final_sources": [Mock(document_id="doc1")],
+            "component_analysis": {
+                "retrieval_time": 0.1,
+                "reranking_time": 0.05,
+                "synthesis_time": 0.2
+            }
         })
         
         results = self.lab.evaluate_query_engine(query_engine, qa_pairs)
         
         assert "evaluation_summary" in results
+        assert "test_results" in results
+        assert "evaluation_time" in results
         assert "test_results" in results
         assert "corpus_name" in results
         assert "qa_set_name" in results
@@ -478,9 +505,10 @@ class TestQualityLabReporting:
         assert "RAG System Evaluation Report" in report
         assert "test_corpus" in report
         assert "test_set" in report
-        assert "Total Tests: 10" in report
-        assert "Success Rate: 70.0%" in report
-        assert "Average Response Time: 1.500s" in report
+        # Check for actual format used by _create_fallback_report
+        assert "**Total_Tests**: 10" in report
+        assert "**Success_Rate**: 70.0%" in report  # Shows as percentage
+        assert "**Average_Response_Time**: 1.500s" in report
 
 
 class TestQualityLabStatistics:

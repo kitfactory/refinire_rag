@@ -7,16 +7,16 @@ RAGシステムの評価を実行するDocumentProcessor。
 
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from dataclasses import field
+from dataclasses import dataclass, field
 import json
 import time
 from pathlib import Path
 
-from ..document_processor import DocumentProcessor
+from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
 
 
-class TestCase(BaseModel):
+class TestCaseModel(BaseModel):
     """テストケース定義"""
     
     id: str
@@ -27,7 +27,7 @@ class TestCase(BaseModel):
     category: Optional[str] = None
 
 
-class TestResult(BaseModel):
+class TestResultModel(BaseModel):
     """テスト結果"""
     
     test_case_id: str
@@ -43,7 +43,12 @@ class TestResult(BaseModel):
     metadata: Dict[str, Any] = field(default_factory=dict)
 
 
-class TestSuiteConfig(BaseModel):
+# Aliases for backward compatibility
+TestCase = TestCaseModel
+TestResult = TestResultModel
+
+@dataclass
+class TestSuiteConfig(DocumentProcessorConfig):
     """TestSuite設定"""
     
     test_cases_file: Optional[str] = None
@@ -72,7 +77,7 @@ class TestSuite(DocumentProcessor):
     
     def __init__(self, config: TestSuiteConfig):
         super().__init__(config)
-        self.test_cases: List[TestCase] = []
+        self.test_cases: List[TestCaseModel] = []
         self.test_results: List[TestResult] = []
         
         # テストケースファイルがあれば読み込み

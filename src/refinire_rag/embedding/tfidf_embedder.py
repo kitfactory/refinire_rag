@@ -43,6 +43,7 @@ class TFIDFEmbeddingConfig(EmbeddingConfig):
     
     # Normalization
     normalize_vectors: bool = True  # L2 normalization
+    normalize_embeddings: bool = True  # Alternative name for compatibility
     
     # Model persistence
     model_path: Optional[str] = None  # Path to save/load trained model
@@ -54,6 +55,12 @@ class TFIDFEmbeddingConfig(EmbeddingConfig):
     
     # Language settings
     language: str = "english"  # Language for stopwords
+    
+    def __post_init__(self):
+        """Post-initialization processing"""
+        # Call parent's post_init if it exists
+        if hasattr(super(), '__post_init__'):
+            super().__post_init__()
 
 
 class TFIDFEmbedder(Embedder):
@@ -80,6 +87,12 @@ class TFIDFEmbedder(Embedder):
         # Load pre-trained model if specified
         if self.config.model_path and os.path.exists(self.config.model_path):
             self.load_model(self.config.model_path)
+    
+    @property
+    def vectorizer(self):
+        """Public access to vectorizer for compatibility with tests
+        テスト互換性のためのベクタライザーへのパブリックアクセス"""
+        return self._vectorizer
     
     def _init_vectorizer(self):
         """Initialize the TF-IDF vectorizer"""
@@ -166,6 +179,8 @@ class TFIDFEmbedder(Embedder):
             print(f"TF-IDF model fitted on {len(processed_texts)} documents in {fit_time:.2f}s")
             print(f"Vocabulary size: {len(self._vocabulary)}")
             
+        except ValueError as ve:
+            raise ValueError(f"Cannot fit TF-IDF model on empty corpus: {ve}")
         except Exception as e:
             raise EmbeddingError(f"Failed to fit TF-IDF model: {e}")
     
@@ -426,3 +441,35 @@ class TFIDFEmbedder(Embedder):
             })
         
         return info
+    
+    def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
+        """Compute cosine similarity between two embeddings
+        
+        Args:
+            embedding1: First embedding vector
+            embedding2: Second embedding vector
+            
+        Returns:
+            Cosine similarity score between 0 and 1
+        """
+        # Normalize vectors if not already normalized
+        norm1 = np.linalg.norm(embedding1)
+        norm2 = np.linalg.norm(embedding2)
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        
+        # Compute cosine similarity
+        similarity = np.dot(embedding1, embedding2) / (norm1 * norm2)
+        return float(similarity)
+    
+    def embed_batch(self, texts: List[str]) -> List[np.ndarray]:
+        """Alias for embed_texts for compatibility
+        
+        Args:
+            texts: List of texts to embed
+            
+        Returns:
+            List of embedding vectors
+        """
+        return self.embed_texts(texts)

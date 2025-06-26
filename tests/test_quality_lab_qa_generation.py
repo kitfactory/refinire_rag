@@ -73,7 +73,7 @@ class TestQualityLabQAGeneration:
         
         # Mock agent response for QA generation
         mock_llm_result = Mock()
-        mock_llm_result.generation = json.dumps({
+        mock_llm_result.content = json.dumps({
             "qa_pairs": [
                 {
                     "question": "What is Python known for?",
@@ -90,7 +90,7 @@ class TestQualityLabQAGeneration:
         mock_agent.run.return_value = mock_llm_result
         
         # Setup corpus manager to return documents
-        self.mock_corpus_manager.get_documents_by_stage.return_value = [self.sample_documents[0]]
+        self.mock_corpus_manager._get_documents_by_stage.return_value = [self.sample_documents[0]]
         
         # Generate QA pairs
         qa_pairs = self.lab.generate_qa_pairs(
@@ -130,7 +130,7 @@ class TestQualityLabQAGeneration:
         
         # Mock agent response
         mock_llm_result = Mock()
-        mock_llm_result.generation = json.dumps({
+        mock_llm_result.content = json.dumps({
             "qa_pairs": [{
                 "question": "What is machine learning?",
                 "answer": "Machine learning is a subset of artificial intelligence.",
@@ -139,9 +139,8 @@ class TestQualityLabQAGeneration:
         })
         mock_agent.run.return_value = mock_llm_result
         
-        # Setup corpus manager to return filtered documents
-        filtered_docs = [doc for doc in self.sample_documents if doc.metadata.get("type") == "ai"]
-        self.mock_corpus_manager.get_documents_by_stage.return_value = self.sample_documents
+        # Setup corpus manager to return documents
+        self.mock_corpus_manager._get_documents_by_stage.return_value = self.sample_documents
         
         # Generate QA pairs with filters
         filters = {"type": "ai"}
@@ -153,7 +152,7 @@ class TestQualityLabQAGeneration:
         )
         
         # Verify corpus manager was called
-        self.mock_corpus_manager.get_documents_by_stage.assert_called_once()
+        self.mock_corpus_manager._get_documents_by_stage.assert_called_once_with("original")
         
         # Verify RefinireAgent was used
         mock_agent_class.assert_called_once()
@@ -173,13 +172,13 @@ class TestQualityLabQAGeneration:
         _retrieve_corpus_documents基本機能のテスト
         """
         # Setup corpus manager
-        self.mock_corpus_manager.get_documents_by_stage.return_value = self.sample_documents
+        self.mock_corpus_manager._get_documents_by_stage.return_value = self.sample_documents
         
         # Call method
         documents = self.lab._retrieve_corpus_documents("test_corpus")
         
         # Verify call and results
-        self.mock_corpus_manager.get_documents_by_stage.assert_called_once_with("test_corpus", stage="original")
+        self.mock_corpus_manager._get_documents_by_stage.assert_called_once_with("original")
         assert documents == self.sample_documents
 
     def test_retrieve_corpus_documents_with_filters(self):
@@ -189,7 +188,7 @@ class TestQualityLabQAGeneration:
         """
         # Setup corpus manager
         filtered_docs = [self.sample_documents[1]]  # Only AI document
-        self.mock_corpus_manager.get_documents_by_stage.return_value = self.sample_documents
+        self.mock_corpus_manager._get_documents_by_stage.return_value = self.sample_documents
         
         # Call method with filters
         filters = {"type": "ai", "difficulty": "beginner"}
@@ -199,7 +198,7 @@ class TestQualityLabQAGeneration:
         )
         
         # Verify call and results (documents will be filtered internally)
-        self.mock_corpus_manager.get_documents_by_stage.assert_called_once_with("test_corpus", stage="original")
+        self.mock_corpus_manager._get_documents_by_stage.assert_called_once_with("original")
         
         # Should filter documents based on metadata
         assert len(documents) == 1
@@ -211,14 +210,14 @@ class TestQualityLabQAGeneration:
         空の結果での_retrieve_corpus_documentsテスト
         """
         # Setup corpus manager to return empty list
-        self.mock_corpus_manager.get_documents_by_stage.return_value = []
+        self.mock_corpus_manager._get_documents_by_stage.return_value = []
         
         # Call method
         documents = self.lab._retrieve_corpus_documents("test_corpus")
         
         # Verify results
         assert documents == []
-        self.mock_corpus_manager.get_documents_by_stage.assert_called_once_with("test_corpus", stage="original")
+        self.mock_corpus_manager._get_documents_by_stage.assert_called_once_with("original")
 
     def test_retrieve_corpus_documents_no_corpus_manager(self):
         """
@@ -372,7 +371,7 @@ class TestQualityLabQAGeneration:
         
         # Mock agent response
         mock_llm_result = Mock()
-        mock_llm_result.generation = json.dumps({
+        mock_llm_result.content = json.dumps({
             "qa_pairs": [
                 {
                     "question": "What is Python?",
@@ -449,7 +448,7 @@ class TestQualityLabQAGeneration:
         mock_agent_class.return_value = mock_agent
         
         mock_llm_result = Mock()
-        mock_llm_result.generation = "Invalid JSON response"
+        mock_llm_result.content = "Invalid JSON response"
         mock_agent.run.return_value = mock_llm_result
         
         # Test QA generation with invalid JSON
@@ -473,7 +472,7 @@ class TestQualityLabQAGeneration:
         
         # Mock agent response with 5 QA pairs
         mock_llm_result = Mock()
-        mock_llm_result.generation = json.dumps({
+        mock_llm_result.content = json.dumps({
             "qa_pairs": [
                 {"question": f"Question {i+1}?", "answer": f"Answer {i+1}", "question_type": ["factual", "analytical"][i % 2]}
                 for i in range(5)
@@ -534,13 +533,13 @@ class TestQualityLabQAGeneration:
         mock_llm_results = []
         for response in responses:
             mock_result = Mock()
-            mock_result.generation = response
+            mock_result.content = response
             mock_llm_results.append(mock_result)
         
         mock_agent.run.side_effect = mock_llm_results
         
         # Setup corpus manager to return multiple documents
-        self.mock_corpus_manager.get_documents_by_stage.return_value = self.sample_documents[:2]
+        self.mock_corpus_manager._get_documents_by_stage.return_value = self.sample_documents[:2]
         
         # Generate QA pairs
         qa_pairs = self.lab.generate_qa_pairs(
@@ -574,7 +573,7 @@ class TestQualityLabQAGeneration:
         ドキュメントがない場合のQAペア生成テスト
         """
         # Setup corpus manager to return empty list
-        self.mock_corpus_manager.get_documents_by_stage.return_value = []
+        self.mock_corpus_manager._get_documents_by_stage.return_value = []
         
         # Generate QA pairs
         qa_pairs = self.lab.generate_qa_pairs(

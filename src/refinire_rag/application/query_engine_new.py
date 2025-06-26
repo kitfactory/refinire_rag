@@ -569,3 +569,43 @@ class QueryEngine:
                 "enable_query_normalization": self.config.enable_query_normalization
             }
         }
+    
+    def add_retriever(self, retriever: Any) -> None:
+        """Add a retriever to the query engine
+        
+        Args:
+            retriever: Retriever instance to add
+        """
+        if retriever not in self.retrievers:
+            self.retrievers.append(retriever)
+            logger.info(f"Added retriever {type(retriever).__name__} to QueryEngine")
+        else:
+            logger.warning(f"Retriever {type(retriever).__name__} already exists in QueryEngine")
+    
+    def remove_retriever(self, retriever_or_index: Union[Any, int]) -> bool:
+        """Remove a retriever from the query engine
+        
+        Args:
+            retriever_or_index: Retriever instance or index to remove
+            
+        Returns:
+            True if retriever was removed, False if not found
+        """
+        try:
+            if isinstance(retriever_or_index, int):
+                # Remove by index
+                if 0 <= retriever_or_index < len(self.retrievers):
+                    removed = self.retrievers.pop(retriever_or_index)
+                    logger.info(f"Removed retriever at index {retriever_or_index} ({type(removed).__name__}) from QueryEngine")
+                    return True
+                else:
+                    logger.warning(f"Index {retriever_or_index} out of range for retrievers list")
+                    return False
+            else:
+                # Remove by object
+                self.retrievers.remove(retriever_or_index)
+                logger.info(f"Removed retriever {type(retriever_or_index).__name__} from QueryEngine")
+                return True
+        except ValueError:
+            logger.warning(f"Retriever {type(retriever_or_index).__name__} not found in QueryEngine")
+            return False

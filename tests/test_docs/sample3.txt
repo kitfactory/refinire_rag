@@ -1,0 +1,23 @@
+Data Science and Analytics
+
+Data science is an interdisciplinary field that uses scientific methods, processes, algorithms, and systems to extract knowledge and insights from structured and unstructured data.
+
+Core Components:
+1. Data Collection and Cleaning
+2. Exploratory Data Analysis
+3. Statistical Modeling
+4. Machine Learning
+5. Data Visualization
+6. Results Communication
+
+Tools and Technologies:
+- Programming Languages: Python, R, SQL
+- Visualization: Matplotlib, Seaborn, Tableau
+- Machine Learning: Scikit-learn, TensorFlow, PyTorch
+- Big Data: Hadoop, Spark, Kafka
+
+Career Paths:
+- Data Scientist
+- Data Analyst
+- Machine Learning Engineer
+- Business Intelligence Analyst

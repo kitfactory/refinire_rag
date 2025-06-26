@@ -49,7 +49,7 @@ uv venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install dependencies (when added to pyproject.toml)
-uv pip install -e .
+source .venv/bin/activagte && uv pip install -e .
 ```
 
 ## Commands
@@ -57,22 +57,22 @@ uv pip install -e .
 ### Environment Setup
 ```bash
 # Install in development mode
-uv pip install -e .
+source .venv/bin/activagte && uv pip install -e .
 
 # Install dependencies
-uv add <package>
+source .venv/bin/activagte && uv add <package>
 
 # Remove dependencies
-uv remove <package>
+source .venv/bin/activagte && uv remove <package>
 ```
 
 ### Development Commands
 ```bash
 # Run tests (when test framework is set up)
-pytest
+source .venv/bin/activagte && pytest
 
 # Run with coverage (when coverage is configured)
-pytest --cov=flexify
+source .venv/bin/activagte && pytest --cov=flexify
 
 # Build the package
 uv build
@@ -161,7 +161,6 @@ addopts = [
 ## クラスの分類
 - レイヤーアーキテクチャを意識して作成
 - レイヤーはデータベースやファイルに読み書きするゲートウェイ、UIからの入力を受け付けるコントローラ、処理の流れを実現するユースケース、処理の流れに複雑な処理が入り込まないようにする機能クラスを、ドメインのデータを表現するデータクラス、設定やログなどのユーティリティ
-- コメントを抜いて、200行を超える複雑な処理が必要であれば、専用に別クラス
 - 複雑処理をステートメントごとに機能クラスにし、そのクラスを呼び出す
 
 ## テスト
@@ -219,4 +218,11 @@ addopts = [
     - ユースケースを手順として箇条書きにする。
 - ユースケースフロー図
     - 手順化されたユースケースを主要インターフェースでmermaidでシーケンス図を書く
+
+# 知見の集積
+- 開発のサブフェーズが終わったら振り返りを行ってください。
+- ユーザーが手直しを指示、特に設計の見直し指示した場合に、bad_generation.mdを記載してください。
+- bad_generation.md には、事例として、どんな指示でどんな生成がされ、ユーザーからどのように指摘がされたかを記載してください。
+- ユーザーの指示がなくてもフェーズが完了出来たら、good_generation.mdに記載してください。そこには、どうして生成がうまくできたかを自分なりに考えて書いてください。
+
 

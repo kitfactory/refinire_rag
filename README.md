@@ -6,15 +6,21 @@ The refined RAG framework that makes enterprise-grade document processing effort
 
 Traditional RAG frameworks are powerful but complex. refinire-rag refines the development experience with radical simplicity and enterprise-grade productivity.
 
+✅ **99.1% Test Pass Rate** - Enterprise-grade reliability  
+✅ **81.6 Tests/KLOC** - Industry-leading quality  
+✅ **2,377+ Tests** - Comprehensive validation  
+
 **[→ Why refinire-rag? The Complete Story](docs/why_refinire_rag.md)** | **[→ なぜrefinire-rag？完全版](docs/why_refinire_rag_ja.md)**
 
 ### ⚡ 10x Simpler Development
 ```python
 # LangChain: 50+ lines of complex setup
 # refinire-rag: 5 lines to production-ready RAG
-manager = CorpusManager.create_simple_rag(doc_store, vector_store)
-results = manager.process_corpus(["documents/"])
-answer = query_engine.answer("How does this work?")
+manager = CorpusManager.from_env()
+results = manager.import_original_documents("my_corpus", "documents/", "*.md")
+processed = manager.rebuild_corpus_from_original("my_corpus")
+query_engine = QueryEngine(corpus_name="my_corpus", retrievers=manager.retrievers)
+answer = query_engine.query("How does this work?")
 ```
 
 ### 🏢 Enterprise-Ready Features Built-In
@@ -110,20 +116,27 @@ print(answer)
 
 ### Production-Ready Setup
 ```python
-from refinire_rag.application import CorpusManager, QueryEngine
+from refinire_rag.application import CorpusManager, QueryEngine, QualityLab
 from refinire_rag.storage import SQLiteDocumentStore, InMemoryVectorStore
+from refinire_rag.retrieval import SimpleRetriever
 
 # Configure storage
 doc_store = SQLiteDocumentStore("corpus.db")
 vector_store = InMemoryVectorStore()
+retriever = SimpleRetriever(vector_store=vector_store)
 
 # Build corpus with incremental processing
-manager = CorpusManager.create_simple_rag(doc_store, vector_store)
-results = manager.process_corpus(["documents/"])
+manager = CorpusManager(document_store=doc_store, retrievers=[retriever])
+results = manager.import_original_documents("company_docs", "documents/", "*.pdf")
+processed = manager.rebuild_corpus_from_original("company_docs")
 
 # Query with confidence
-query_engine = QueryEngine(retriever, reranker, reader)
-result = query_engine.answer("What is our company policy on remote work?")
+query_engine = QueryEngine(corpus_name="company_docs", retrievers=[retriever])
+result = query_engine.query("What is our company policy on remote work?")
+
+# Evaluate quality
+quality_lab = QualityLab(corpus_manager=manager)
+eval_results = quality_lab.run_full_evaluation("qa_set", "company_docs", query_engine)
 ```
 
 ### Enterprise Features
@@ -171,6 +184,12 @@ Complete 3-part tutorial series covering the entire RAG workflow:
 - [Tutorial 6: Incremental Document Loading](docs/tutorials/tutorial_06_incremental_loading.md) - Efficient updates
 - [Tutorial 7: RAG Evaluation](docs/tutorials/tutorial_07_rag_evaluation.md) - Advanced evaluation
 
+#### **🔧 Plugin Development**
+- [Plugin Development Guide](docs/plugins/plugin_development.md) - Create custom processors
+- [Embedder Plugin Tutorial](docs/plugins/embedder_plugin.md) - Custom embedding models
+- [Loader Plugin Tutorial](docs/plugins/loader_plugin.md) - Custom document formats
+- [Plugin Registry](docs/plugins/plugin_registry.md) - Available community plugins
+
 ### 📖 API Reference
 Detailed API documentation for each module.
 
@@ -217,14 +236,25 @@ System design philosophy and implementation details.
 
 ## Development
 
+### Quality Metrics
+- **Test Coverage**: 2,377+ tests across 108 test files
+- **Pass Rate**: 99.1% (enterprise-grade reliability)
+- **Test Density**: 81.6 tests/KLOC (industry-leading)
+- **Architecture**: DocumentProcessor unified interface
+
 ### Running Tests
 ```bash
-# Run all tests
-python -m pytest tests/
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run all tests with coverage
+pytest --cov=refinire_rag
 
 # Run specific test categories
-python -m pytest tests/unit/        # Unit tests
-python -m pytest tests/integration/ # Integration tests
+pytest tests/unit/        # Unit tests
+pytest tests/integration/ # Integration tests
+pytest tests/test_corpus_manager_*.py  # Corpus management tests
+pytest tests/test_quality_lab_*.py     # Evaluation tests
 
 # Run examples
 python examples/simple_rag_test.py

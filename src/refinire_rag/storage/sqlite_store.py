@@ -134,9 +134,18 @@ class SQLiteDocumentStore(DocumentStore):
         
         try:
             self.conn.executescript(fts_sql)
+            
+            # Populate FTS with existing documents
+            cursor = self.conn.execute("SELECT rowid, id, content FROM documents")
+            for row in cursor.fetchall():
+                self.conn.execute(
+                    "INSERT INTO documents_fts(rowid, id, content) VALUES (?, ?, ?)",
+                    (row[0], row[1], row[2])
+                )
+            
             self.conn.commit()
             self.fts_initialized = True
-            logger.info("FTS5 search initialized")
+            logger.info("FTS5 search initialized and populated with existing documents")
         except sqlite3.OperationalError as e:
             logger.warning(f"FTS5 initialization failed: {e}")
             self.fts_initialized = False
@@ -221,6 +230,37 @@ class SQLiteDocumentStore(DocumentStore):
         except Exception as e:
             raise StorageError(f"Failed to delete document {document_id}: {e}") from e
     
+    def document_exists(self, document_id: str) -> bool:
+        """Check if a document exists by ID"""
+        
+        try:
+            cursor = self.conn.execute(
+                "SELECT 1 FROM documents WHERE id = ?",
+                (document_id,)
+            )
+            return cursor.fetchone() is not None
+        except Exception as e:
+            raise StorageError(f"Failed to check document existence {document_id}: {e}") from e
+    
+    def clear_all_documents(self) -> int:
+        """Clear all documents from the store"""
+        
+        try:
+            cursor = self.conn.execute("SELECT COUNT(*) FROM documents")
+            count = cursor.fetchone()[0]
+            
+            self.conn.execute("DELETE FROM documents")
+            self.conn.commit()
+            
+            logger.info(f"Cleared {count} documents from store")
+            return count
+        except Exception as e:
+            raise StorageError(f"Failed to clear all documents: {e}") from e
+    
+    def clear_all(self) -> int:
+        """Alias for clear_all_documents for compatibility"""
+        return self.clear_all_documents()
+    
     def search_by_metadata(
         self,
         filters: Dict[str, Any],
@@ -291,7 +331,7 @@ class SQLiteDocumentStore(DocumentStore):
                     """SELECT id, content, metadata FROM documents 
                        WHERE metadata LIKE ? OR id = ?
                        ORDER BY created_at""",
-                    (f'%"original_document_id":"{original_document_id}"%', original_document_id)
+                    (f'%"original_document_id": "{original_document_id}"%', original_document_id)
                 )
             
             documents = []
@@ -379,6 +419,57 @@ class SQLiteDocumentStore(DocumentStore):
             
         except Exception as e:
             raise StorageError(f"Failed to count documents: {e}") from e
+    
+    def get_document_count(self) -> int:
+        """Get total document count (alias for count_documents)"""
+        return self.count_documents()
+    
+    def search_documents(self, query: str, limit: int = 100, offset: int = 0) -> List[SearchResult]:
+        """Search documents by content or metadata"""
+        try:
+            # Try content search first
+            if query.strip():
+                return self.search_by_content(query, limit, offset)
+            else:
+                # If empty query, return recent documents
+                documents = self.list_documents(limit, offset)
+                return [SearchResult(document=doc) for doc in documents]
+        except Exception:
+            # Fallback to metadata search
+            return self.search_by_metadata({}, limit, offset)
+    
+    def batch_store_documents(self, documents: List[Document]) -> List[str]:
+        """Store multiple documents in a batch operation"""
+        try:
+            stored_ids = []
+            for document in documents:
+                stored_id = self.store_document(document)
+                stored_ids.append(stored_id)
+            logger.debug(f"Batch stored {len(documents)} documents")
+            return stored_ids
+        except Exception as e:
+            raise StorageError(f"Failed to batch store documents: {e}") from e
+    
+    def search_documents_by_metadata(self, filters: Dict[str, Any], limit: int = 100, offset: int = 0) -> List[SearchResult]:
+        """Search documents by metadata (alias for search_by_metadata)"""
+        return self.search_by_metadata(filters, limit, offset)
+    
+    def store_documents(self, documents: List[Document]) -> List[str]:
+        """Store multiple documents (alias for batch_store_documents)"""
+        return self.batch_store_documents(documents)
+    
+    def get_documents(self, document_ids: List[str]) -> List[Document]:
+        """Get multiple documents by their IDs"""
+        try:
+            documents = []
+            for doc_id in document_ids:
+                doc = self.get_document(doc_id)
+                if doc:
+                    documents.append(doc)
+            logger.debug(f"Retrieved {len(documents)} documents out of {len(document_ids)} requested")
+            return documents
+        except Exception as e:
+            raise StorageError(f"Failed to get documents: {e}") from e
     
     def get_storage_stats(self) -> StorageStats:
         """Get storage statistics"""
@@ -555,11 +646,11 @@ class SQLiteDocumentStore(DocumentStore):
                     like_clauses = []
                     for val in value["$in"]:
                         like_clauses.append("metadata LIKE ?")
-                        params.append(f'%"{key}":"{val}"%')
+                        params.append(f'%"{key}": "{val}"%')
                     where_clauses.append(f"({' OR '.join(like_clauses)})")
             else:
                 where_clauses.append("metadata LIKE ?")
-                params.append(f'%"{key}":"{value}"%')
+                params.append(f'%"{key}": "{value}"%')
         
         return where_clauses, params
     

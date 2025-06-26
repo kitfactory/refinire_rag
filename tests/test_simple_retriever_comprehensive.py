@@ -268,10 +268,9 @@ class TestSimpleRetrieverRetrieval:
         Test successful retrieval with embedder
         エンベッダー使用での正常検索テスト
         """
-        # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        self.mock_embedder.embed_text.return_value = mock_embedding_result
+        # Setup mock responses - embed_text returns numpy array directly
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        self.mock_embedder.embed_text.return_value = mock_embedding_vector
         
         mock_vector_result = Mock()
         mock_vector_result.document_id = "doc1"
@@ -287,7 +286,7 @@ class TestSimpleRetrieverRetrieval:
         # Verify calls
         self.mock_embedder.embed_text.assert_called_once_with("test query")
         self.mock_vector_store.search_similar.assert_called_once_with(
-            mock_embedding_result.vector, 
+            mock_embedding_vector, 
             limit=5
         )
         
@@ -314,11 +313,10 @@ class TestSimpleRetrieverRetrieval:
         
         # Mock the TF-IDF embedder import during retrieval execution
         with patch('refinire_rag.retrieval.simple_retriever.TFIDFEmbedder') as mock_tfidf_class:
-            # Setup mock TF-IDF embedder
+            # Setup mock TF-IDF embedder - embed_text returns numpy array directly
             mock_tfidf_embedder = Mock()
-            mock_embedding_result = Mock()
-            mock_embedding_result.vector = np.array([0.4, 0.5, 0.6])
-            mock_tfidf_embedder.embed_text.return_value = mock_embedding_result
+            mock_embedding_vector = np.array([0.4, 0.5, 0.6])
+            mock_tfidf_embedder.embed_text.return_value = mock_embedding_vector
             mock_tfidf_class.return_value = mock_tfidf_embedder
             
             # Setup vector store response
@@ -331,7 +329,7 @@ class TestSimpleRetrieverRetrieval:
             mock_tfidf_class.assert_called_once()
             mock_tfidf_embedder.embed_text.assert_called_once_with("test query")
             self.mock_vector_store.search_similar.assert_called_once_with(
-                mock_embedding_result.vector,
+                mock_embedding_vector,
                 limit=5
             )
     
@@ -341,9 +339,8 @@ class TestSimpleRetrieverRetrieval:
         類似度閾値フィルタリング付き検索テスト
         """
         # Setup mock responses with different scores
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        self.mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        self.mock_embedder.embed_text.return_value = mock_embedding_vector
         
         high_score_result = Mock()
         high_score_result.document_id = "doc1"
@@ -387,9 +384,8 @@ class TestSimpleRetrieverRetrieval:
         )
         
         # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        self.mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        self.mock_embedder.embed_text.return_value = mock_embedding_vector
         
         low_score_result = Mock()
         low_score_result.document_id = "doc1"
@@ -412,10 +408,9 @@ class TestSimpleRetrieverRetrieval:
         Test retrieval with custom limit parameter
         カスタム制限パラメータでの検索テスト
         """
-        # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        self.mock_embedder.embed_text.return_value = mock_embedding_result
+        # Setup mock responses - embed_text returns numpy array directly
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        self.mock_embedder.embed_text.return_value = mock_embedding_vector
         
         self.mock_vector_store.search_similar.return_value = []
         
@@ -424,7 +419,7 @@ class TestSimpleRetrieverRetrieval:
         
         # Verify custom limit was used
         self.mock_vector_store.search_similar.assert_called_once_with(
-            mock_embedding_result.vector,
+            mock_embedding_vector,
             limit=15
         )
     
@@ -452,9 +447,8 @@ class TestSimpleRetrieverRetrieval:
         ベクトルストアからの空結果での検索テスト
         """
         # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        self.mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        self.mock_embedder.embed_text.return_value = mock_embedding_vector
         
         self.mock_vector_store.search_similar.return_value = []
         
@@ -515,9 +509,8 @@ class TestSimpleRetrieverStatistics:
         正常検索後の統計更新テスト
         """
         # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        self.mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        self.mock_embedder.embed_text.return_value = mock_embedding_vector
         
         mock_result = Mock()
         mock_result.document_id = "doc1"
@@ -568,9 +561,8 @@ class TestSimpleRetrieverStatistics:
         複数クエリ間での統計累積テスト
         """
         # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        self.mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        self.mock_embedder.embed_text.return_value = mock_embedding_vector
         
         self.mock_vector_store.search_similar.return_value = []
         
@@ -616,9 +608,8 @@ class TestSimpleRetrieverErrorHandling:
         mock_embedder = Mock()
         
         # Setup embedder to work normally
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        mock_embedder.embed_text.return_value = mock_embedding_vector
         
         # Setup vector store to raise exception
         mock_vector_store.search_similar.side_effect = Exception("Vector store error")
@@ -671,9 +662,8 @@ class TestSimpleRetrieverErrorHandling:
         mock_embedder = Mock()
         
         # Setup normal mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.0, 0.0, 0.0])
-        mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.0, 0.0, 0.0])
+        mock_embedder.embed_text.return_value = mock_embedding_vector
         
         mock_vector_store.search_similar.return_value = []
         
@@ -699,9 +689,8 @@ class TestSimpleRetrieverErrorHandling:
         mock_embedder = Mock()
         
         # Setup embedder
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        mock_embedder.embed_text.return_value = mock_embedding_vector
         
         # Setup malformed vector store result (missing attributes)
         malformed_result = Mock()
@@ -746,9 +735,8 @@ class TestSimpleRetrieverEdgeCases:
         long_query = "test " * 200
         
         # Setup normal mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        mock_embedder.embed_text.return_value = mock_embedding_vector
         
         mock_vector_store.search_similar.return_value = []
         
@@ -771,39 +759,33 @@ class TestSimpleRetrieverEdgeCases:
     
     def test_zero_limit_parameter(self):
         """
-        Test retrieval with zero limit
-        ゼロ制限での検索テスト
+        Test retrieval with zero limit falls back to config default
+        ゼロ制限での検索時のデフォルト設定フォールバックテスト
         """
         mock_vector_store = Mock()
         mock_embedder = Mock()
         
         # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        mock_embedder.embed_text.return_value = mock_embedding_vector
         
         mock_vector_store.search_similar.return_value = []
         
         retriever = SimpleRetriever(
             vector_store=mock_vector_store,
             embedder=mock_embedder,
-            config=SimpleRetrieverConfig()
+            config=SimpleRetrieverConfig()  # default top_k = 10
         )
         
-        # Execute retrieval with zero limit - should handle gracefully
-        try:
-            results = retriever.retrieve("test query", limit=0)
-            # If it succeeds, verify it returns empty list
-            assert results == []
-            mock_vector_store.search_similar.assert_called_once_with(
-                mock_embedding_result.vector,
-                limit=0
-            )
-        except Exception:
-            # If it raises an exception due to zero limit, that's also acceptable behavior
-            # Just verify that error handling works
-            stats = retriever.get_processing_stats()
-            assert stats["errors_encountered"] == 1
+        # Execute retrieval with zero limit - should fall back to config.top_k
+        results = retriever.retrieve("test query", limit=0)
+        
+        # Should return empty list and fall back to config default (10)
+        assert results == []
+        mock_vector_store.search_similar.assert_called_once_with(
+            mock_embedding_vector,
+            limit=10  # Falls back to config.top_k default
+        )
     
     def test_negative_limit_parameter(self):
         """
@@ -814,9 +796,8 @@ class TestSimpleRetrieverEdgeCases:
         mock_embedder = Mock()
         
         # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        mock_embedder.embed_text.return_value = mock_embedding_vector
         
         mock_vector_store.search_similar.return_value = []
         
@@ -832,7 +813,7 @@ class TestSimpleRetrieverEdgeCases:
         # Should handle negative limit
         assert results == []
         mock_vector_store.search_similar.assert_called_once_with(
-            mock_embedding_result.vector,
+            mock_embedding_vector,
             limit=-5
         )
     
@@ -848,9 +829,8 @@ class TestSimpleRetrieverEdgeCases:
         unicode_query = "Hello 世界 🌍 café naïve résumé"
         
         # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        mock_embedder.embed_text.return_value = mock_embedding_vector
         
         mock_vector_store.search_similar.return_value = []
         
@@ -879,9 +859,8 @@ class TestSimpleRetrieverEdgeCases:
         special_query = "!@#$%^&*()_+-=[]{}|;':\",./<>?`~"
         
         # Setup mock responses
-        mock_embedding_result = Mock()
-        mock_embedding_result.vector = np.array([0.1, 0.2, 0.3])
-        mock_embedder.embed_text.return_value = mock_embedding_result
+        mock_embedding_vector = np.array([0.1, 0.2, 0.3])
+        mock_embedder.embed_text.return_value = mock_embedding_vector
         
         mock_vector_store.search_similar.return_value = []
         

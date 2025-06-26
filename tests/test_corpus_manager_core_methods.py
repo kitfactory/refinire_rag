@@ -28,19 +28,27 @@ class TestCorpusManagerImportMethods:
             retrievers=[self.mock_retriever]
         )
     
-    @patch('refinire_rag.application.corpus_manager_new.IncrementalDirectoryLoader')
-    @patch('refinire_rag.application.corpus_manager_new.ConstantMetadata')
-    def test_import_original_documents_basic(self, mock_constant_metadata, mock_loader):
+    @patch('refinire_rag.application.corpus_manager_new.Path.exists')
+    @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
+    @patch('refinire_rag.metadata.constant_metadata.ConstantMetadata')
+    def test_import_original_documents_basic(self, mock_constant_metadata, mock_loader, mock_exists):
         """Test basic document import functionality"""
         # Setup mocks
+        mock_exists.return_value = True  # Mock directory exists
         mock_loader_instance = Mock()
         mock_loader.return_value = mock_loader_instance
         
-        test_docs = [
-            Document(id="doc1", content="Content 1", metadata={}),
-            Document(id="doc2", content="Content 2", metadata={})
-        ]
-        mock_loader_instance.process.return_value = iter(test_docs)
+        # Mock sync_result properly
+        mock_sync_result = Mock()
+        mock_sync_result.added_documents = ["doc1", "doc2"]  # List, not Mock
+        mock_sync_result.updated_documents = []  # List, not Mock
+        mock_sync_result.has_errors = False
+        mock_sync_result.errors = []
+        mock_loader_instance.sync_with_store.return_value = mock_sync_result
+        
+        # Mock file_tracker
+        mock_file_tracker = Mock()
+        mock_loader_instance.file_tracker = mock_file_tracker
         
         # Execute
         stats = self.manager.import_original_documents(
@@ -50,37 +58,57 @@ class TestCorpusManagerImportMethods:
         
         # Verify
         assert isinstance(stats, CorpusStats)
+        assert stats.total_files_processed == 2
+        assert stats.total_documents_created == 2
         mock_loader.assert_called_once()
         mock_constant_metadata.assert_called_once()
         
-        # Check that loader process was called
-        mock_loader_instance.process.assert_called_once()
+        # Check that sync_with_store was called
+        mock_loader_instance.sync_with_store.assert_called_once()
     
-    @patch('refinire_rag.application.corpus_manager_new.IncrementalDirectoryLoader')
-    @patch('refinire_rag.application.corpus_manager_new.ConstantMetadata')
-    def test_import_original_documents_with_options(self, mock_constant_metadata, mock_loader):
+    @patch('refinire_rag.application.corpus_manager_new.Path.exists')
+    @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
+    @patch('refinire_rag.metadata.constant_metadata.ConstantMetadata')
+    def test_import_original_documents_with_options(self, mock_constant_metadata, mock_loader, mock_exists):
         """Test document import with all options"""
+        mock_exists.return_value = True  # Mock directory exists
         mock_loader_instance = Mock()
         mock_loader.return_value = mock_loader_instance
-        mock_loader_instance.process.return_value = iter([])
+        
+        # Mock sync_result properly
+        mock_sync_result = Mock()
+        mock_sync_result.added_documents = ["doc1"]  # List, not Mock
+        mock_sync_result.updated_documents = []  # List, not Mock
+        mock_sync_result.has_errors = False
+        mock_sync_result.errors = []
+        mock_loader_instance.sync_with_store.return_value = mock_sync_result
+        
+        # Mock file_tracker
+        mock_file_tracker = Mock()
+        mock_loader_instance.file_tracker = mock_file_tracker
         
         additional_metadata = {"project": "test", "version": "1.0"}
         
-        stats = self.manager.import_original_documents(
-            corpus_name="test_corpus",
-            directory="/test/dir",
-            glob="**/*.md",
-            use_multithreading=True,
-            force_reload=True,
-            additional_metadata=additional_metadata,
-            tracking_file_path="/custom/tracking.json",
-            create_dictionary=True,
-            create_knowledge_graph=True,
-            dictionary_output_dir="/dict/output",
-            graph_output_dir="/graph/output"
-        )
+        # Mock knowledge artifacts creation to avoid file system operations
+        with patch.object(self.manager, '_create_knowledge_artifacts') as mock_create_artifacts:
+            mock_create_artifacts.return_value = None
+            
+            stats = self.manager.import_original_documents(
+                corpus_name="test_corpus",
+                directory="/test/dir",
+                glob="**/*.md",
+                use_multithreading=True,
+                force_reload=True,
+                additional_metadata=additional_metadata,
+                tracking_file_path="/custom/tracking.json",
+                create_dictionary=True,
+                create_knowledge_graph=True,
+                dictionary_output_dir="/dict/output",
+                graph_output_dir="/graph/output"
+            )
         
         assert isinstance(stats, CorpusStats)
+        assert stats.total_files_processed == 1
         
         # Verify constant metadata includes additional metadata
         call_args = mock_constant_metadata.call_args[0][0]
@@ -129,12 +157,14 @@ class TestCorpusManagerImportMethods:
         assert result == Path("/custom/env/path")
         mock_getenv.assert_called_once_with("TEST_ENV_VAR")
     
+    @patch('pathlib.Path.mkdir')
     @patch('os.getenv')
     @patch('pathlib.Path.home')
-    def test_get_default_output_directory_fallback(self, mock_home, mock_getenv):
+    def test_get_default_output_directory_fallback(self, mock_home, mock_getenv, mock_mkdir):
         """Test getting default output directory fallback to home"""
         mock_getenv.return_value = None
         mock_home.return_value = Path("/home/user")
+        mock_mkdir.return_value = None  # Mock successful directory creation
         
         result = CorpusManager._get_default_output_directory("TEST_ENV_VAR", "subdir")
         
@@ -293,8 +323,9 @@ class TestCorpusManagerConfigurationMethods:
         with pytest.raises(ValueError, match="Unknown file type"):
             CorpusManager._get_corpus_file_path("test", "invalid_type")
     
+    @patch('refinire_rag.application.corpus_manager_new.Path.mkdir')
     @patch('os.getenv')
-    def test_get_refinire_rag_dir_from_env(self, mock_getenv):
+    def test_get_refinire_rag_dir_from_env(self, mock_getenv, mock_mkdir):
         """Test getting refinire rag directory from environment"""
         mock_getenv.return_value = "/custom/refinire/path"
         
@@ -302,16 +333,19 @@ class TestCorpusManagerConfigurationMethods:
         
         expected = Path("/custom/refinire/path") / "rag"
         assert result == expected
+        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
     
+    @patch('refinire_rag.application.corpus_manager_new.Path.mkdir')
     @patch('os.getenv')
-    def test_get_refinire_rag_dir_default(self, mock_getenv):
+    def test_get_refinire_rag_dir_default(self, mock_getenv, mock_mkdir):
         """Test getting default refinire rag directory"""
-        mock_getenv.return_value = None
+        mock_getenv.side_effect = lambda key, default=None: default if key == "REFINIRE_DIR" else None
         
         result = CorpusManager._get_refinire_rag_dir()
         
         expected = Path("./refinire/rag")
         assert result == expected
+        mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
 
 class TestCorpusManagerDocumentProcessing:
@@ -393,18 +427,20 @@ class TestCorpusManagerErrorHandling:
             retrievers=[Mock()]
         )
     
-    @patch('refinire_rag.application.corpus_manager_new.IncrementalDirectoryLoader')
-    def test_import_documents_with_loader_error(self, mock_loader):
+    @patch('refinire_rag.application.corpus_manager_new.Path.exists')
+    @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
+    def test_import_documents_with_loader_error(self, mock_loader, mock_exists):
         """Test import documents handles loader errors"""
+        mock_exists.return_value = True  # Directory exists
         mock_loader.side_effect = Exception("Loader initialization failed")
         
         with pytest.raises(Exception, match="Loader initialization failed"):
             self.manager.import_original_documents(
                 corpus_name="test",
-                directory="/nonexistent"
+                directory="/test/dir"
             )
     
-    @patch('refinire_rag.application.corpus_manager_new.ConstantMetadata')
+    @patch('refinire_rag.metadata.constant_metadata.ConstantMetadata')
     def test_import_documents_with_metadata_error(self, mock_metadata):
         """Test import documents handles metadata processor errors"""
         mock_metadata.side_effect = Exception("Metadata processor failed")

@@ -25,7 +25,7 @@ class MockVectorStore(VectorStore):
     """Mock vector store for testing"""
     
     def __init__(self, config=None):
-        super().__init__(config or PluginConfig().for_plugin_type("vector_store"))
+        self.config = config or PluginConfig("MockVectorStore", {"type": "vector_store"})
     
     def retrieve(self, query, limit=None, metadata_filter=None):
         return []
@@ -47,6 +47,21 @@ class MockVectorStore(VectorStore):
     
     def get_document_count(self):
         return 0
+    
+    def add_documents(self, documents):
+        pass
+    
+    def clear(self):
+        pass
+    
+    def delete_documents(self, document_ids):
+        pass
+    
+    def get_stats(self):
+        return {}
+    
+    def search(self, query, limit=None, metadata_filter=None):
+        return []
 
 
 class TestPluginAutoDiscovery:
@@ -56,7 +71,7 @@ class TestPluginAutoDiscovery:
         """Test entry point scanning with no plugins available"""
         discovery = PluginAutoDiscovery()
         
-        with patch('importlib.metadata.entry_points') as mock_entry_points:
+        with patch('refinire_rag.plugins.auto_discovery.entry_points') as mock_entry_points:
             # Mock empty entry points
             mock_eps = MagicMock()
             mock_eps.select.return_value = []
@@ -81,9 +96,14 @@ class TestPluginAutoDiscovery:
         mock_entry_point.module = "mock_plugin"
         mock_entry_point.load.return_value = MockVectorStore
         
-        with patch('importlib.metadata.entry_points') as mock_entry_points:
+        with patch('refinire_rag.plugins.auto_discovery.entry_points') as mock_entry_points:
             mock_eps = MagicMock()
-            mock_eps.select.return_value = [mock_entry_point]
+            # Mock select to return our mock entry point only for vectorstore group
+            def mock_select(group=None):
+                if group == 'refinire_rag.vectorstore':
+                    return [mock_entry_point]
+                return []
+            mock_eps.select.side_effect = mock_select
             mock_entry_points.return_value = mock_eps
             
             plugins = discovery.scan_entry_points()
@@ -104,7 +124,7 @@ class TestPluginAutoDiscovery:
         mock_entry_point.name = "FailingPlugin"
         mock_entry_point.load.side_effect = ImportError("Module not found")
         
-        with patch('importlib.metadata.entry_points') as mock_entry_points:
+        with patch('refinire_rag.plugins.auto_discovery.entry_points') as mock_entry_points:
             mock_eps = MagicMock()
             mock_eps.select.return_value = [mock_entry_point]
             mock_entry_points.return_value = mock_eps
@@ -122,7 +142,7 @@ class TestPluginAutoDiscovery:
         mock_dist = Mock()
         mock_dist.metadata = {'Name': 'refinire-rag-test'}
         
-        with patch('importlib.metadata.distributions') as mock_distributions:
+        with patch('refinire_rag.plugins.auto_discovery.distributions') as mock_distributions:
             mock_distributions.return_value = [mock_dist]
             
             with patch('importlib.import_module') as mock_import:
@@ -155,12 +175,17 @@ class TestPluginAutoDiscovery:
         mock_dist = Mock()
         mock_dist.metadata = {'Name': 'refinire-rag-package'}
         
-        with patch('importlib.metadata.entry_points') as mock_entry_points:
-            with patch('importlib.metadata.distributions') as mock_distributions:
+        with patch('refinire_rag.plugins.auto_discovery.entry_points') as mock_entry_points:
+            with patch('refinire_rag.plugins.auto_discovery.distributions') as mock_distributions:
                 with patch('importlib.import_module') as mock_import:
                     # Configure mocks
                     mock_eps = MagicMock()
-                    mock_eps.select.return_value = [mock_entry_point]
+                    # Mock select to return our mock entry point only for vectorstore group
+                    def mock_select(group=None):
+                        if group == 'refinire_rag.vectorstore':
+                            return [mock_entry_point]
+                        return []
+                    mock_eps.select.side_effect = mock_select
                     mock_entry_points.return_value = mock_eps
                     
                     mock_distributions.return_value = [mock_dist]
@@ -398,9 +423,14 @@ class TestIntegration:
         mock_entry_point.module = "test_plugin"
         mock_entry_point.load.return_value = MockVectorStore
         
-        with patch('importlib.metadata.entry_points') as mock_entry_points:
+        with patch('refinire_rag.plugins.auto_discovery.entry_points') as mock_entry_points:
             mock_eps = MagicMock()
-            mock_eps.select.return_value = [mock_entry_point]
+            # Mock select to return our mock entry point only for vectorstore group
+            def mock_select(group=None):
+                if group == 'refinire_rag.vectorstore':
+                    return [mock_entry_point]
+                return []
+            mock_eps.select.side_effect = mock_select
             mock_entry_points.return_value = mock_eps
             
             # Test discovery
@@ -421,7 +451,7 @@ class TestIntegration:
             assert store_class == MockVectorStore
             
             # Test instantiation
-            config = PluginConfig().for_plugin_type("vector_store")
+            config = PluginConfig("IntegrationTestStore", {"type": "vector_store"})
             store_instance = store_class(config)
             assert isinstance(store_instance, MockVectorStore)
     
@@ -432,7 +462,7 @@ class TestIntegration:
         mock_entry_point.name = "FailingStore"
         mock_entry_point.load.side_effect = ImportError("Plugin dependency missing")
         
-        with patch('importlib.metadata.entry_points') as mock_entry_points:
+        with patch('refinire_rag.plugins.auto_discovery.entry_points') as mock_entry_points:
             mock_eps = MagicMock()
             mock_eps.select.return_value = [mock_entry_point]
             mock_entry_points.return_value = mock_eps

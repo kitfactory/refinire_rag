@@ -232,8 +232,9 @@ class TestCorpusManagerBasic:
         mock_store.clear_all_documents.assert_called_once()
         
         # Verify retriever was cleared (check for different possible clear methods)
-        # The implementation tries multiple methods, so we check if any was called
-        assert (mock_retriever.clear_all_vectors.called or 
+        # The implementation tries multiple methods in order, so we check if any was called
+        assert (mock_retriever.clear_all_embeddings.called or 
+                mock_retriever.clear_all_vectors.called or 
                 mock_retriever.clear_all_documents.called or 
                 mock_retriever.clear.called)
 
@@ -250,8 +251,8 @@ class TestCorpusManagerBasic:
             # Call method
             result = CorpusManager._get_refinire_rag_dir()
             
-            # Verify result (implementation returns tests/data subdirectory)
-            expected_path = Path('./tests/data')
+            # Verify result (implementation returns refinire/rag subdirectory)
+            expected_path = Path('./refinire/rag')
             assert result == expected_path
             mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
 

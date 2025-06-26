@@ -355,43 +355,42 @@ class TestSQLiteDocumentStoreErrorHandling:
         """Test error handling when database operation fails"""
         store = SQLiteDocumentStore(":memory:")
         
-        # Create invalid document that should cause an error
-        with patch.object(store.conn, 'execute', side_effect=sqlite3.Error("Database error")):
-            with pytest.raises(StorageError, match="Failed to store document"):
-                store.store_document(Document(id="test", content="test", metadata={}))
+        # Close the connection to cause database error
+        store.conn.close()
         
-        store.close()
+        with pytest.raises(StorageError, match="Failed to store document"):
+            store.store_document(Document(id="test", content="test", metadata={}))
     
     def test_get_document_database_error(self):
         """Test error handling when retrieving document fails"""
         store = SQLiteDocumentStore(":memory:")
         
-        with patch.object(store.conn, 'execute', side_effect=sqlite3.Error("Database error")):
-            with pytest.raises(StorageError, match="Failed to get document"):
-                store.get_document("test")
+        # Close the connection to cause database error
+        store.conn.close()
         
-        store.close()
+        with pytest.raises(StorageError, match="Failed to get document"):
+            store.get_document("test")
     
     def test_search_metadata_database_error(self):
         """Test error handling when metadata search fails"""
         store = SQLiteDocumentStore(":memory:")
         
-        with patch.object(store.conn, 'execute', side_effect=sqlite3.Error("Database error")):
-            with pytest.raises(StorageError, match="Failed to search by metadata"):
-                store.search_by_metadata({"key": "value"})
+        # Close the connection to cause database error
+        store.conn.close()
         
-        store.close()
+        with pytest.raises(StorageError, match="Failed to search by metadata"):
+            store.search_by_metadata({"key": "value"})
     
     def test_search_content_database_error(self):
         """Test error handling when content search fails"""
         store = SQLiteDocumentStore(":memory:")
         store._init_fts()
         
-        with patch.object(store.conn, 'execute', side_effect=sqlite3.Error("FTS error")):
-            with pytest.raises(StorageError, match="Failed to search by content"):
-                store.search_by_content("test")
+        # Close the connection to cause database error
+        store.conn.close()
         
-        store.close()
+        with pytest.raises(StorageError, match="Failed to search by content"):
+            store.search_by_content("test")
 
 
 class TestSQLiteDocumentStoreFTSOperations:
@@ -475,8 +474,9 @@ class TestSQLiteDocumentStoreUtilityMethods:
         stats = store.get_storage_stats()
         
         assert stats.total_documents == 3
-        assert stats.total_size_bytes > 0
-        assert stats.last_updated is not None
+        assert stats.storage_size_bytes > 0
+        assert stats.oldest_document is not None
+        assert stats.newest_document is not None
         
         store.close()
     

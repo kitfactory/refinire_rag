@@ -100,6 +100,10 @@ class PickleVectorStore(InMemoryVectorStore):
             self.save_to_disk()
         return result
     
+    def save(self) -> bool:
+        """Alias for save_to_disk for compatibility"""
+        return self.save_to_disk()
+    
     def save_to_disk(self) -> bool:
         """Explicitly save current state to disk"""
         
@@ -130,6 +134,10 @@ class PickleVectorStore(InMemoryVectorStore):
         except Exception as e:
             logger.error(f"Failed to save vectors to disk: {e}")
             return False
+    
+    def load(self) -> bool:
+        """Alias for load_from_disk for compatibility"""
+        return self.load_from_disk()
     
     def load_from_disk(self) -> bool:
         """Explicitly load state from disk"""
@@ -177,10 +185,11 @@ class PickleVectorStore(InMemoryVectorStore):
     def _maybe_save(self):
         """Save to disk if auto_save is enabled and save_interval is reached"""
         
+        # Always increment operation counter regardless of auto_save setting
+        self._operations_since_save += 1
+        
         if not self.auto_save:
             return
-        
-        self._operations_since_save += 1
         
         if self._operations_since_save >= self.save_interval:
             self.save_to_disk()
@@ -260,7 +269,10 @@ class PickleVectorStore(InMemoryVectorStore):
             if not self.file_path.exists():
                 return {
                     "exists": False,
-                    "path": str(self.file_path)
+                    "path": str(self.file_path),
+                    "operations_since_save": self._operations_since_save,
+                    "auto_save": self.auto_save,
+                    "save_interval": self.save_interval
                 }
             
             stat = self.file_path.stat()

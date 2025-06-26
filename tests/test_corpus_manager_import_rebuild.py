@@ -32,10 +32,13 @@ class TestCorpusManagerImport:
         Set up test environment for each test
         各テストのためのテスト環境を設定
         """
-        # Create mock components
-        self.mock_document_store = Mock(spec=DocumentStore)
-        self.mock_vector_store = Mock(spec=InMemoryVectorStore)
+        # Create mock components (no spec to allow all methods)
+        self.mock_document_store = Mock()
+        self.mock_vector_store = Mock()
         self.mock_retrievers = [self.mock_vector_store]
+        
+        # Set up common mock methods for compatibility
+        self.mock_document_store.search_by_metadata = Mock(return_value=[])
         
         # Create CorpusManager instance
         self.corpus_manager = CorpusManager(
@@ -43,7 +46,7 @@ class TestCorpusManagerImport:
             retrievers=self.mock_retrievers
         )
 
-    @patch('refinire_rag.application.corpus_manager_new.DocumentStoreLoader')
+    @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
     @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     def test_import_original_documents_basic(self, mock_exists, mock_loader_class):
         """
@@ -52,7 +55,7 @@ class TestCorpusManagerImport:
         """
         # Setup mocks
         mock_exists.return_value = True
-        mock_loader = Mock(spec=DocumentStoreLoader)
+        mock_loader = Mock()
         mock_loader_class.return_value = mock_loader
         
         # Mock sync results
@@ -61,31 +64,33 @@ class TestCorpusManagerImport:
             Document(id="1", content="test1", metadata={"source": "file1.txt"}),
             Document(id="2", content="test2", metadata={"source": "file2.txt"})
         ]
-        mock_sync_result.get_stats.return_value = {"total_files": 2, "total_documents": 2}
-        mock_loader.sync_from_directory.return_value = mock_sync_result
+        mock_sync_result.updated_documents = []
+        mock_sync_result.has_errors = False
+        mock_sync_result.errors = []
+        mock_loader.sync_with_store.return_value = mock_sync_result
         
-        # Setup mock for knowledge artifacts creation
-        with patch.object(self.corpus_manager, '_create_knowledge_artifacts') as mock_create_artifacts:
-            mock_create_artifacts.return_value = []
-            
-            # Call import method
-            result = self.corpus_manager.import_original_documents(
-                source_directory="./test_docs",
-                corpus_name="test_corpus"
-            )
+        # Mock file_tracker
+        mock_file_tracker = Mock()
+        mock_loader.file_tracker = mock_file_tracker
+        
+        # Call import method (no knowledge artifacts by default)
+        result = self.corpus_manager.import_original_documents(
+            directory="./test_docs",
+            corpus_name="test_corpus"
+        )
         
         # Verify loader was created and called
         mock_loader_class.assert_called_once()
-        mock_loader.sync_from_directory.assert_called_once()
-        
-        # Verify artifacts creation was called
-        mock_create_artifacts.assert_called_once()
+        mock_loader.sync_with_store.assert_called_once()
         
         # Verify result
         assert result is not None
-        assert hasattr(result, 'added_documents')
+        from refinire_rag.application.corpus_manager_new import CorpusStats
+        assert isinstance(result, CorpusStats)
+        assert result.total_documents_created == 2
+        assert result.total_files_processed == 2
 
-    @patch('refinire_rag.application.corpus_manager_new.DocumentStoreLoader')
+    @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
     @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     def test_import_original_documents_with_glob(self, mock_exists, mock_loader_class):
         """
@@ -94,7 +99,7 @@ class TestCorpusManagerImport:
         """
         # Setup mocks
         mock_exists.return_value = True
-        mock_loader = Mock(spec=DocumentStoreLoader)
+        mock_loader = Mock()
         mock_loader_class.return_value = mock_loader
         
         # Mock sync results
@@ -102,8 +107,10 @@ class TestCorpusManagerImport:
         mock_sync_result.added_documents = [
             Document(id="1", content="test1", metadata={"source": "file1.txt"})
         ]
-        mock_sync_result.get_stats.return_value = {"total_files": 1, "total_documents": 1}
-        mock_loader.sync_from_directory.return_value = mock_sync_result
+        mock_sync_result.updated_documents = []
+        mock_sync_result.has_errors = False
+        mock_sync_result.errors = []
+        mock_loader.sync_with_store.return_value = mock_sync_result
         
         # Setup mock for knowledge artifacts creation
         with patch.object(self.corpus_manager, '_create_knowledge_artifacts') as mock_create_artifacts:
@@ -111,9 +118,9 @@ class TestCorpusManagerImport:
             
             # Call import method with glob pattern
             result = self.corpus_manager.import_original_documents(
-                source_directory="./test_docs",
+                directory="./test_docs",
                 corpus_name="test_corpus",
-                glob_pattern="*.txt"
+                glob="*.txt"
             )
         
         # Verify loader configuration included filter
@@ -122,8 +129,10 @@ class TestCorpusManagerImport:
         
         # Verify result
         assert result is not None
+        from refinire_rag.application.corpus_manager_new import CorpusStats
+        assert isinstance(result, CorpusStats)
 
-    @patch('refinire_rag.application.corpus_manager_new.DocumentStoreLoader')
+    @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
     @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     def test_import_original_documents_nonexistent_directory(self, mock_exists, mock_loader_class):
         """
@@ -136,14 +145,14 @@ class TestCorpusManagerImport:
         # Call import method and expect exception
         with pytest.raises(ValueError, match="Source directory does not exist"):
             self.corpus_manager.import_original_documents(
-                source_directory="./nonexistent",
+                directory="./nonexistent",
                 corpus_name="test_corpus"
             )
         
         # Verify loader was not created
         mock_loader_class.assert_not_called()
 
-    @patch('refinire_rag.application.corpus_manager_new.DocumentStoreLoader')
+    @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
     @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     def test_import_original_documents_with_error_handling(self, mock_exists, mock_loader_class):
         """
@@ -152,16 +161,16 @@ class TestCorpusManagerImport:
         """
         # Setup mocks
         mock_exists.return_value = True
-        mock_loader = Mock(spec=DocumentStoreLoader)
+        mock_loader = Mock()
         mock_loader_class.return_value = mock_loader
         
         # Mock loader to raise exception
-        mock_loader.sync_from_directory.side_effect = Exception("Sync failed")
+        mock_loader.sync_with_store.side_effect = Exception("Sync failed")
         
         # Call import method and expect exception
         with pytest.raises(Exception, match="Sync failed"):
             self.corpus_manager.import_original_documents(
-                source_directory="./test_docs",
+                directory="./test_docs",
                 corpus_name="test_corpus"
             )
 
@@ -170,78 +179,78 @@ class TestCorpusManagerImport:
         Test _create_knowledge_artifacts basic functionality
         _create_knowledge_artifacts基本機能のテスト
         """
-        # Create sample documents
-        documents = [
-            Document(id="1", content="Python is a programming language", metadata={"source": "file1.txt"}),
-            Document(id="2", content="Machine learning uses algorithms", metadata={"source": "file2.txt"})
-        ]
+        from refinire_rag.application.corpus_manager_new import CorpusStats
         
         # Mock the knowledge artifact processors
-        with patch('refinire_rag.application.corpus_manager_new.PluginFactory') as mock_factory:
-            mock_dictionary_maker = Mock()
-            mock_graph_builder = Mock()
-            
-            # Setup factory to return mock processors
-            mock_factory.create_plugin.side_effect = lambda plugin_type, **kwargs: {
-                'dictionary_maker': mock_dictionary_maker,
-                'graph_builder': mock_graph_builder
-            }.get(plugin_type)
-            
-            # Mock processor outputs
-            mock_dictionary_maker.process.return_value = iter([])
-            mock_graph_builder.process.return_value = iter([])
-            
-            # Call method
-            result = self.corpus_manager._create_knowledge_artifacts(
-                documents=documents,
-                corpus_name="test_corpus",
-                source_directory="./test"
-            )
-        
-        # Verify processors were called
-        mock_dictionary_maker.process.assert_called_once()
-        mock_graph_builder.process.assert_called_once()
-        
-        # Verify result is a list
-        assert isinstance(result, list)
+        with patch('refinire_rag.processing.dictionary_maker.DictionaryMaker') as mock_dict_maker:
+            with patch('refinire_rag.processing.graph_builder.GraphBuilder') as mock_graph_builder:
+                with patch('refinire_rag.processing.document_pipeline.DocumentPipeline') as mock_pipeline:
+                    # Setup mocks
+                    mock_dict_instance = Mock()
+                    mock_graph_instance = Mock()
+                    mock_pipeline_instance = Mock()
+                    
+                    mock_dict_maker.return_value = mock_dict_instance
+                    mock_graph_builder.return_value = mock_graph_instance
+                    mock_pipeline.return_value = mock_pipeline_instance
+                    
+                    mock_pipeline_instance.process_documents.return_value = []
+                    
+                    # Create stats object
+                    stats = CorpusStats()
+                    
+                    # Call method with correct signature
+                    self.corpus_manager._create_knowledge_artifacts(
+                        corpus_name="test_corpus",
+                        create_dictionary=True,
+                        create_knowledge_graph=True,
+                        dictionary_output_dir="./dict",
+                        graph_output_dir="./graph",
+                        stats=stats
+                    )
+                    
+                    # Verify processors were created
+                    mock_dict_maker.assert_called_once()
+                    mock_graph_builder.assert_called_once()
 
     def test_create_knowledge_artifacts_with_output_directories(self):
         """
         Test _create_knowledge_artifacts with custom output directories
         カスタム出力ディレクトリでの_create_knowledge_artifacts テスト
         """
-        # Create sample documents
-        documents = [
-            Document(id="1", content="Test content", metadata={"source": "file1.txt"})
-        ]
+        from refinire_rag.application.corpus_manager_new import CorpusStats
         
         # Mock the knowledge artifact processors
-        with patch('refinire_rag.application.corpus_manager_new.PluginFactory') as mock_factory:
-            mock_dictionary_maker = Mock()
-            mock_graph_builder = Mock()
-            
-            # Setup factory to return mock processors
-            mock_factory.create_plugin.side_effect = lambda plugin_type, **kwargs: {
-                'dictionary_maker': mock_dictionary_maker,
-                'graph_builder': mock_graph_builder
-            }.get(plugin_type)
-            
-            # Mock processor outputs
-            mock_dictionary_maker.process.return_value = iter([])
-            mock_graph_builder.process.return_value = iter([])
-            
-            # Call method with custom directories
-            result = self.corpus_manager._create_knowledge_artifacts(
-                documents=documents,
-                corpus_name="test_corpus",
-                source_directory="./test",
-                dictionary_output_directory="./custom_dict",
-                knowledge_graph_output_directory="./custom_kg"
-            )
-        
-        # Verify processors were called with custom paths
-        mock_factory.create_plugin.assert_called()
-        assert isinstance(result, list)
+        with patch('refinire_rag.processing.dictionary_maker.DictionaryMaker') as mock_dict_maker:
+            with patch('refinire_rag.processing.graph_builder.GraphBuilder') as mock_graph_builder:
+                with patch('refinire_rag.processing.document_pipeline.DocumentPipeline') as mock_pipeline:
+                    # Setup mocks
+                    mock_dict_instance = Mock()
+                    mock_graph_instance = Mock()
+                    mock_pipeline_instance = Mock()
+                    
+                    mock_dict_maker.return_value = mock_dict_instance
+                    mock_graph_builder.return_value = mock_graph_instance
+                    mock_pipeline.return_value = mock_pipeline_instance
+                    
+                    mock_pipeline_instance.process_documents.return_value = []
+                    
+                    # Create stats object
+                    stats = CorpusStats()
+                    
+                    # Call method with custom directories
+                    self.corpus_manager._create_knowledge_artifacts(
+                        corpus_name="test_corpus",
+                        create_dictionary=True,
+                        create_knowledge_graph=True,
+                        dictionary_output_dir="./custom_dict",
+                        graph_output_dir="./custom_kg",
+                        stats=stats
+                    )
+                    
+                    # Verify processors were created
+                    mock_dict_maker.assert_called_once()
+                    mock_graph_builder.assert_called_once()
 
 
 class TestCorpusManagerRebuild:
@@ -255,10 +264,14 @@ class TestCorpusManagerRebuild:
         Set up test environment for each test
         各テストのためのテスト環境を設定
         """
-        # Create mock components
-        self.mock_document_store = Mock(spec=DocumentStore)
-        self.mock_vector_store = Mock(spec=InMemoryVectorStore)
+        # Create mock components (no spec to allow all methods)
+        self.mock_document_store = Mock()
+        self.mock_vector_store = Mock()
         self.mock_retrievers = [self.mock_vector_store]
+        
+        # Set up common mock methods
+        self.mock_document_store.search_by_metadata = Mock(return_value=[])
+        self.mock_document_store.list_documents = Mock(return_value=[])
         
         # Create CorpusManager instance
         self.corpus_manager = CorpusManager(
@@ -281,23 +294,29 @@ class TestCorpusManagerRebuild:
             Document(id="orig_2", content="Original content 2", metadata={"source": "file2.txt", "processing_stage": "original"})
         ]
         
+        # Mock the document pipeline and processor dependencies
         with patch.object(self.corpus_manager, '_get_documents_by_stage') as mock_get_docs:
-            mock_get_docs.return_value = original_docs
-            
-            with patch.object(self.corpus_manager, '_create_knowledge_artifacts') as mock_create_artifacts:
-                mock_create_artifacts.return_value = []
-                
-                # Call rebuild method
-                result = self.corpus_manager.rebuild_corpus_from_original("test_corpus")
+            with patch('refinire_rag.processing.document_pipeline.DocumentPipeline') as mock_pipeline:
+                with patch('refinire_rag.loader.document_store_loader.DocumentStoreLoader') as mock_loader:
+                    with patch('refinire_rag.processing.normalizer.Normalizer') as mock_normalizer:
+                        with patch('refinire_rag.processing.chunker.Chunker') as mock_chunker:
+                            mock_get_docs.return_value = original_docs
+                            
+                            # Setup pipeline mock
+                            mock_pipeline_instance = Mock()
+                            mock_pipeline.return_value = mock_pipeline_instance
+                            mock_pipeline_instance.process_document.return_value = []
+                            
+                            # Call rebuild method
+                            result = self.corpus_manager.rebuild_corpus_from_original("test_corpus")
         
         # Verify original documents were retrieved
         mock_get_docs.assert_called_with("original")
         
-        # Verify knowledge artifacts were created
-        mock_create_artifacts.assert_called_once()
-        
         # Verify result
         assert result is not None
+        from refinire_rag.application.corpus_manager_new import CorpusStats
+        assert isinstance(result, CorpusStats)
 
     @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     def test_rebuild_corpus_from_original_no_documents(self, mock_exists):
@@ -321,16 +340,20 @@ class TestCorpusManagerRebuild:
         Test _get_documents_by_stage functionality
         _get_documents_by_stage機能のテスト
         """
-        # Mock documents with different stages
-        all_docs = [
-            Document(id="1", content="test1", metadata={"processing_stage": "original"}),
-            Document(id="2", content="test2", metadata={"processing_stage": "normalized"}),
-            Document(id="3", content="test3", metadata={"processing_stage": "original"}),
-            Document(id="4", content="test4", metadata={"processing_stage": "chunked"})
+        # Mock documents with different stages wrapped in search results
+        doc1 = Document(id="1", content="test1", metadata={"processing_stage": "original"})
+        doc2 = Document(id="2", content="test2", metadata={"processing_stage": "normalized"})
+        doc3 = Document(id="3", content="test3", metadata={"processing_stage": "original"})
+        doc4 = Document(id="4", content="test4", metadata={"processing_stage": "chunked"})
+        
+        # Create mock search results
+        search_results = [
+            Mock(document=doc1),
+            Mock(document=doc3)
         ]
         
         # Setup mock document store
-        self.mock_document_store.list_documents.return_value = all_docs
+        self.mock_document_store.search_by_metadata.return_value = search_results
         
         # Call method
         original_docs = self.corpus_manager._get_documents_by_stage("original")
@@ -364,15 +387,17 @@ class TestCorpusManagerRebuild:
         Test _get_documents_by_stage with documents missing processing_stage metadata
         processing_stageメタデータが欠けているドキュメントでの_get_documents_by_stageテスト
         """
-        # Mock documents with missing metadata
-        all_docs = [
-            Document(id="1", content="test1", metadata={"processing_stage": "original"}),
-            Document(id="2", content="test2", metadata={"source": "file2.txt"}),  # Missing processing_stage
-            Document(id="3", content="test3", metadata={"processing_stage": "original"})
+        # Mock documents with correct stage (search_by_metadata should only return matching docs)
+        doc1 = Document(id="1", content="test1", metadata={"processing_stage": "original"})
+        doc3 = Document(id="3", content="test3", metadata={"processing_stage": "original"})
+        
+        search_results = [
+            Mock(document=doc1),
+            Mock(document=doc3)
         ]
         
         # Setup mock document store
-        self.mock_document_store.list_documents.return_value = all_docs
+        self.mock_document_store.search_by_metadata.return_value = search_results
         
         # Call method
         original_docs = self.corpus_manager._get_documents_by_stage("original")
@@ -400,13 +425,17 @@ class TestCorpusManagerFactoryMethods:
         """
         # Setup mock factory
         mock_store = Mock()
-        mock_factory.create_plugin.return_value = mock_store
+        mock_vector_store = Mock()
+        mock_factory.create_document_stores_from_env.return_value = [mock_store]
+        mock_factory.create_vector_stores_from_env.return_value = [mock_vector_store]
+        mock_factory.create_keyword_stores_from_env.return_value = []
+        mock_factory.create_retrievers_from_env.return_value = []
         
         # Create CorpusManager to trigger env loading
         corpus_manager = CorpusManager()
         
         # Verify factory was called for document store
-        mock_factory.create_plugin.assert_any_call('sqlite', plugin_type='document_store')
+        mock_factory.create_document_stores_from_env.assert_called_once()
 
     @patch.dict(os.environ, {
         'REFINIRE_RAG_DOCUMENT_STORES': 'sqlite',
@@ -421,16 +450,16 @@ class TestCorpusManagerFactoryMethods:
         # Setup mock factory
         mock_store = Mock()
         mock_retriever = Mock()
-        mock_factory.create_plugin.side_effect = lambda plugin_name, **kwargs: {
-            'sqlite': mock_store,
-            'inmemory_vector': mock_retriever
-        }.get(plugin_name)
+        mock_factory.create_document_stores_from_env.return_value = [mock_store]
+        mock_factory.create_vector_stores_from_env.return_value = [mock_retriever]
+        mock_factory.create_keyword_stores_from_env.return_value = []
+        mock_factory.create_retrievers_from_env.return_value = []
         
         # Create CorpusManager to trigger env loading
         corpus_manager = CorpusManager()
         
         # Verify factory was called for retrievers
-        mock_factory.create_plugin.assert_any_call('inmemory_vector', plugin_type='vector_store')
+        mock_factory.create_vector_stores_from_env.assert_called_once()
 
     @patch.dict(os.environ, {
         'REFINIRE_RAG_DOCUMENT_STORES': 'sqlite',
@@ -446,19 +475,18 @@ class TestCorpusManagerFactoryMethods:
         mock_store = Mock()
         mock_vector_retriever = Mock()
         mock_keyword_retriever = Mock()
-        mock_factory.create_plugin.side_effect = lambda plugin_name, **kwargs: {
-            'sqlite': mock_store,
-            'inmemory_vector': mock_vector_retriever,
-            'keyword_store': mock_keyword_retriever
-        }.get(plugin_name)
+        mock_factory.create_document_stores_from_env.return_value = [mock_store]
+        mock_factory.create_vector_stores_from_env.return_value = [mock_vector_retriever]
+        mock_factory.create_keyword_stores_from_env.return_value = [mock_keyword_retriever]
+        mock_factory.create_retrievers_from_env.return_value = []
         
         # Create CorpusManager to trigger env loading
         corpus_manager = CorpusManager()
         
         # Verify multiple retrievers were created
         assert len(corpus_manager.retrievers) == 2
-        mock_factory.create_plugin.assert_any_call('inmemory_vector', plugin_type='vector_store')
-        mock_factory.create_plugin.assert_any_call('keyword_store', plugin_type='keyword_store')
+        mock_factory.create_vector_stores_from_env.assert_called_once()
+        mock_factory.create_keyword_stores_from_env.assert_called_once()
 
     @patch('refinire_rag.application.corpus_manager_new.PluginFactory')
     def test_from_env_classmethod(self, mock_factory):
@@ -469,10 +497,10 @@ class TestCorpusManagerFactoryMethods:
         # Setup mock factory
         mock_store = Mock()
         mock_retriever = Mock()
-        mock_factory.create_plugin.side_effect = lambda plugin_name, **kwargs: {
-            'sqlite': mock_store,
-            'inmemory_vector': mock_retriever
-        }.get(plugin_name)
+        mock_factory.create_document_stores_from_env.return_value = [mock_store]
+        mock_factory.create_vector_stores_from_env.return_value = [mock_retriever]
+        mock_factory.create_keyword_stores_from_env.return_value = []
+        mock_factory.create_retrievers_from_env.return_value = []
         
         # Call from_env method
         corpus_manager = CorpusManager.from_env()

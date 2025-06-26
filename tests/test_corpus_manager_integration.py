@@ -159,16 +159,21 @@ class TestCorpusManagerFileOperations:
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
     
+    @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
-    def test_import_original_documents_basic(self, mock_loader_class):
+    def test_import_original_documents_basic(self, mock_loader_class, mock_exists):
         """Test basic document import functionality"""
-        # Mock the loader
+        # Mock directory exists
+        mock_exists.return_value = True
+        # Mock the loader and sync result
         mock_loader = Mock()
-        mock_docs = [
-            Document(id="doc1", content="Content 1", metadata={"processing_stage": "original"}),
-            Document(id="doc2", content="Content 2", metadata={"processing_stage": "original"})
-        ]
-        mock_loader.load.return_value = mock_docs
+        mock_sync_result = Mock()
+        mock_sync_result.added_documents = ["doc1", "doc2"]
+        mock_sync_result.updated_documents = []
+        mock_sync_result.has_errors = False
+        mock_sync_result.errors = []
+        mock_loader.sync_with_store.return_value = mock_sync_result
+        mock_loader.file_tracker = Mock()
         mock_loader_class.return_value = mock_loader
         
         # Test import
@@ -179,16 +184,24 @@ class TestCorpusManagerFileOperations:
         
         # Verify loader was called
         mock_loader_class.assert_called_once()
-        mock_loader.load.assert_called_once()
+        mock_loader.sync_with_store.assert_called_once()
         
         # Verify return type
         assert isinstance(stats, CorpusStats)
     
+    @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
-    def test_import_original_documents_with_glob(self, mock_loader_class):
+    def test_import_original_documents_with_glob(self, mock_loader_class, mock_exists):
         """Test document import with glob pattern"""
+        mock_exists.return_value = True
         mock_loader = Mock()
-        mock_loader.load.return_value = []
+        mock_sync_result = Mock()
+        mock_sync_result.added_documents = []
+        mock_sync_result.updated_documents = []
+        mock_sync_result.has_errors = False
+        mock_sync_result.errors = []
+        mock_loader.sync_with_store.return_value = mock_sync_result
+        mock_loader.file_tracker = Mock()
         mock_loader_class.return_value = mock_loader
         
         stats = self.manager.import_original_documents(
@@ -203,11 +216,19 @@ class TestCorpusManagerFileOperations:
         
         assert isinstance(stats, CorpusStats)
     
+    @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
-    def test_import_original_documents_with_metadata(self, mock_loader_class):
+    def test_import_original_documents_with_metadata(self, mock_loader_class, mock_exists):
         """Test document import with additional metadata"""
+        mock_exists.return_value = True
         mock_loader = Mock()
-        mock_loader.load.return_value = []
+        mock_sync_result = Mock()
+        mock_sync_result.added_documents = []
+        mock_sync_result.updated_documents = []
+        mock_sync_result.has_errors = False
+        mock_sync_result.errors = []
+        mock_loader.sync_with_store.return_value = mock_sync_result
+        mock_loader.file_tracker = Mock()
         mock_loader_class.return_value = mock_loader
         
         additional_metadata = {"department": "test", "version": "1.0"}
@@ -407,17 +428,21 @@ class TestCorpusManagerIntegrationWorkflows:
         import shutil
         shutil.rmtree(self.temp_dir, ignore_errors=True)
     
+    @patch('refinire_rag.application.corpus_manager_new.Path.exists')
     @patch('refinire_rag.loader.incremental_directory_loader.IncrementalDirectoryLoader')
-    def test_complete_corpus_building_workflow(self, mock_loader_class):
+    def test_complete_corpus_building_workflow(self, mock_loader_class, mock_exists):
         """Test complete corpus building workflow"""
+        # Mock directory exists
+        mock_exists.return_value = True
         # Mock successful document loading
         mock_loader = Mock()
-        mock_docs = [
-            Document(id="doc1", content="ML content", metadata={"processing_stage": "original"}),
-            Document(id="doc2", content="NLP content", metadata={"processing_stage": "original"}),
-            Document(id="doc3", content="IR content", metadata={"processing_stage": "original"})
-        ]
-        mock_loader.load.return_value = mock_docs
+        mock_sync_result = Mock()
+        mock_sync_result.added_documents = ["doc1", "doc2", "doc3"]
+        mock_sync_result.updated_documents = []
+        mock_sync_result.has_errors = False
+        mock_sync_result.errors = []
+        mock_loader.sync_with_store.return_value = mock_sync_result
+        mock_loader.file_tracker = Mock()
         mock_loader_class.return_value = mock_loader
         
         # Step 1: Import original documents

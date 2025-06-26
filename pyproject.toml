@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "refinire-rag"
-version = "0.1.2"
+version = "0.1.3"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -41,9 +41,30 @@ refinire_rag = "refinire_rag.env_template:refinire_rag_env_template"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+python_classes = ["Test*", "!TestCase", "!TestResult", "!TestSuiteConfig"]
 pythonpath = ["src"]
 addopts = [
     "--import-mode=importlib",
-    "--cov=refinire_rag",
-    "--cov-report=term-missing",
+]
+markers = [
+    "integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+
+# Coverage configuration (separate to avoid collection issues)
+[tool.coverage.run]
+source = ["src/refinire_rag"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
 ]

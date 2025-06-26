@@ -298,12 +298,12 @@ class TestCorpusManagerFilePathMethods:
     def test_get_refinire_rag_dir_default(self):
         """Test getting default refinire rag directory"""
         with patch('os.getenv') as mock_getenv:
-            # Configure the mock to call the original implementation
+            # Configure the mock to return default value for REFINIRE_DIR
             mock_getenv.side_effect = lambda key, default=None: default if key == "REFINIRE_DIR" else None
             
             result = CorpusManager._get_refinire_rag_dir()
             
-            expected = Path("./tests/data")
+            expected = Path("./refinire/rag")
             assert result == expected
     
     def test_get_refinire_rag_dir_from_env(self):
@@ -530,7 +530,9 @@ class TestCorpusManagerLoggingAndBackwardCompatibility:
         self.vector_retriever.search_similar = Mock()
         
         self.non_vector_retriever = Mock()
-        # non_vector_retriever doesn't have vector methods
+        # non_vector_retriever doesn't have vector methods - explicitly remove them
+        del self.non_vector_retriever.add_vector
+        del self.non_vector_retriever.search_similar
     
     def test_initialization_logging_with_multiple_retrievers(self):
         """Test initialization logs retriever types correctly"""

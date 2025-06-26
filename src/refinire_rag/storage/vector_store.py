@@ -45,6 +45,7 @@ class VectorStoreStats:
     vector_dimension: int
     storage_size_bytes: int
     index_type: str = "exact"
+    similarity_metric: str = "cosine"
 
 
 class VectorStore(DocumentProcessor):

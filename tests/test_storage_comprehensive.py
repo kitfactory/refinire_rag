@@ -13,6 +13,7 @@ from typing import List, Dict, Any
 
 from refinire_rag.models.document import Document
 from refinire_rag.storage.vector_store import VectorStore
+from refinire_rag.exceptions import StorageError
 from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
 from refinire_rag.storage.evaluation_store import SQLiteEvaluationStore
 from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
@@ -24,28 +25,26 @@ class TestVectorStore:
     
     def test_vector_store_interface(self):
         """Test VectorStore interface compliance"""
-        # Create a mock implementation
-        vector_store = VectorStore()
+        # Test interface methods exist using InMemoryVectorStore
+        from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
+        vector_store = InMemoryVectorStore()
         
         # Test abstract methods exist
-        assert hasattr(vector_store, 'store_embedding')
+        assert hasattr(vector_store, 'add_vector')
         assert hasattr(vector_store, 'search_similar')
-        assert hasattr(vector_store, 'delete_embedding')
-        assert hasattr(vector_store, 'clear_all')
+        assert hasattr(vector_store, 'delete_vector')
+        assert hasattr(vector_store, 'clear')
         assert hasattr(vector_store, 'get_embedding_count')
     
     def test_vector_store_config_validation(self):
         """Test VectorStore configuration validation"""
         config = {
-            "similarity_threshold": 0.8,
-            "max_results": 10,
-            "distance_metric": "cosine"
+            "similarity_metric": "cosine"
         }
         
-        vector_store = VectorStore(config=config)
-        assert vector_store.config["similarity_threshold"] == 0.8
-        assert vector_store.config["max_results"] == 10
-        assert vector_store.config["distance_metric"] == "cosine"
+        from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
+        vector_store = InMemoryVectorStore(config=config)
+        assert vector_store.similarity_metric == "cosine"
 
 
 class TestInMemoryVectorStore:
@@ -193,10 +192,11 @@ class TestPickleVectorStore:
         with tempfile.TemporaryDirectory() as temp_dir:
             pickle_path = Path(temp_dir) / "auto_test.pkl"
             
-            # Create vector store with auto-save
+            # Create vector store with auto-save interval 1
             vector_store = PickleVectorStore(
                 file_path=str(pickle_path),
-                auto_save=True
+                auto_save=True,
+                save_interval=1
             )
             
             # Store embedding (should auto-save)
@@ -598,7 +598,7 @@ class TestStorageErrorHandling:
         vector_store.store_embedding("doc1", [0.1, 0.2, 0.3, 0.4], {})
         
         # Try to search with different dimension
-        with pytest.raises(ValueError):
+        with pytest.raises(StorageError):
             vector_store.search_similar([0.1, 0.2, 0.3])  # Only 3 dimensions
     
     def test_pickle_file_corruption(self):

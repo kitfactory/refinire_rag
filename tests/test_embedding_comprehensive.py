@@ -15,6 +15,7 @@ from refinire_rag.models.document import Document
 from refinire_rag.embedding.base import Embedder
 from refinire_rag.embedding.openai_embedder import OpenAIEmbedder, OpenAIEmbeddingConfig
 from refinire_rag.embedding.tfidf_embedder import TFIDFEmbedder, TFIDFEmbeddingConfig
+from refinire_rag.exceptions import EmbeddingError
 
 
 class TestEmbedderBase:
@@ -22,27 +23,26 @@ class TestEmbedderBase:
     
     def test_embedder_interface(self):
         """Test Embedder interface compliance"""
-        # Create a mock implementation
-        embedder = Embedder()
+        # Test abstract methods exist on the class (can't instantiate abstract class)
+        assert hasattr(Embedder, 'embed_text')
+        assert hasattr(Embedder, 'embed_documents')
+        assert hasattr(Embedder, 'get_embedding_dimension')
         
-        # Test abstract methods exist
-        assert hasattr(embedder, 'embed_text')
-        assert hasattr(embedder, 'embed_documents')
-        assert hasattr(embedder, 'get_embedding_dimension')
-        assert hasattr(embedder, 'fit')
+        # Test that abstract class cannot be instantiated
+        with pytest.raises(TypeError):
+            Embedder()
     
     def test_embedder_config_validation(self):
-        """Test Embedder configuration validation"""
-        config = {
-            "batch_size": 32,
-            "max_length": 512,
-            "normalize_embeddings": True
-        }
+        """Test Embedder configuration validation using concrete implementation"""
+        config = TFIDFEmbeddingConfig(
+            max_features=32,
+            normalize_vectors=True
+        )
         
-        embedder = Embedder(config=config)
-        assert embedder.config["batch_size"] == 32
-        assert embedder.config["max_length"] == 512
-        assert embedder.config["normalize_embeddings"] == True
+        # Test with concrete implementation (TFIDFEmbedder)
+        embedder = TFIDFEmbedder(config)
+        assert embedder.config.max_features == 32
+        assert embedder.config.normalize_vectors == True
 
 
 class TestTFIDFEmbedder:
@@ -116,7 +116,7 @@ class TestTFIDFEmbedder:
         # Transform text
         embedding = self.embedder.embed_text(self.test_texts[0])
         
-        assert isinstance(embedding, (list, np.ndarray))
+        assert isinstance(embedding, np.ndarray)
         assert len(embedding) > 0
         assert len(embedding) <= self.config.max_features
     
@@ -128,16 +128,15 @@ class TestTFIDFEmbedder:
         text = "Machine learning algorithms are powerful tools"
         embedding = self.embedder.embed_text(text)
         
-        assert isinstance(embedding, (list, np.ndarray))
+        assert isinstance(embedding, np.ndarray)
         assert len(embedding) == self.embedder.get_embedding_dimension()
         
         # Check that embedding is normalized if configured
-        if self.config.normalize_embeddings:
-            embedding_array = np.array(embedding)
-            norm = np.linalg.norm(embedding_array)
+        if self.config.normalize_vectors:
+            norm = np.linalg.norm(embedding)
             assert abs(norm - 1.0) < 1e-6
     
-    def test_embed_batch_texts(self):
+    def test_embed_texts_texts(self):
         """Test embedding batch of texts"""
         # Fit first
         self.embedder.fit(self.test_texts)
@@ -148,13 +147,15 @@ class TestTFIDFEmbedder:
             "Data science methodology"
         ]
         
-        embeddings = self.embedder.embed_batch(batch_texts)
+        embeddings = self.embedder.embed_texts(batch_texts)
         
         assert len(embeddings) == len(batch_texts)
         assert all(len(emb) == self.embedder.get_embedding_dimension() for emb in embeddings)
     
     def test_embed_documents(self):
         """Test embedding documents"""
+        # Fit first before embedding documents
+        self.embedder.fit(self.test_texts)
         embeddings = self.embedder.embed_documents(self.test_docs)
         
         assert len(embeddings) == len(self.test_docs)
@@ -190,8 +191,8 @@ class TestTFIDFEmbedder:
         emb1 = self.embedder.embed_text(text1)
         emb2 = self.embedder.embed_text(text2)
         
-        # Compute cosine similarity
-        similarity = self.embedder.compute_similarity(emb1, emb2)
+        # Compute cosine similarity manually
+        similarity = np.dot(emb1, emb2) / (np.linalg.norm(emb1) * np.linalg.norm(emb2))
         
         assert 0 <= similarity <= 1
         assert similarity > 0.1  # Should have some similarity
@@ -220,19 +221,33 @@ class TestTFIDFEmbedder:
     
     def test_stopword_removal(self):
         """Test stopword removal functionality"""
+        # Skip test if NLTK data not available
+        try:
+            import nltk
+            from nltk.corpus import stopwords
+            # Try to access stopwords
+            stopwords.words('english')
+        except (ImportError, LookupError):
+            pytest.skip("NLTK stopwords not available")
+            
+        # Use simpler config to avoid sklearn parameter conflicts
         config_with_stopwords = TFIDFEmbeddingConfig(
             remove_stopwords=True,
-            min_df=1
+            min_df=1,
+            max_df=0.99,  # Use higher value to avoid conflicts
+            max_features=100
         )
         config_without_stopwords = TFIDFEmbeddingConfig(
             remove_stopwords=False,
-            min_df=1
+            min_df=1,
+            max_df=0.99,  # Use higher value to avoid conflicts
+            max_features=100
         )
         
         embedder_with = TFIDFEmbedder(config_with_stopwords)
         embedder_without = TFIDFEmbedder(config_without_stopwords)
         
-        texts = ["The machine learning algorithm is very good"]
+        texts = ["The machine learning algorithm is very good", "Another text about programming", "More content for the test"]
         
         embedder_with.fit(texts)
         embedder_without.fit(texts)
@@ -313,12 +328,12 @@ class TestTFIDFEmbedder:
         
         # Test empty string
         empty_embedding = self.embedder.embed_text("")
-        assert isinstance(empty_embedding, (list, np.ndarray))
+        assert isinstance(empty_embedding, np.ndarray)
         assert len(empty_embedding) == self.embedder.get_embedding_dimension()
         
         # Test whitespace-only string
         whitespace_embedding = self.embedder.embed_text("   ")
-        assert isinstance(whitespace_embedding, (list, np.ndarray))
+        assert isinstance(whitespace_embedding, np.ndarray)
 
 
 class TestOpenAIEmbedder:
@@ -366,7 +381,7 @@ class TestOpenAIEmbedder:
         assert embedder.config.batch_size == 5
         assert embedder.config.dimensions == 1024
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_api_client_initialization(self, mock_openai_class):
         """Test OpenAI API client initialization"""
         mock_client = Mock()
@@ -376,9 +391,9 @@ class TestOpenAIEmbedder:
         
         # Should have initialized client
         mock_openai_class.assert_called_once_with(api_key="test-key")
-        assert embedder.client == mock_client
+        assert embedder._client == mock_client
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_embed_single_text(self, mock_openai_class):
         """Test embedding single text with OpenAI API"""
         # Mock API response
@@ -394,19 +409,19 @@ class TestOpenAIEmbedder:
         text = "Machine learning is powerful"
         embedding = embedder.embed_text(text)
         
-        assert isinstance(embedding, list)
+        assert isinstance(embedding, np.ndarray)
         assert len(embedding) == 1536
         assert all(isinstance(x, (int, float)) for x in embedding)
         
-        # Verify API call
+        # Verify API call (dimensions not included when it matches default)
         mock_client.embeddings.create.assert_called_once_with(
-            model="text-embedding-3-small",
             input=[text],
-            dimensions=1536
+            model="text-embedding-3-small",
+            encoding_format="float"
         )
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
-    def test_embed_batch_texts(self, mock_openai_class):
+    @patch('openai.OpenAI')
+    def test_embed_texts_texts(self, mock_openai_class):
         """Test embedding batch of texts"""
         # Mock API response for batch
         mock_response = Mock()
@@ -423,19 +438,19 @@ class TestOpenAIEmbedder:
         embedder = OpenAIEmbedder(self.config)
         
         texts = ["Text 1", "Text 2", "Text 3"]
-        embeddings = embedder.embed_batch(texts)
+        embeddings = embedder.embed_texts(texts)
         
         assert len(embeddings) == 3
         assert all(len(emb) == 1536 for emb in embeddings)
         
-        # Should make single API call for batch
+        # Should make single API call for batch (dimensions not included when it matches default)
         mock_client.embeddings.create.assert_called_once_with(
-            model="text-embedding-3-small",
             input=texts,
-            dimensions=1536
+            model="text-embedding-3-small",
+            encoding_format="float"
         )
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_large_batch_splitting(self, mock_openai_class):
         """Test automatic splitting of large batches"""
         # Mock API response
@@ -453,17 +468,20 @@ class TestOpenAIEmbedder:
         
         # Create large batch (15 texts, batch_size=5, should result in 3 API calls)
         texts = [f"Text {i}" for i in range(15)]
-        embeddings = embedder.embed_batch(texts)
+        embeddings = embedder.embed_texts(texts)
         
         assert len(embeddings) == 15
         
         # Should make 3 API calls (15/5 = 3)
         assert mock_client.embeddings.create.call_count == 3
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_api_error_handling(self, mock_openai_class):
         """Test API error handling and retries"""
-        from openai import RateLimitError
+        try:
+            from openai import RateLimitError
+        except ImportError:
+            pytest.skip("OpenAI library not available")
         
         mock_client = Mock()
         # First call fails, second succeeds
@@ -481,21 +499,25 @@ class TestOpenAIEmbedder:
         assert len(embedding) == 1536
         assert mock_client.embeddings.create.call_count == 2  # Initial + 1 retry
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_api_timeout_handling(self, mock_openai_class):
         """Test API timeout handling"""
-        from openai import APITimeoutError
+        try:
+            from openai import APITimeoutError
+        except ImportError:
+            pytest.skip("OpenAI library not available")
         
         mock_client = Mock()
-        mock_client.embeddings.create.side_effect = APITimeoutError("Request timed out")
+        mock_client.embeddings.create.side_effect = APITimeoutError("Request timed out.")
         mock_openai_class.return_value = mock_client
         
         embedder = OpenAIEmbedder(self.config)
         
-        with pytest.raises(APITimeoutError):
+        from refinire_rag.exceptions import EmbeddingError
+        with pytest.raises(EmbeddingError):
             embedder.embed_text("Test text")
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_embed_documents(self, mock_openai_class):
         """Test embedding documents"""
         # Mock API response
@@ -519,12 +541,12 @@ class TestOpenAIEmbedder:
         # Should extract content from documents
         expected_texts = [doc.content for doc in self.test_docs]
         mock_client.embeddings.create.assert_called_once_with(
-            model="text-embedding-3-small",
             input=expected_texts,
-            dimensions=1536
+            model="text-embedding-3-small",
+            encoding_format="float"
         )
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_caching_functionality(self, mock_openai_class):
         """Test embedding caching"""
         mock_response = Mock()
@@ -548,7 +570,7 @@ class TestOpenAIEmbedder:
         emb2 = embedder.embed_text(text)
         
         # Should be identical
-        assert emb1 == emb2
+        assert np.array_equal(emb1, emb2)
         
         # Should only make one API call due to caching
         mock_client.embeddings.create.assert_called_once()
@@ -560,7 +582,7 @@ class TestOpenAIEmbedder:
         dimension = embedder.get_embedding_dimension()
         assert dimension == 1536
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_different_models(self, mock_openai_class):
         """Test different OpenAI embedding models"""
         models_and_dimensions = [
@@ -579,7 +601,7 @@ class TestOpenAIEmbedder:
             embedder = OpenAIEmbedder(config)
             assert embedder.get_embedding_dimension() == expected_dim
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_custom_dimensions(self, mock_openai_class):
         """Test custom dimension configuration"""
         # Mock API response with custom dimensions
@@ -620,9 +642,9 @@ class TestEmbeddingComparison:
     def test_tfidf_vs_dimensions(self):
         """Test TF-IDF embedding consistency across different configurations"""
         configs = [
-            TFIDFEmbeddingConfig(max_features=100, min_df=1),
-            TFIDFEmbeddingConfig(max_features=500, min_df=1),
-            TFIDFEmbeddingConfig(max_features=1000, min_df=1)
+            TFIDFEmbeddingConfig(max_features=10, min_df=1),  # Force smaller vocabulary
+            TFIDFEmbeddingConfig(max_features=25, min_df=1),  # Medium vocabulary
+            TFIDFEmbeddingConfig(max_features=50, min_df=1)   # Larger vocabulary (will be limited by actual vocab size)
         ]
         
         embeddings_by_config = []
@@ -654,7 +676,7 @@ class TestEmbeddingComparison:
             assert isinstance(sim_ml, (int, float))
             assert isinstance(sim_prog, (int, float))
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_embedding_normalization(self, mock_openai_class):
         """Test embedding normalization across different methods"""
         # TF-IDF embedder with normalization
@@ -702,7 +724,7 @@ class TestEmbeddingErrorHandling:
         embedder = TFIDFEmbedder(TFIDFEmbeddingConfig())
         
         # Try to fit with empty corpus
-        with pytest.raises(ValueError):
+        with pytest.raises(EmbeddingError):
             embedder.fit([])
     
     def test_tfidf_unfitted_model(self):
@@ -710,7 +732,7 @@ class TestEmbeddingErrorHandling:
         embedder = TFIDFEmbedder(TFIDFEmbeddingConfig())
         
         # Try to embed without fitting
-        with pytest.raises(ValueError):
+        with pytest.raises(EmbeddingError):
             embedder.embed_text("Test text")
     
     def test_openai_invalid_api_key(self):
@@ -724,13 +746,17 @@ class TestEmbeddingErrorHandling:
         embedder = OpenAIEmbedder(config)
         assert embedder.config.api_key == ""
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_openai_network_error(self, mock_openai_class):
         """Test OpenAI embedder network error handling"""
-        from openai import APIConnectionError
+        try:
+            from openai import APIConnectionError
+        except ImportError:
+            pytest.skip("OpenAI library not available")
         
         mock_client = Mock()
-        mock_client.embeddings.create.side_effect = APIConnectionError("Network error")
+        # Use a generic Exception since APIConnectionError has complex constructor requirements
+        mock_client.embeddings.create.side_effect = Exception("Network error")
         mock_openai_class.return_value = mock_client
         
         embedder = OpenAIEmbedder(OpenAIEmbeddingConfig(
@@ -738,7 +764,8 @@ class TestEmbeddingErrorHandling:
             api_key="test-key"
         ))
         
-        with pytest.raises(APIConnectionError):
+        from refinire_rag.exceptions import EmbeddingError
+        with pytest.raises(EmbeddingError):
             embedder.embed_text("Test text")
     
     def test_dimension_mismatch_detection(self):
@@ -767,6 +794,10 @@ class TestEmbeddingIntegration:
             min_df=1
         ))
         
+        # Fit the embedder first
+        texts = [doc.content for doc in docs]
+        tfidf_embedder.fit(texts)
+        
         # Process documents
         embeddings = tfidf_embedder.embed_documents(docs)
         
@@ -777,7 +808,7 @@ class TestEmbeddingIntegration:
         dimension = len(embeddings[0])
         assert all(len(emb) == dimension for emb in embeddings)
     
-    @patch('src.refinire_rag.embedding.openai_embedder.OpenAI')
+    @patch('openai.OpenAI')
     def test_hybrid_embedding_comparison(self, mock_openai_class):
         """Test comparison between TF-IDF and OpenAI embeddings"""
         # Mock OpenAI response
@@ -868,7 +899,7 @@ class TestEmbeddingIntegration:
         
         # Batch processing
         start_time = time.time()
-        batch_embeddings = embedder.embed_batch(texts[:10])
+        batch_embeddings = embedder.embed_texts(texts[:10])
         batch_time = time.time() - start_time
         
         # Results should be identical
