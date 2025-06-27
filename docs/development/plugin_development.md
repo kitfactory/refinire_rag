@@ -387,6 +387,26 @@ def chroma_env_template() -> EnvTemplate:
 
 すべてのプラグインは以下の統一設定パターンに従って実装します：
 
+#### 統一設定パターンの設計思想
+
+**なぜ統一設定パターンが重要か**
+
+refinire-ragでは、全プラグインで一貫した設定パターンを採用することで以下の利点を実現しています：
+
+1. **設定の一貫性**: 全プラグインが同じ優先順位ルール（kwargs > 環境変数 > デフォルト値）に従う
+2. **運用の簡素化**: Docker・Kubernetes等でコンテナ環境変数による設定が可能
+3. **テスト容易性**: kwargs経由でテスト用設定を直接注入可能
+4. **デバッグ支援**: `get_config()`により現在の設定状態を常に確認可能
+5. **セキュリティ**: 機密情報を環境変数で管理し、コードから分離
+
+#### 設定優先順位の設計理由
+
+**kwargs > 環境変数 > デフォルト値** の順序を採用する理由：
+
+- **kwargs最優先**: プログラム内での明示的な設定変更を最重要視
+- **環境変数次点**: デプロイメント時の柔軟な設定変更をサポート
+- **デフォルト値最後**: 何も設定しなくても動作する安全なフォールバック
+
 #### 基本実装テンプレート
 
 ```python
@@ -530,6 +550,33 @@ class ChromaConfig:
 ```
 
 ### 5. Retrieverクラス実装
+
+#### Retrieverプラグインの設計思想
+
+**なぜRetrieverベースクラスを継承するのか**
+
+ChromaRetrieverがRetrieverベースクラスを継承する設計理由：
+
+1. **統一インターフェース**: 全検索プラグインが`search(query, top_k, filters)`で統一
+2. **プラグイン互換性**: InMemoryRetriever、BM25Retrieverと完全に差し替え可能
+3. **パイプライン統合**: QueryEngineが自動的にあらゆるRetrieverを利用可能
+4. **品質保証**: 基底クラスが提供するエラーハンドリングとログ機能を継承
+
+#### 遅延初期化パターンの採用理由
+
+```python
+@property
+def client(self):
+    """Lazy initialization of Chroma client"""
+    if self._client is None:
+        self._client = chromadb.HttpClient(...)
+    return self._client
+```
+
+**設計意図**:
+- **起動時間短縮**: プラグイン初期化時にはChromaサーバーに接続せず、実際の使用時まで遅延
+- **エラー分離**: 設定エラーと接続エラーを分離し、デバッグを容易化
+- **リソース効率**: 使用されないプラグインはネットワークリソースを消費しない
 
 ```python
 # src/refinire_rag_chroma/retriever.py
@@ -745,6 +792,44 @@ __version__ = '0.1.0'
 ## 評価プラグインの実装例
 
 ### BERTScoreEvaluatorプラグイン
+
+#### 評価プラグインの設計思想
+
+**なぜReferenceBasedEvaluatorを継承するのか**
+
+BERTScoreEvaluatorがReferenceBasedEvaluatorを継承する設計理由：
+
+1. **評価タイプの明確化**: 参照ベース評価（予測結果と正解の比較）であることを型レベルで保証
+2. **インターフェース統一**: 他の参照ベース評価器（ROUGE、BLEU等）と完全に互換
+3. **品質保証**: 基底クラスが提供する評価結果の検証・正規化機能を継承
+4. **パイプライン統合**: QualityLabが自動的にあらゆる評価器を利用可能
+
+#### BERTScoreの技術的優位性
+
+**従来のROUGE・BLEUとの違い**：
+- **意味理解**: 単純な文字列マッチではなく、BERTによるセマンティック類似度を計算
+- **言語対応**: 多言語BERTモデルにより、日本語等でも高精度な評価が可能
+- **文脈考慮**: トークンの文脈を考慮した評価により、より人間の判断に近い結果
+
+#### 評価結果の構造化の重要性
+
+```python
+return EvaluationResult(
+    metric_name="bertscore",
+    overall_score=f1_score,
+    component_scores={
+        "precision": precision,
+        "recall": recall,
+        "f1_score": f1_score
+    },
+    individual_scores=individual_scores
+)
+```
+
+**設計意図**:
+- **aggregation対応**: 複数評価指標の統合集計を可能に
+- **詳細分析**: 個別ケースの詳細分析により、システム改善点を特定
+- **品質監視**: 時系列での評価結果追跡により、モデル劣化を早期検出
 
 ```python
 # src/refinire_rag_bertscore/evaluator.py
@@ -1139,6 +1224,35 @@ class PluginRegistry:
 
 
 ### 環境変数ベースファクトリー（統合版）
+
+#### プラグインファクトリーの設計思想
+
+**なぜ統合ファクトリーパターンを採用するのか**
+
+PluginFactoryが統合ファクトリーパターンを採用する設計理由：
+
+1. **設定の一元化**: すべてのプラグインタイプで統一された環境変数ベースの設定管理
+2. **依存関係解決**: プラグイン間の依存関係を自動的に解決し、適切な順序で初期化
+3. **エラー集約**: プラグイン作成時のエラーを一箇所で処理し、適切なフォールバック提供
+4. **環境別設定**: 開発・テスト・本番環境で異なるプラグインセットを簡単に切り替え
+
+#### Entry Pointsによる動的プラグイン発見の利点
+
+**従来の静的import vs 動的発見**:
+
+```python
+# 従来の静的import（非推奨）
+from refinire_rag_chroma import ChromaRetriever  # 依存関係を強制
+
+# Entry Pointsによる動的発見（推奨）
+plugin = PluginRegistry.get_plugin_class('retrievers', 'chroma')  # オプション依存
+```
+
+**設計利点**:
+- **疎結合**: コアシステムが外部プラグインに依存しない
+- **プラグアンドプレイ**: パッケージインストールだけでプラグインが自動発見
+- **エラー耐性**: 一部プラグインの読み込み失敗が全体に影響しない
+- **拡張性**: 新しいプラグインタイプを既存コードを変更せずに追加
 
 ```python
 # src/refinire_rag/factories/plugin_factory.py
@@ -1668,20 +1782,51 @@ print(RetrieverRegistry.list_available_retrievers())
 
 ### 1. 設計原則
 
-#### 単一責任の原則
+#### 単一責任の原則の重要性
+
+**なぜ単一責任が重要なのか**
+
+プラグインアーキテクチャにおいて単一責任の原則は特に重要です：
+
+1. **テスタビリティ**: 一つの機能に集中することで、テストケースが明確になり、バグの特定が容易
+2. **再利用性**: 特定の機能に特化したプラグインは、異なるコンテキストでも再利用可能
+3. **保守性**: 機能が分離されているため、一つの変更が他の機能に影響しない
+4. **プラグイン互換性**: 明確な責務により、他のプラグインとの組み合わせが予測可能
+
 ```python
 # ✅ 良い例：単一の責務を持つプラグイン
 class ElasticsearchVectorStore(VectorStore):
-    """Elasticsearchベクトルストレージ専用"""
+    """Elasticsearchベクトルストレージ専用
+    
+    設計意図：
+    - ベクトル保存・検索のみに特化
+    - Elasticsearchの特性を活かした最適化
+    - 他のKeywordSearchプラグインと組み合わせ可能
+    """
     pass
 
 # ❌ 悪い例：複数の責務を持つプラグイン  
 class ElasticsearchEverything(VectorStore, KeywordSearch, DocumentStore):
-    """責務が不明確"""
+    """責務が不明確
+    
+    問題点：
+    - どの機能が主要なのか不明
+    - 他プラグインとの組み合わせ時に競合の可能性
+    - テストが複雑化し、バグの原因特定が困難
+    """
     pass
 ```
 
-#### インターフェース分離の原則
+#### インターフェース分離の原則と設計意図
+
+**なぜインターフェースを分離するのか**
+
+refinire-ragでは、プラグインが必要最小限のインターフェースのみを実装することを推奨します：
+
+1. **実装負荷軽減**: 不要なメソッドの実装を強制しない
+2. **型安全性**: 使用されるメソッドのみが公開され、誤用を防止
+3. **進化可能性**: インターフェースが小さいため、将来の変更影響が限定的
+4. **プラグイン特化**: 各プラグインタイプに最適化されたメソッドセットを提供
 ```python
 # ✅ 必要なインターフェースのみ実装
 class ChromaVectorStore(VectorStore, Indexer, Retriever):

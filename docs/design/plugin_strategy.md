@@ -172,7 +172,9 @@ ENTERPRISE_PLUGINS = {
 3. **品質監視統合**: 全プラグインがQualityLabと連携
 4. **エラーハンドリング**: 統一されたエラー処理
 
-### プラグイン実装例
+### プラグイン実装原則の解説
+
+#### なぜDocumentProcessorベースクラスを使うのか
 ```python
 # loaders/pdf_loader.py
 from ..base import DocumentProcessor
@@ -188,7 +190,13 @@ class PDFLoader(DocumentProcessor):
         pass
 ```
 
-### 環境変数設定例
+**設計解説:**
+1. **統一インターフェース**: すべてのローダーが`DocumentProcessor`を継承することで、`process()`メソッドで統一的に処理できます
+2. **パイプライン統合**: CorpusManagerの文書処理パイプラインに自動的に組み込まれます
+3. **設定統一**: `**kwargs`パターンで環境変数とコンストラクタ引数の両方をサポートします
+4. **品質保証**: DocumentProcessorが提供する統一されたエラーハンドリングとログ機能を継承します
+
+#### 環境変数による設定管理の意義
 ```bash
 # Vector Store設定
 export REFINIRE_RAG_VECTOR_STORES="chroma_vector"
@@ -199,6 +207,13 @@ export REFINIRE_RAG_CHROMA_PORT="8000"
 export REFINIRE_RAG_DOCUMENT_LOADERS="pdf_loader,csv_loader"
 export REFINIRE_RAG_PDF_STRATEGY="pypdf"
 ```
+
+**設計解説:**
+1. **設定の外部化**: コードを変更せずに実行時に動作を変更できます
+2. **環境別設定**: 開発・テスト・本番環境で異なるプラグインを使い分けられます
+3. **セキュリティ**: 接続情報などの機密データをコードから分離できます
+4. **運用性**: Docker環境やKubernetes環境で設定の管理が容易になります
+5. **一貫性**: 全プラグインで統一された命名規則により混乱を防げます
 
 ## 競合優位性への貢献
 

@@ -94,59 +94,84 @@ class CustomKeywordSearch(KeywordSearch):
 
 ### Example Implementation: ElasticsearchKeywordStore / 実装例
 
+### 必須実装事項 / Required Implementation
+
+#### 1. 基底クラス継承とインターフェース実装
+
 ```python
-import logging
-import time
-from typing import List, Optional, Dict, Any, Type
-from elasticsearch import Elasticsearch
+from refinire_rag.retrieval.base import KeywordSearch
 
-from refinire_rag.retrieval.base import KeywordSearch, SearchResult
-from refinire_rag.models.document import Document
-from refinire_rag.exceptions import StorageError
-
-logger = logging.getLogger(__name__)
-
-
-class ElasticsearchKeywordStore(KeywordSearch):
-    """Elasticsearch-based keyword search implementation
-    Elasticsearchベースのキーワード検索実装
-    
-    Provides full-text search capabilities using Elasticsearch with
-    support for complex queries, aggregations, and filters.
-    
-    複雑なクエリ、集約、フィルタをサポートするElasticsearchを使用した
-    全文検索機能を提供します。
-    """
+class CustomKeywordSearch(KeywordSearch):
+    """必須：KeywordSearchインターフェースを継承"""
     
     def __init__(self, **kwargs):
-        """Initialize Elasticsearch keyword store with environment variable support
-        
-        Args:
-            **kwargs: Configuration parameters, supporting:
-                     host: Elasticsearch host (REFINIRE_RAG_ELASTICSEARCH_HOST)
-                     port: Elasticsearch port (REFINIRE_RAG_ELASTICSEARCH_PORT) 
-                     index_name: Index name (REFINIRE_RAG_ELASTICSEARCH_INDEX_NAME)
-                     similarity_threshold: Score threshold (REFINIRE_RAG_ELASTICSEARCH_THRESHOLD)
-                     top_k: Result limit (REFINIRE_RAG_ELASTICSEARCH_TOP_K)
-        """
+        """必須：統一設定パターンのコンストラクタ"""
         super().__init__(**kwargs)
-        
-        # Configuration with environment variable support and priorities
+        # 環境変数サポート付き設定処理
         import os
+        self.setting = kwargs.get('setting', os.getenv('REFINIRE_RAG_PLUGIN_SETTING', 'default'))
+    
+    def get_config(self) -> Dict[str, Any]:
+        """必須：現在の設定を辞書で返却"""
+        return {'setting': self.setting}
+    
+    # 必須メソッド群
+    def add_document(self, document: Document) -> None: ...
+    def search(self, query: str, limit: int = 10) -> List[SearchResult]: ...
+    def index_document(self, document: Document) -> None: ...
+    def retrieve(self, query: str, limit: Optional[int] = None, 
+                metadata_filter: Optional[Dict[str, Any]] = None) -> List[SearchResult]: ...
+```
+
+#### 2. 環境変数命名規則の遵守
+
+```python
+# 必須：プラグイン固有環境変数は REFINIRE_RAG_{PLUGIN}_{SETTING} パターン
+REFINIRE_RAG_ELASTICSEARCH_HOST="localhost"
+REFINIRE_RAG_ELASTICSEARCH_PORT="9200"
+REFINIRE_RAG_ELASTICSEARCH_INDEX="documents"
+```
+
+#### 3. エラーハンドリングとログ
+
+```python
+import logging
+logger = logging.getLogger(__name__)
+
+class CustomKeywordSearch(KeywordSearch):
+    def search(self, query: str, limit: int = 10) -> List[SearchResult]:
+        try:
+            # 検索処理
+            results = self._perform_search(query, limit)
+            logger.info(f"Retrieved {len(results)} results for query: {query[:50]}")
+            return results
+        except Exception as e:
+            logger.error(f"Search failed: {e}")
+            return []  # 必須：エラー時は空リストを返却
+```
+
+### 簡略化実装例：ElasticsearchKeywordStore
+
+```python
+class ElasticsearchKeywordStore(KeywordSearch):
+    """Elasticsearch keyword search implementation"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        import os
+        # 必須：環境変数サポート付き設定
         self.host = kwargs.get('host', os.getenv('REFINIRE_RAG_ELASTICSEARCH_HOST', 'localhost'))
         self.port = int(kwargs.get('port', os.getenv('REFINIRE_RAG_ELASTICSEARCH_PORT', '9200')))
-        self.index_name = kwargs.get('index_name', os.getenv('REFINIRE_RAG_ELASTICSEARCH_INDEX_NAME', 'documents'))
-        self.similarity_threshold = float(kwargs.get('similarity_threshold', 
-                                                    os.getenv('REFINIRE_RAG_ELASTICSEARCH_THRESHOLD', '0.0')))
-        self.top_k = int(kwargs.get('top_k', os.getenv('REFINIRE_RAG_ELASTICSEARCH_TOP_K', '10')))
-        
-        # Legacy config dict for backward compatibility with internal methods
-        self.config = {
-            "host": self.host,
-            "port": self.port,
-            "index_name": self.index_name,
-            "similarity_threshold": self.similarity_threshold,
-            "top_k": self.top_k
+        self.index_name = kwargs.get('index_name', 
+                                   os.getenv('REFINIRE_RAG_ELASTICSEARCH_INDEX', 'documents'))
+        self._client = None
+    
+    def get_config(self) -> Dict[str, Any]:
+        """必須：設定情報を辞書で返却"""
+        return {
+            'host': self.host,
+            'port': self.port, 
+            'index_name': self.index_name
         }
         
         # Initialize Elasticsearch client
@@ -176,152 +201,39 @@ class ElasticsearchKeywordStore(KeywordSearch):
             'top_k': self.top_k
         }
     
+    # 必須メソッドの簡略化実装例
     def add_document(self, document: Document) -> None:
-        """Add a document to the Elasticsearch index"""
+        """必須：文書をインデックスに追加"""
         try:
-            doc_body = {
-                "content": document.content,
-                "metadata": document.metadata,
-                "timestamp": time.time()
-            }
-            
-            self.es_client.index(
-                index=self.config["index_name"],
-                id=document.id,
-                body=doc_body
-            )
-            
-            logger.debug(f"Added document to Elasticsearch: {document.id}")
-            
+            # プラグイン固有の保存処理
+            self._store_document(document)
+            logger.debug(f"Added document: {document.id}")
         except Exception as e:
-            raise StorageError(f"Failed to add document {document.id}: {e}") from e
+            logger.error(f"Failed to add document {document.id}: {e}")
+            raise
     
     def search(self, query: str, limit: int = 10) -> List[SearchResult]:
-        """Search for documents using Elasticsearch full-text search"""
-        start_time = time.time()
-        
+        """必須：キーワード検索の実行"""
         try:
-            # Build Elasticsearch query
-            es_query = {
-                "query": {
-                    "multi_match": {
-                        "query": query,
-                        "fields": ["content^2", "metadata.*"],
-                        "type": "best_fields",
-                        "fuzziness": "AUTO"
-                    }
-                },
-                "size": limit,
-                "sort": [
-                    {"_score": {"order": "desc"}},
-                    {"timestamp": {"order": "desc"}}
-                ]
-            }
-            
-            # Execute search
-            response = self.es_client.search(
-                index=self.config["index_name"],
-                body=es_query
-            )
-            
-            # Process results
-            search_results = []
-            for hit in response["hits"]["hits"]:
-                doc_id = hit["_id"]
-                score = float(hit["_score"])
-                source = hit["_source"]
-                
-                # Apply similarity threshold
-                if score < self.config["similarity_threshold"]:
-                    continue
-                
-                # Create Document object
-                document = Document(
-                    id=doc_id,
-                    content=source["content"],
-                    metadata=source.get("metadata", {})
-                )
-                
-                # Create SearchResult
-                search_result = SearchResult(
-                    document_id=doc_id,
-                    document=document,
-                    score=score,
-                    metadata={
-                        "retrieval_method": "elasticsearch",
-                        "algorithm": "multi_match",
-                        "query_length": len(query),
-                        "keyword_store": "ElasticsearchKeywordStore"
-                    }
-                )
-                search_results.append(search_result)
-            
-            # Update statistics
-            processing_time = time.time() - start_time
-            self.processing_stats["queries_processed"] += 1
-            self.processing_stats["processing_time"] += processing_time
-            
-            logger.debug(f"Elasticsearch search completed: {len(search_results)} results in {processing_time:.3f}s")
-            return search_results
-            
+            # プラグイン固有の検索処理
+            results = self._perform_search(query, limit)
+            logger.info(f"Search completed: {len(results)} results")
+            return results
         except Exception as e:
-            self.processing_stats["errors_encountered"] += 1
-            logger.error(f"Elasticsearch search failed: {e}")
-            return []
+            logger.error(f"Search failed: {e}")
+            return []  # 必須：エラー時は空リスト返却
     
-    def retrieve(self, 
-                 query: str, 
-                 limit: Optional[int] = None,
-                 metadata_filter: Optional[Dict[str, Any]] = None) -> List[SearchResult]:
-        """Retrieve documents with optional metadata filtering"""
-        limit = limit or self.config["top_k"]
-        
+    def retrieve(self, query: str, limit: Optional[int] = None,
+                metadata_filter: Optional[Dict[str, Any]] = None) -> List[SearchResult]:
+        """必須：メタデータフィルタ付き検索"""
+        limit = limit or 10
         try:
-            # Build base query
-            query_clause = {
-                "multi_match": {
-                    "query": query,
-                    "fields": ["content^2", "metadata.*"],
-                    "type": "best_fields",
-                    "fuzziness": "AUTO"
-                }
-            }
-            
-            # Add metadata filters if provided
-            if metadata_filter:
-                filter_clauses = []
-                for key, value in metadata_filter.items():
-                    if isinstance(value, list):
-                        filter_clauses.append({
-                            "terms": {f"metadata.{key}": value}
-                        })
-                    elif isinstance(value, dict):
-                        # Range queries
-                        range_query = {}
-                        if "$gte" in value:
-                            range_query["gte"] = value["$gte"]
-                        if "$lte" in value:
-                            range_query["lte"] = value["$lte"]
-                        if range_query:
-                            filter_clauses.append({
-                                "range": {f"metadata.{key}": range_query}
-                            })
-                    else:
-                        filter_clauses.append({
-                            "term": {f"metadata.{key}": value}
-                        })
-                
-                # Combine query with filters
-                es_query = {
-                    "query": {
-                        "bool": {
-                            "must": query_clause,
-                            "filter": filter_clauses
-                        }
-                    },
-                    "size": limit
-                }
-            else:
+            # フィルタ処理を含む検索実行
+            results = self._search_with_filters(query, limit, metadata_filter)
+            return results
+        except Exception as e:
+            logger.error(f"Filtered search failed: {e}")
+            return []
                 es_query = {
                     "query": query_clause,
                     "size": limit
@@ -497,142 +409,71 @@ class ElasticsearchKeywordStore(KeywordSearch):
 
 ## VectorStore Plugin Development / VectorStoreプラグイン開発
 
-### Interface Requirements / インターフェース要件
+### 必須実装事項 / Required Implementation
 
-All VectorStore plugins must implement the `VectorStore` interface:
+#### 1. VectorStore基底クラス継承
 
 ```python
-from refinire_rag.storage.vector_store import VectorStore, VectorEntry, VectorSearchResult, VectorStoreStats
-from refinire_rag.models.document import Document
-from typing import List, Optional, Dict, Any, Type
-import numpy as np
+from refinire_rag.storage.vector_store import VectorStore
 
 class CustomVectorStore(VectorStore):
-    """Custom vector store implementation"""
+    """必須：VectorStoreインターフェースを継承"""
     
     def __init__(self, **kwargs):
-        """Initialize with unified configuration support
-        
-        Args:
-            **kwargs: Configuration parameters, merged with environment variables
-                     設定パラメータ、環境変数とマージされます
-        """
+        """必須：統一設定パターンのコンストラクタ"""
         super().__init__(**kwargs)
-        # Your initialization code here
+        import os
+        # 環境変数サポート付き設定
+        self.setting = kwargs.get('setting', os.getenv('REFINIRE_RAG_PLUGIN_SETTING', 'default'))
     
     def get_config(self) -> Dict[str, Any]:
-        """Get current configuration as dictionary
-        現在の設定を辞書として取得
-        """
-        return {
-            'setting1': getattr(self, 'setting1', 'default_value1'),
-            'setting2': getattr(self, 'setting2', 'default_value2'),
-            # Add your configuration parameters here
-        }
+        """必須：現在の設定を辞書で返却"""
+        return {'setting': self.setting}
     
-    # Core VectorStore methods
-    def add_vector(self, entry: VectorEntry) -> str:
-        """Add a vector entry to the store"""
-        pass
-    
-    def add_vectors(self, entries: List[VectorEntry]) -> List[str]:
-        """Add multiple vector entries to the store"""
-        pass
-    
-    def get_vector(self, document_id: str) -> Optional[VectorEntry]:
-        """Retrieve vector entry by document ID"""
-        pass
-    
-    def update_vector(self, entry: VectorEntry) -> bool:
-        """Update an existing vector entry"""
-        pass
-    
-    def delete_vector(self, document_id: str) -> bool:
-        """Delete vector entry by document ID"""
-        pass
-    
-    def search_similar(
-        self, 
-        query_vector: np.ndarray, 
-        limit: int = 10,
-        threshold: Optional[float] = None,
-        filters: Optional[Dict[str, Any]] = None
-    ) -> List[VectorSearchResult]:
-        """Search for similar vectors"""
-        pass
-    
-    def search_by_metadata(
-        self,
-        filters: Dict[str, Any],
-        limit: int = 100
-    ) -> List[VectorSearchResult]:
-        """Search vectors by metadata filters"""
-        pass
-    
-    def count_vectors(self, filters: Optional[Dict[str, Any]] = None) -> int:
-        """Count vectors matching optional filters"""
-        pass
-    
-    def get_stats(self) -> VectorStoreStats:
-        """Get vector store statistics"""
-        pass
-    
-    def clear(self) -> bool:
-        """Clear all vectors from the store"""
-        pass
+    # 必須メソッド群（簡略化）
+    def add_vector(self, entry: VectorEntry) -> str: ...
+    def search_similar(self, query_vector: np.ndarray, limit: int = 10) -> List[VectorSearchResult]: ...
+    def get_stats(self) -> VectorStoreStats: ...
+    def clear(self) -> bool: ...
 ```
 
-### Example Implementation: ChromaVectorStore / 実装例
+#### 2. エラーハンドリングパターン
 
 ```python
-import logging
-import time
-from typing import List, Optional, Dict, Any, Type
-import numpy as np
+def search_similar(self, query_vector: np.ndarray, limit: int = 10) -> List[VectorSearchResult]:
+    """必須：類似ベクトル検索"""
+    try:
+        # ベクトル検索処理
+        results = self._perform_vector_search(query_vector, limit)
+        logger.info(f"Vector search completed: {len(results)} results")
+        return results
+    except Exception as e:
+        logger.error(f"Vector search failed: {e}")
+        return []  # 必須：エラー時は空リスト返却
+```
 
-try:
-    import chromadb
-    from chromadb.config import Settings
-except ImportError:
-    chromadb = None
+### 簡略化実装例：ChromaVectorStore
 
-from refinire_rag.storage.vector_store import VectorStore, VectorEntry, VectorSearchResult, VectorStoreStats
-from refinire_rag.exceptions import StorageError
-
-logger = logging.getLogger(__name__)
-
-
+```python
 class ChromaVectorStore(VectorStore):
-    """ChromaDB-based vector store implementation
-    ChromaDBベースのベクトルストア実装
+    """ChromaDB vector store implementation"""
     
-    Provides persistent vector storage with efficient similarity search
-    using ChromaDB as the backend database.
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        import os
+        # 必須：環境変数サポート付き設定
+        self.collection_name = kwargs.get('collection_name', 
+                                        os.getenv('REFINIRE_RAG_CHROMA_COLLECTION', 'documents'))
+        self.host = kwargs.get('host', os.getenv('REFINIRE_RAG_CHROMA_HOST', 'localhost'))
+        self.port = int(kwargs.get('port', os.getenv('REFINIRE_RAG_CHROMA_PORT', '8000')))
+        self._client = None
     
-    ChromaDBをバックエンドデータベースとして使用した効率的な類似検索を備えた
-    永続的なベクトルストレージを提供します。
-    """
-    
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize ChromaDB vector store
-        
-        Args:
-            config: Configuration including ChromaDB settings
-                   ChromaDB設定を含む設定
-        """
-        if chromadb is None:
-            raise ImportError("chromadb package is required for ChromaVectorStore")
-        
-        super().__init__(config or {})
-        
-        # Default configuration
-        self.config = {
-            "collection_name": "documents",
-            "persist_directory": "./chroma_db",
-            "similarity_metric": "cosine",
-            "host": None,  # For remote ChromaDB
-            "port": None,
-            **self.config
+    def get_config(self) -> Dict[str, Any]:
+        """必須：設定情報返却"""
+        return {
+            'collection_name': self.collection_name,
+            'host': self.host,
+            'port': self.port
         }
         
         # Initialize ChromaDB client
@@ -1005,646 +846,110 @@ my-refinire-rag-plugin/
     └── test_integration.py
 ```
 
-## Project Configuration / プロジェクト設定
+## プロジェクト設定 / Project Configuration
 
-### pyproject.toml Setup
-
-Your plugin's `pyproject.toml` should include:
+### 必須pyproject.toml設定
 
 ```toml
 [project]
 name = "my-refinire-rag-plugin"
 version = "0.1.0"
-description = "Custom KeywordSearch and VectorStore implementations for refinire-rag"
-requires-python = ">=3.10"
 dependencies = [
     "refinire-rag>=0.1.0",
-    "numpy>=1.24.0",
-    # Add your specific dependencies here
-    "elasticsearch>=8.0.0",  # For Elasticsearch example
-    "chromadb>=0.4.0",       # For ChromaDB example
+    # プラグイン固有の依存関係のみ追加
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-cov>=4.1.0",
-    "pytest-asyncio>=0.21.0",
-]
+# 必須：エントリーポイント設定
+[project.entry-points."refinire_rag.keyword_stores"]
+elasticsearch = "my_refinire_plugin:ElasticsearchKeywordStore"
 
-[build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-addopts = [
-    "--import-mode=importlib",
-    "--cov=my_refinire_plugin",
-    "--cov-report=term-missing",
-]
+[project.entry-points."refinire_rag.vector_stores"] 
+chroma = "my_refinire_plugin:ChromaVectorStore"
 ```
 
-## Plugin Registration / プラグイン登録
-
-### Using Plugin Discovery
-
-Create an `__init__.py` file in your plugin package to register your implementations:
+### 必須パッケージ初期化
 
 ```python
 # src/my_refinire_plugin/__init__.py
 
-"""My Refinire RAG Plugin
-
-Custom KeywordSearch and VectorStore implementations for specific use cases.
-"""
-
 from .keyword_search import ElasticsearchKeywordStore
 from .vector_store import ChromaVectorStore
 
-__version__ = "0.1.0"
-
-# Plugin registration
+# 必須：プラグインクラスのエクスポート
 __all__ = [
-    "ElasticsearchKeywordStore",
-    "ChromaVectorStore",
+    "ElasticsearchKeywordStore", 
+    "ChromaVectorStore"
 ]
-
-# Plugin metadata
-PLUGIN_INFO = {
-    "name": "my-refinire-rag-plugin",
-    "version": __version__,
-    "description": "Custom search implementations",
-    "implementations": {
-        "keyword_search": {
-            "elasticsearch": ElasticsearchKeywordStore,
-        },
-        "vector_store": {
-            "chroma": ChromaVectorStore,
-        }
-    }
-}
 ```
 
-## Testing Your Plugins / プラグインのテスト
+## プラグインテスト / Plugin Testing
 
-### KeywordSearch Testing
+### 必須テスト項目
+
+#### 1. 基本機能テスト
 
 ```python
-# tests/test_keyword_search.py
-
+# tests/test_plugin.py
 import pytest
-import numpy as np
-from refinire_rag.models.document import Document
-from refinire_rag.retrieval.base import SearchResult
+from my_refinire_plugin import ElasticsearchKeywordStore
 
-from my_refinire_plugin.keyword_search import ElasticsearchKeywordStore
+def test_plugin_initialization():
+    """必須：プラグイン初期化テスト"""
+    plugin = ElasticsearchKeywordStore()
+    assert plugin is not None
+    
+def test_get_config():
+    """必須：設定取得テスト"""
+    plugin = ElasticsearchKeywordStore()
+    config = plugin.get_config()
+    assert isinstance(config, dict)
 
-
-class TestElasticsearchKeywordStore:
-    """Test suite for ElasticsearchKeywordStore"""
-    
-    @pytest.fixture
-    def keyword_store(self):
-        """Create a test keyword store instance"""
-        config = {
-            "host": "localhost",
-            "port": 9200,
-            "index_name": "test_documents",
-            "similarity_threshold": 0.1
-        }
-        return ElasticsearchKeywordStore(config)
-    
-    @pytest.fixture
-    def sample_documents(self):
-        """Create sample documents for testing"""
-        return [
-            Document(
-                id="doc1",
-                content="Machine learning algorithms for data analysis",
-                metadata={"category": "AI", "year": 2024}
-            ),
-            Document(
-                id="doc2",
-                content="Deep learning and neural networks",
-                metadata={"category": "AI", "year": 2024}
-            ),
-            Document(
-                id="doc3",
-                content="Database optimization techniques",
-                metadata={"category": "DB", "year": 2023}
-            )
-        ]
-    
-    def test_add_document(self, keyword_store, sample_documents):
-        """Test adding a single document"""
-        doc = sample_documents[0]
-        keyword_store.add_document(doc)
-        
-        # Verify document was added
-        assert keyword_store.get_document_count() == 1
-    
-    def test_index_documents(self, keyword_store, sample_documents):
-        """Test indexing multiple documents"""
-        keyword_store.index_documents(sample_documents)
-        
-        # Verify all documents were indexed
-        assert keyword_store.get_document_count() == len(sample_documents)
-    
-    def test_search(self, keyword_store, sample_documents):
-        """Test basic search functionality"""
-        # Index test documents
-        keyword_store.index_documents(sample_documents)
-        
-        # Search for relevant documents
-        results = keyword_store.search("machine learning", limit=5)
-        
-        # Verify search results
-        assert isinstance(results, list)
-        assert len(results) > 0
-        assert all(isinstance(r, SearchResult) for r in results)
-        
-        # Check that most relevant document is first
-        assert results[0].document_id == "doc1"
-        assert results[0].score > 0.1
-    
-    def test_retrieve_with_metadata_filter(self, keyword_store, sample_documents):
-        """Test retrieval with metadata filtering"""
-        # Index test documents
-        keyword_store.index_documents(sample_documents)
-        
-        # Search with metadata filter
-        metadata_filter = {"category": "AI"}
-        results = keyword_store.retrieve(
-            "learning", 
-            limit=10, 
-            metadata_filter=metadata_filter
-        )
-        
-        # Verify filtered results
-        assert len(results) == 2  # Only AI category documents
-        for result in results:
-            assert result.document.metadata["category"] == "AI"
-    
-    def test_remove_document(self, keyword_store, sample_documents):
-        """Test document removal"""
-        # Index documents
-        keyword_store.index_documents(sample_documents)
-        
-        # Remove a document
-        success = keyword_store.remove_document("doc1")
-        assert success is True
-        
-        # Verify document count decreased
-        assert keyword_store.get_document_count() == len(sample_documents) - 1
-        
-        # Verify document is no longer found in search
-        results = keyword_store.search("machine learning", limit=5)
-        doc_ids = [r.document_id for r in results]
-        assert "doc1" not in doc_ids
-    
-    def test_clear_index(self, keyword_store, sample_documents):
-        """Test clearing the entire index"""
-        # Index documents
-        keyword_store.index_documents(sample_documents)
-        assert keyword_store.get_document_count() > 0
-        
-        # Clear index
-        keyword_store.clear_index()
-        
-        # Verify index is empty
-        assert keyword_store.get_document_count() == 0
+def test_environment_variables():
+    """必須：環境変数サポートテスト"""
+    import os
+    os.environ['REFINIRE_RAG_ELASTICSEARCH_HOST'] = 'test-host'
+    plugin = ElasticsearchKeywordStore()
+    assert plugin.host == 'test-host'
 ```
 
-### VectorStore Testing
+#### 2. エラーハンドリングテスト
 
 ```python
-# tests/test_vector_store.py
-
-import pytest
-import numpy as np
-from refinire_rag.storage.vector_store import VectorEntry, VectorSearchResult
-from refinire_rag.models.document import Document
-
-from my_refinire_plugin.vector_store import ChromaVectorStore
-
-
-class TestChromaVectorStore:
-    """Test suite for ChromaVectorStore"""
-    
-    @pytest.fixture
-    def vector_store(self):
-        """Create a test vector store instance"""
-        config = {
-            "collection_name": "test_collection",
-            "persist_directory": "./test_chroma_db",
-            "similarity_metric": "cosine"
-        }
-        return ChromaVectorStore(config)
-    
-    @pytest.fixture
-    def sample_vector_entries(self):
-        """Create sample vector entries for testing"""
-        return [
-            VectorEntry(
-                document_id="doc1",
-                content="Machine learning algorithms",
-                embedding=np.array([1.0, 0.0, 0.0, 0.5]),
-                metadata={"category": "AI", "year": 2024}
-            ),
-            VectorEntry(
-                document_id="doc2",
-                content="Deep learning networks",
-                embedding=np.array([0.8, 0.2, 0.0, 0.3]),
-                metadata={"category": "AI", "year": 2024}
-            ),
-            VectorEntry(
-                document_id="doc3",
-                content="Database optimization",
-                embedding=np.array([0.0, 0.0, 1.0, 0.0]),
-                metadata={"category": "DB", "year": 2023}
-            )
-        ]
-    
-    def test_add_vector(self, vector_store, sample_vector_entries):
-        """Test adding a single vector"""
-        entry = sample_vector_entries[0]
-        result_id = vector_store.add_vector(entry)
-        
-        assert result_id == entry.document_id
-        
-        # Verify vector was added
-        stats = vector_store.get_stats()
-        assert stats.total_vectors == 1
-    
-    def test_add_vectors_batch(self, vector_store, sample_vector_entries):
-        """Test adding multiple vectors in batch"""
-        result_ids = vector_store.add_vectors(sample_vector_entries)
-        
-        assert len(result_ids) == len(sample_vector_entries)
-        
-        # Verify all vectors were added
-        stats = vector_store.get_stats()
-        assert stats.total_vectors == len(sample_vector_entries)
-    
-    def test_get_vector(self, vector_store, sample_vector_entries):
-        """Test retrieving a specific vector"""
-        # Add vectors
-        vector_store.add_vectors(sample_vector_entries)
-        
-        # Retrieve a vector
-        retrieved = vector_store.get_vector("doc1")
-        
-        assert retrieved is not None
-        assert retrieved.document_id == "doc1"
-        assert retrieved.content == "Machine learning algorithms"
-        np.testing.assert_array_equal(retrieved.embedding, sample_vector_entries[0].embedding)
-    
-    def test_search_similar(self, vector_store, sample_vector_entries):
-        """Test similarity search"""
-        # Add vectors
-        vector_store.add_vectors(sample_vector_entries)
-        
-        # Search with a query vector similar to doc1
-        query_vector = np.array([0.9, 0.1, 0.0, 0.4])
-        results = vector_store.search_similar(query_vector, limit=3)
-        
-        # Verify search results
-        assert isinstance(results, list)
-        assert len(results) > 0
-        assert all(isinstance(r, VectorSearchResult) for r in results)
-        
-        # Results should be sorted by similarity
-        assert results[0].score >= results[1].score
-        
-        # Most similar should be doc1 or doc2 (both AI-related)
-        assert results[0].document_id in ["doc1", "doc2"]
-    
-    def test_search_with_metadata_filter(self, vector_store, sample_vector_entries):
-        """Test similarity search with metadata filtering"""
-        # Add vectors
-        vector_store.add_vectors(sample_vector_entries)
-        
-        # Search with metadata filter
-        query_vector = np.array([0.5, 0.5, 0.5, 0.5])
-        filters = {"category": "AI"}
-        results = vector_store.search_similar(
-            query_vector, 
-            limit=5, 
-            filters=filters
-        )
-        
-        # Verify filtered results
-        assert len(results) == 2  # Only AI category vectors
-        for result in results:
-            assert result.metadata["category"] == "AI"
-    
-    def test_count_vectors(self, vector_store, sample_vector_entries):
-        """Test counting vectors"""
-        # Initially empty
-        assert vector_store.count_vectors() == 0
-        
-        # Add vectors
-        vector_store.add_vectors(sample_vector_entries)
-        
-        # Count all vectors
-        assert vector_store.count_vectors() == len(sample_vector_entries)
-        
-        # Count with filter
-        ai_count = vector_store.count_vectors({"category": "AI"})
-        assert ai_count == 2
-    
-    def test_delete_vector(self, vector_store, sample_vector_entries):
-        """Test vector deletion"""
-        # Add vectors
-        vector_store.add_vectors(sample_vector_entries)
-        
-        # Delete a vector
-        success = vector_store.delete_vector("doc1")
-        assert success is True
-        
-        # Verify vector was deleted
-        assert vector_store.get_vector("doc1") is None
-        assert vector_store.count_vectors() == len(sample_vector_entries) - 1
-    
-    def test_clear(self, vector_store, sample_vector_entries):
-        """Test clearing all vectors"""
-        # Add vectors
-        vector_store.add_vectors(sample_vector_entries)
-        assert vector_store.count_vectors() > 0
-        
-        # Clear all vectors
-        success = vector_store.clear()
-        assert success is True
-        
-        # Verify store is empty
-        assert vector_store.count_vectors() == 0
+def test_search_error_handling():
+    """必須：エラー時の空リスト返却テスト"""
+    plugin = ElasticsearchKeywordStore()
+    # 接続不可能な設定でテスト
+    results = plugin.search("test query")
+    assert results == []  # エラー時は空リスト
 ```
 
-## Integration Testing / 統合テスト
+## プラグイン開発チェックリスト / Development Checklist
 
-```python
-# tests/test_integration.py
+### ✅ 必須実装項目
 
-import pytest
-import numpy as np
-from refinire_rag.models.document import Document
-from refinire_rag.storage.vector_store import VectorEntry
+#### KeywordSearchプラグイン
+- [ ] `KeywordSearch` 基底クラスを継承
+- [ ] `__init__(**kwargs)` で環境変数サポート
+- [ ] `get_config()` メソッド実装
+- [ ] `search()`, `add_document()`, `retrieve()` メソッド実装
+- [ ] エラー時に空リスト返却
+- [ ] 適切なログ出力
 
-from my_refinire_plugin.keyword_search import ElasticsearchKeywordStore
-from my_refinire_plugin.vector_store import ChromaVectorStore
+#### VectorStoreプラグイン  
+- [ ] `VectorStore` 基底クラスを継承
+- [ ] `__init__(**kwargs)` で環境変数サポート
+- [ ] `get_config()` メソッド実装
+- [ ] `add_vector()`, `search_similar()` メソッド実装
+- [ ] エラー時に空リスト返却
+- [ ] 適切なログ出力
 
+#### プロジェクト設定
+- [ ] pyproject.tomlにentry points設定
+- [ ] __init__.pyでクラスエクスポート
+- [ ] 環境変数命名規則遵守 (`REFINIRE_RAG_{PLUGIN}_{SETTING}`)
+- [ ] 基本テストケース作成
 
-class TestPluginIntegration:
-    """Integration tests for plugin components"""
-    
-    @pytest.fixture
-    def documents(self):
-        """Sample documents for integration testing"""
-        return [
-            Document(
-                id="doc1",
-                content="Machine learning algorithms for data analysis and prediction",
-                metadata={"category": "AI", "difficulty": "intermediate"}
-            ),
-            Document(
-                id="doc2",
-                content="Deep learning neural networks and backpropagation",
-                metadata={"category": "AI", "difficulty": "advanced"}
-            ),
-            Document(
-                id="doc3",
-                content="Database query optimization and indexing strategies",
-                metadata={"category": "DB", "difficulty": "intermediate"}
-            )
-        ]
-    
-    def test_hybrid_search_workflow(self, documents):
-        """Test combining keyword and vector search"""
-        # Initialize both stores
-        keyword_store = ElasticsearchKeywordStore({
-            "index_name": "test_hybrid",
-            "similarity_threshold": 0.1
-        })
-        
-        vector_store = ChromaVectorStore({
-            "collection_name": "test_hybrid",
-            "persist_directory": "./test_hybrid_db"
-        })
-        
-        # Index documents in keyword store
-        keyword_store.index_documents(documents)
-        
-        # Create vector entries (simulate embedder)
-        vector_entries = [
-            VectorEntry(
-                document_id=doc.id,
-                content=doc.content,
-                embedding=np.random.rand(384),  # Simulate embedding
-                metadata=doc.metadata
-            )
-            for doc in documents
-        ]
-        
-        # Index vectors
-        vector_store.add_vectors(vector_entries)
-        
-        # Perform hybrid search
-        query = "machine learning"
-        
-        # Get keyword results
-        keyword_results = keyword_store.search(query, limit=5)
-        
-        # Get vector results (using first document's embedding as query)
-        query_vector = vector_entries[0].embedding
-        vector_results = vector_store.search_similar(query_vector, limit=5)
-        
-        # Verify both searches return results
-        assert len(keyword_results) > 0
-        assert len(vector_results) > 0
-        
-        # Verify results contain expected documents
-        keyword_doc_ids = {r.document_id for r in keyword_results}
-        vector_doc_ids = {r.document_id for r in vector_results}
-        
-        assert "doc1" in keyword_doc_ids  # Should match "machine learning"
-        assert "doc1" in vector_doc_ids   # Should be similar to itself
-    
-    def test_document_processor_integration(self, documents):
-        """Test DocumentProcessor integration"""
-        keyword_store = ElasticsearchKeywordStore()
-        vector_store = ChromaVectorStore()
-        
-        # Test processing documents through the stores
-        keyword_processed = list(keyword_store.process(documents))
-        vector_processed = list(vector_store.process(documents))
-        
-        # Verify documents pass through unchanged
-        assert len(keyword_processed) == len(documents)
-        assert len(vector_processed) == len(documents)
-        
-        # Verify documents have been indexed
-        assert keyword_store.get_document_count() == len(documents)
-        # Note: vector_store would need an embedder set to actually store vectors
-```
+---
 
-## Best Practices / ベストプラクティス
+この簡略化ガイドに従って、プラグインで守らなければならない必須事項に焦点を当てて開発を進めてください。詳細な実装は各プラグインの要件に応じて調整してください。
 
-### 1. Error Handling / エラーハンドリング
-
-```python
-from refinire_rag.exceptions import StorageError
-
-class MyKeywordStore(KeywordSearch):
-    def search(self, query: str, limit: int = 10) -> List[SearchResult]:
-        try:
-            # Your search implementation
-            results = self._perform_search(query, limit)
-            return results
-        except ConnectionError as e:
-            logger.error(f"Connection failed: {e}")
-            raise StorageError(f"Search backend unavailable: {e}") from e
-        except ValueError as e:
-            logger.error(f"Invalid query: {e}")
-            return []  # Return empty results for invalid queries
-        except Exception as e:
-            logger.error(f"Unexpected error during search: {e}")
-            raise StorageError(f"Search failed: {e}") from e
-```
-
-### 2. Configuration Management / 設定管理
-
-```python
-from typing import Dict, Any, Optional
-from dataclasses import dataclass
-
-@dataclass
-class ElasticsearchConfig:
-    """Configuration for Elasticsearch KeywordStore"""
-    host: str = "localhost"
-    port: int = 9200
-    index_name: str = "documents"
-    similarity_threshold: float = 0.0
-    top_k: int = 10
-    max_retries: int = 3
-    timeout: int = 30
-    
-    @classmethod
-    def from_dict(cls, config: Dict[str, Any]) -> 'ElasticsearchConfig':
-        """Create config from dictionary"""
-        return cls(**{k: v for k, v in config.items() if k in cls.__annotations__})
-
-class ElasticsearchKeywordStore(KeywordSearch):
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__(config or {})
-        self.es_config = ElasticsearchConfig.from_dict(self.config)
-        # Use self.es_config for typed access to configuration
-```
-
-### 3. Performance Optimization / パフォーマンス最適化
-
-```python
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-
-class OptimizedVectorStore(VectorStore):
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__(config)
-        self.executor = ThreadPoolExecutor(max_workers=4)
-        self._cache = {}  # Simple cache for frequent queries
-    
-    def add_vectors(self, entries: List[VectorEntry]) -> List[str]:
-        """Optimized batch addition"""
-        # Process in chunks for better memory usage
-        chunk_size = 100
-        result_ids = []
-        
-        for i in range(0, len(entries), chunk_size):
-            chunk = entries[i:i + chunk_size]
-            chunk_ids = self._add_vector_chunk(chunk)
-            result_ids.extend(chunk_ids)
-        
-        return result_ids
-    
-    def search_similar_async(self, query_vector: np.ndarray, **kwargs):
-        """Async version of similarity search"""
-        loop = asyncio.get_event_loop()
-        return loop.run_in_executor(
-            self.executor, 
-            self.search_similar, 
-            query_vector, 
-            **kwargs
-        )
-```
-
-### 4. Logging and Monitoring / ログとモニタリング
-
-```python
-import logging
-import time
-from functools import wraps
-
-def monitor_performance(func):
-    """Decorator to monitor method performance"""
-    @wraps(func)
-    def wrapper(self, *args, **kwargs):
-        start_time = time.time()
-        try:
-            result = func(self, *args, **kwargs)
-            duration = time.time() - start_time
-            
-            # Update statistics
-            if hasattr(self, 'processing_stats'):
-                self.processing_stats['processing_time'] += duration
-                self.processing_stats[f'{func.__name__}_calls'] = \
-                    self.processing_stats.get(f'{func.__name__}_calls', 0) + 1
-            
-            logger.debug(f"{func.__name__} completed in {duration:.3f}s")
-            return result
-            
-        except Exception as e:
-            duration = time.time() - start_time
-            logger.error(f"{func.__name__} failed after {duration:.3f}s: {e}")
-            raise
-    
-    return wrapper
-
-class MonitoredKeywordStore(KeywordSearch):
-    @monitor_performance
-    def search(self, query: str, limit: int = 10) -> List[SearchResult]:
-        # Your implementation here
-        pass
-```
-
-### 5. Testing Strategies / テスト戦略
-
-```python
-# Use pytest fixtures for consistent test setup
-@pytest.fixture(scope="session")
-def test_elasticsearch():
-    """Start test Elasticsearch instance"""
-    # Setup test instance (e.g., using testcontainers)
-    yield es_instance
-    # Cleanup
-
-@pytest.fixture
-def clean_index(test_elasticsearch):
-    """Ensure clean index for each test"""
-    index_name = "test_index"
-    # Clean up before test
-    yield index_name
-    # Clean up after test
-
-# Use property-based testing for edge cases
-from hypothesis import given, strategies as st
-
-@given(st.text(min_size=1, max_size=1000))
-def test_search_with_random_queries(keyword_store, query):
-    """Test search with various query inputs"""
-    # Should not crash on any valid text input
-    results = keyword_store.search(query, limit=5)
-    assert isinstance(results, list)
-```
-
-This comprehensive plugin development guide provides everything needed to create robust, production-ready KeywordSearch and VectorStore plugins for the refinire-rag system. The examples demonstrate real-world implementations with proper error handling, testing, and best practices.
