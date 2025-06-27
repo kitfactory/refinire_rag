@@ -9,7 +9,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import List, Optional, Type
+from typing import List, Optional, Type, Dict, Any
 
 from ..document_processor import DocumentProcessor, DocumentProcessorConfig
 from ..models.document import Document
@@ -49,14 +49,17 @@ class RecursiveChunkerConfig(DocumentProcessorConfig):
     
     def __post_init__(self):
         """Initialize configuration from environment variables"""
-        # Load from environment variables
-        self.chunk_size = int(os.getenv("REFINIRE_RAG_CHUNK_SIZE", str(self.chunk_size)))
-        self.chunk_overlap = int(os.getenv("REFINIRE_RAG_CHUNK_OVERLAP", str(self.chunk_overlap)))
-        self.keep_separator = os.getenv("REFINIRE_RAG_KEEP_SEPARATOR", "true").lower() == "true"
-        self.is_separator_regex = os.getenv("REFINIRE_RAG_IS_SEPARATOR_REGEX", "false").lower() == "true"
+        # Load from environment variables with current values as defaults
+        self.chunk_size = int(os.getenv("REFINIRE_RAG_RECURSIVE_CHUNK_SIZE", str(self.chunk_size)))
+        self.chunk_overlap = int(os.getenv("REFINIRE_RAG_RECURSIVE_CHUNK_OVERLAP", str(self.chunk_overlap)))
+        self.keep_separator = os.getenv("REFINIRE_RAG_RECURSIVE_KEEP_SEPARATOR", "true" if self.keep_separator else "false").lower() == "true"
+        self.is_separator_regex = os.getenv("REFINIRE_RAG_RECURSIVE_IS_SEPARATOR_REGEX", "true" if self.is_separator_regex else "false").lower() == "true"
+        self.strip_whitespace = os.getenv("REFINIRE_RAG_RECURSIVE_STRIP_WHITESPACE", "true" if self.strip_whitespace else "false").lower() == "true"
+        self.add_chunk_metadata = os.getenv("REFINIRE_RAG_RECURSIVE_ADD_CHUNK_METADATA", "true" if self.add_chunk_metadata else "false").lower() == "true"
+        self.preserve_original_metadata = os.getenv("REFINIRE_RAG_RECURSIVE_PRESERVE_ORIGINAL_METADATA", "true" if self.preserve_original_metadata else "false").lower() == "true"
         
         # Load separators from environment
-        env_separators = os.getenv("REFINIRE_RAG_SEPARATORS")
+        env_separators = os.getenv("REFINIRE_RAG_RECURSIVE_SEPARATORS")
         if env_separators:
             # Parse separators, filtering out empty ones after stripping
             parsed_seps = []
@@ -88,13 +91,32 @@ class RecursiveChunker(DocumentProcessor):
     - REFINIRE_RAG_IS_SEPARATOR_REGEX: Whether separators are regex patterns
     """
     
-    def __init__(self, config: Optional[RecursiveChunkerConfig] = None):
+    def __init__(self, **kwargs):
         """Initialize RecursiveChunker processor
         
         Args:
-            config: Configuration for the processor
+            **kwargs: Configuration parameters including:
+                - chunk_size: Maximum chunk size in characters
+                - chunk_overlap: Overlap between chunks in characters
+                - separators: List of separators for recursive splitting
+                - keep_separator: Whether to keep separators in chunks
+                - is_separator_regex: Whether separators are regex patterns
+                - strip_whitespace: Whether to strip whitespace from chunks
+                - add_chunk_metadata: Whether to add chunking metadata
+                - preserve_original_metadata: Whether to preserve original metadata
         """
-        super().__init__(config or RecursiveChunkerConfig())
+        # Handle legacy config parameter
+        config = kwargs.pop('config', None)
+        if config is not None:
+            # Convert config object to kwargs
+            config_dict = config.__dict__ if hasattr(config, '__dict__') else config
+            kwargs.update(config_dict)
+        
+        # Create config with kwargs
+        final_config = RecursiveChunkerConfig()
+        final_config.__dict__.update(kwargs)
+        
+        super().__init__(final_config)
         
         # Processing statistics
         self.processing_stats.update({
@@ -109,16 +131,30 @@ class RecursiveChunker(DocumentProcessor):
                    f"overlap={self.config.chunk_overlap}, "
                    f"separators={self.config.separators}")
     
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        
+        Returns:
+            Current configuration settings
+        """
+        base_config = super().get_config() or {}
+        base_config.update({
+            'chunk_size': self.config.chunk_size,
+            'chunk_overlap': self.config.chunk_overlap,
+            'separators': self.config.separators,
+            'keep_separator': self.config.keep_separator,
+            'is_separator_regex': self.config.is_separator_regex,
+            'strip_whitespace': self.config.strip_whitespace,
+            'add_chunk_metadata': self.config.add_chunk_metadata,
+            'preserve_original_metadata': self.config.preserve_original_metadata
+        })
+        return base_config
+    
     @classmethod
     def get_config_class(cls) -> Type[RecursiveChunkerConfig]:
         """Get the configuration class for this processor"""
         return RecursiveChunkerConfig
     
-    @classmethod
-    def from_env(cls) -> 'RecursiveChunker':
-        """Create RecursiveChunker from environment variables"""
-        config = RecursiveChunkerConfig()
-        return cls(config)
     
     def process(self, documents, config: Optional[RecursiveChunkerConfig] = None):
         """Process documents to create recursive chunks

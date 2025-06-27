@@ -89,16 +89,6 @@ class JSONLoader(Loader):
             except Exception as e:
                 raise Exception(f"Error processing JSON file {file_path}: {str(e)}")
     
-    @classmethod
-    def from_env(cls) -> "JSONLoader":
-        """Create JSONLoader instance from environment variables
-        
-        環境変数からJSONLoaderインスタンスを作成
-        
-        Returns:
-            JSONLoader instance configured from environment
-        """
-        return cls()
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration as dictionary

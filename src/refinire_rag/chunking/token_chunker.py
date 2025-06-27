@@ -136,16 +136,6 @@ class TokenBasedChunker(Chunker):
             max_chunk_size=max_chunk_size
         )
     
-    @classmethod
-    def from_env(cls) -> "TokenBasedChunker":
-        """Create TokenBasedChunker instance from environment variables
-        
-        環境変数からTokenBasedChunkerインスタンスを作成
-        
-        Returns:
-            TokenBasedChunker instance configured from environment
-        """
-        return cls()
     
     def get_config(self) -> dict:
         """Get current configuration as dictionary

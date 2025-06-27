@@ -91,18 +91,6 @@ class SimpleReranker(Reranker):
         
         logger.info("Initialized SimpleReranker with heuristic scoring")
     
-    @classmethod
-    def from_env(cls) -> "SimpleReranker":
-        """Create SimpleReranker instance from environment variables
-        
-        Creates a SimpleReranker with configuration loaded from environment.
-        環境変数から設定を読み込んでSimpleRerankerを作成します。
-        
-        Returns:
-            SimpleReranker instance configured from environment
-        """
-        config = SimpleRerankerConfig.from_env()
-        return cls(config=config)
     
     @classmethod
     def get_config_class(cls) -> Type[SimpleRerankerConfig]:

@@ -90,16 +90,6 @@ class TextLoader(Loader):
                 }
             )
     
-    @classmethod
-    def from_env(cls) -> "TextLoader":
-        """Create TextLoader instance from environment variables
-        
-        環境変数からTextLoaderインスタンスを作成
-        
-        Returns:
-            TextLoader instance configured from environment
-        """
-        return cls()
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration as dictionary

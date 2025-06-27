@@ -562,16 +562,6 @@ class TFIDFEmbedder(Embedder):
             fail_on_error=fail_on_error
         )
     
-    @classmethod
-    def from_env(cls) -> "TFIDFEmbedder":
-        """Create TFIDFEmbedder instance from environment variables
-        
-        環境変数からTFIDFEmbedderインスタンスを作成
-        
-        Returns:
-            TFIDFEmbedder instance configured from environment
-        """
-        return cls()
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration as dictionary

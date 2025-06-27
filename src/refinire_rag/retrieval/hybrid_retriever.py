@@ -163,18 +163,6 @@ class HybridRetriever(Retriever):
         logger.info(f"Initialized HybridRetriever with {len(self.retrievers)} retrievers "
                    f"using {self.config.fusion_method} fusion")
     
-    @classmethod
-    def from_env(cls) -> "HybridRetriever":
-        """Create HybridRetriever instance from environment variables
-        
-        Creates a HybridRetriever with configuration and dependencies loaded from environment.
-        環境変数から設定と依存関係を読み込んでHybridRetrieverを作成します。
-        
-        Returns:
-            HybridRetriever instance configured from environment
-        """
-        config = HybridRetrieverConfig.from_env()
-        return cls(config=config)
     
     @classmethod
     def get_config_class(cls) -> Type[HybridRetrieverConfig]:

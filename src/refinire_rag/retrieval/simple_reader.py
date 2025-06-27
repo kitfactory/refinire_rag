@@ -165,18 +165,6 @@ class SimpleAnswerSynthesizer(AnswerSynthesizer):
             logger.error("Neither Refinire nor OpenAI is available. SimpleAnswerSynthesizer will not work.")
             self._use_refinire = None
     
-    @classmethod
-    def from_env(cls) -> "SimpleAnswerSynthesizer":
-        """Create SimpleAnswerSynthesizer instance from environment variables
-        
-        Creates a SimpleAnswerSynthesizer with configuration loaded from environment.
-        環境変数から設定を読み込んでSimpleAnswerSynthesizerを作成します。
-        
-        Returns:
-            SimpleAnswerSynthesizer instance configured from environment
-        """
-        config = SimpleAnswerSynthesizerConfig.from_env()
-        return cls(config=config)
     
     @classmethod
     def get_config_class(cls) -> Type[SimpleAnswerSynthesizerConfig]:

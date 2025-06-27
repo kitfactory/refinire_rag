@@ -117,18 +117,6 @@ class SimpleRetriever(Retriever):
         else:
             logger.warning("SimpleRetriever initialized without vector_store")
     
-    @classmethod
-    def from_env(cls) -> "SimpleRetriever":
-        """Create SimpleRetriever instance from environment variables
-        
-        Creates a SimpleRetriever with configuration and dependencies loaded from environment.
-        環境変数から設定と依存関係を読み込んでSimpleRetrieverを作成します。
-        
-        Returns:
-            SimpleRetriever instance configured from environment
-        """
-        config = SimpleRetrieverConfig.from_env()
-        return cls(config=config)
     
     @classmethod
     def get_config_class(cls) -> Type[SimpleRetrieverConfig]:

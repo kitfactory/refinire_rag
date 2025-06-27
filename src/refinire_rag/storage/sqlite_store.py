@@ -723,16 +723,6 @@ class SQLiteDocumentStore(DocumentStore):
         except:
             pass
     
-    @classmethod
-    def from_env(cls) -> "SQLiteDocumentStore":
-        """Create SQLiteDocumentStore instance from environment variables
-        
-        環境変数からSQLiteDocumentStoreインスタンスを作成
-        
-        Returns:
-            SQLiteDocumentStore instance configured from environment
-        """
-        return cls()
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration as dictionary

@@ -57,15 +57,21 @@ class CorpusManager:
     - Knowledge graph file: {corpus_name}_knowledge_graph.md
     """
     
-    def __init__(self, document_store=None, retrievers=None, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, **kwargs):
         """Initialize CorpusManager
         
         Args:
-            document_store: DocumentStore for document persistence (optional, can be created from env)
-            retrievers: List of retrievers (VectorStore, KeywordSearch, etc.) or single retriever
-                       (optional, can be created from env)
-            config: Optional global configuration
+            **kwargs: Configuration parameters including:
+                - document_store: DocumentStore for document persistence (optional, can be created from env)
+                - retrievers: List of retrievers (VectorStore, KeywordSearch, etc.) or single retriever
+                             (optional, can be created from env)
+                - config: Optional global configuration dictionary
         """
+        # Extract components from kwargs
+        document_store = kwargs.pop('document_store', None)
+        retrievers = kwargs.pop('retrievers', None)
+        config = kwargs.pop('config', None)
+        
         # Initialize document store
         if document_store is None:
             self.document_store = self._create_document_store_from_env()
@@ -82,7 +88,9 @@ class CorpusManager:
             else:
                 self.retrievers = retrievers
         
+        # Merge config with remaining kwargs
         self.config = config or {}
+        self.config.update(kwargs)
         self.stats = CorpusStats()
         
         # Backward compatibility - set vector_store to first VectorStore found
@@ -91,16 +99,22 @@ class CorpusManager:
         logger.info(f"Initialized CorpusManager with DocumentStore: {type(self.document_store).__name__}, "
                    f"Retrievers: {[type(r).__name__ for r in self.retrievers]}")
     
-    @classmethod
-    def from_env(cls, config: Optional[Dict[str, Any]] = None):
-        """Create CorpusManager from environment variables
-        
-        環境変数からCorpusManagerを作成
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
         
         Returns:
-            CorpusManager instance configured from environment variables
+            Current configuration settings
         """
-        return cls(document_store=None, retrievers=None, config=config)
+        base_config = self.config.copy()
+        base_config.update({
+            'document_store_type': type(self.document_store).__name__,
+            'retriever_types': [type(r).__name__ for r in self.retrievers],
+            'vector_store_type': type(self.vector_store).__name__ if self.vector_store else None,
+            'total_files_processed': self.stats.total_files_processed,
+            'total_documents_created': self.stats.total_documents_created,
+            'total_chunks_created': self.stats.total_chunks_created
+        })
+        return base_config
     
     def _create_document_store_from_env(self):
         """Create document store from environment variables

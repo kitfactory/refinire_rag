@@ -17,20 +17,15 @@ class CharacterTextSplitter(Splitter):
     Processor that splits documents into chunks based on character count
     文字数ベースで文書を分割するプロセッサー
     """
-    def __init__(
-        self,
-        chunk_size: int = None,
-        overlap_size: int = None
-    ):
+    def __init__(self, **kwargs):
         """
         Initialize character splitter
         文字分割プロセッサーを初期化
 
         Args:
-            chunk_size: Maximum number of characters per chunk. If None, reads from REFINIRE_RAG_CHARACTER_CHUNK_SIZE environment variable (default: 1000)
-            チャンクサイズ: 各チャンクの最大文字数。Noneの場合、REFINIRE_RAG_CHARACTER_CHUNK_SIZE環境変数から読み取り (デフォルト: 1000)
-            overlap_size: Number of characters to overlap between chunks. If None, reads from REFINIRE_RAG_CHARACTER_OVERLAP environment variable (default: 0)
-            オーバーラップサイズ: チャンク間のオーバーラップ文字数。Noneの場合、REFINIRE_RAG_CHARACTER_OVERLAP環境変数から読み取り (デフォルト: 0)
+            **kwargs: Configuration parameters including:
+                - chunk_size: Maximum number of characters per chunk
+                - overlap_size: Number of characters to overlap between chunks
 
         Environment variables:
         環境変数:
@@ -39,12 +34,9 @@ class CharacterTextSplitter(Splitter):
             REFINIRE_RAG_CHARACTER_OVERLAP: Number of characters to overlap between chunks (default: 0)
             オーバーラップサイズ: チャンク間のオーバーラップ文字数 (デフォルト: 0)
         """
-        # Read from environment variables if arguments are not provided
-        # 引数が提供されていない場合は環境変数から読み取り
-        if chunk_size is None:
-            chunk_size = int(os.getenv('REFINIRE_RAG_CHARACTER_CHUNK_SIZE', '1000'))
-        if overlap_size is None:
-            overlap_size = int(os.getenv('REFINIRE_RAG_CHARACTER_OVERLAP', '0'))
+        # Get parameters from kwargs with environment variable fallback
+        chunk_size = kwargs.get('chunk_size', int(os.getenv('REFINIRE_RAG_CHARACTER_CHUNK_SIZE', '1000')))
+        overlap_size = kwargs.get('overlap_size', int(os.getenv('REFINIRE_RAG_CHARACTER_OVERLAP', '0')))
             
         super().__init__({
             'chunk_size': chunk_size,
@@ -52,6 +44,19 @@ class CharacterTextSplitter(Splitter):
         })
         self.chunk_size = chunk_size
         self.overlap_size = overlap_size
+
+    def get_config(self) -> dict:
+        """Get current configuration as dictionary
+        
+        Returns:
+            Current configuration settings
+        """
+        base_config = super().get_config() or {}
+        base_config.update({
+            'chunk_size': self.chunk_size,
+            'overlap_size': self.overlap_size
+        })
+        return base_config
 
     def process(self, documents: Iterable[Document], config: Optional[Any] = None) -> Iterator[Document]:
         """

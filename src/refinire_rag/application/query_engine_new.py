@@ -85,25 +85,40 @@ class QueryEngine:
     - REFINIRE_RAG_QUERY_ENGINE_ENABLE_QUERY_NORMALIZATION: Enable query normalization
     """
     
-    def __init__(self, 
-                 corpus_name: str,
-                 retrievers: Optional[Union[Any, List[Any]]] = None,
-                 reranker: Optional[Any] = None,
-                 synthesizer: Optional[Any] = None,
-                 config: Optional[QueryEngineConfig] = None):
+    def __init__(self, corpus_name: str = None, **kwargs):
         """Initialize QueryEngine
         
         Args:
             corpus_name: Name of the corpus for this query engine
-            retrievers: Retriever component(s) or None to load from environment
-            reranker: Reranker component or None to load from environment
-            synthesizer: Synthesizer component or None to load from environment
-            config: Configuration for the engine
+            **kwargs: Configuration parameters including:
+                - retrievers: Retriever component(s) or None to load from environment
+                - reranker: Reranker component or None to load from environment
+                - synthesizer: Synthesizer component or None to load from environment
+                - config: QueryEngineConfig instance or None for environment loading
+                - retriever_top_k: Top-K results per retriever
+                - total_top_k: Total top-K results after combining retrievers
+                - reranker_top_k: Top-K results after reranking
+                - enable_caching: Enable result caching
+                - enable_query_normalization: Enable query normalization
         """
-        self.corpus_name = corpus_name
+        # Get corpus name from kwargs or parameter
+        self.corpus_name = corpus_name or kwargs.get('corpus_name', os.getenv('REFINIRE_RAG_CORPUS_NAME', 'default'))
+        
+        # Extract components from kwargs
+        retrievers = kwargs.pop('retrievers', None)
+        reranker = kwargs.pop('reranker', None)
+        synthesizer = kwargs.pop('synthesizer', None)
+        config = kwargs.pop('config', None)
         
         # Load configuration from environment if not provided
-        self.config = config or self._load_config_from_env()
+        if config is None:
+            self.config = self._load_config_from_env()
+            # Override with any kwargs parameters
+            for key, value in kwargs.items():
+                if hasattr(self.config, key):
+                    setattr(self.config, key, value)
+        else:
+            self.config = config
         
         # Initialize components
         self.retrievers = self._initialize_retrievers(retrievers)
@@ -121,20 +136,27 @@ class QueryEngine:
                    f"reranker: {type(self.reranker).__name__ if self.reranker else 'None'}, "
                    f"synthesizer: {type(self.synthesizer).__name__ if self.synthesizer else 'None'}")
     
-    @classmethod
-    def from_env(cls, corpus_name: str, config: Optional[QueryEngineConfig] = None):
-        """Create QueryEngine from environment variables
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
         
-        環境変数からQueryEngineを作成
-        
-        Args:
-            corpus_name: Name of the corpus for this query engine
-            config: Optional configuration override
-            
         Returns:
-            QueryEngine instance configured from environment variables
+            Current configuration settings
         """
-        return cls(corpus_name=corpus_name, config=config)
+        return {
+            'corpus_name': self.corpus_name,
+            'retriever_top_k': self.config.retriever_top_k,
+            'total_top_k': self.config.total_top_k,
+            'reranker_top_k': self.config.reranker_top_k,
+            'synthesizer_max_context': self.config.synthesizer_max_context,
+            'enable_caching': self.config.enable_caching,
+            'cache_ttl': self.config.cache_ttl,
+            'include_sources': self.config.include_sources,
+            'include_confidence': self.config.include_confidence,
+            'include_processing_metadata': self.config.include_processing_metadata,
+            'deduplicate_results': self.config.deduplicate_results,
+            'combine_scores': self.config.combine_scores,
+            'enable_query_normalization': self.config.enable_query_normalization
+        }
     
     def _load_config_from_env(self) -> QueryEngineConfig:
         """Load configuration from environment variables"""

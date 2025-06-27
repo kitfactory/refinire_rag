@@ -140,27 +140,44 @@ class QualityLab:
     3. 詳細な評価レポートと分析
     """
     
-    def __init__(self, 
-                 corpus_manager: Optional[CorpusManager] = None,
-                 config: Optional[QualityLabConfig] = None,
-                 evaluation_store: Optional[SQLiteEvaluationStore] = None):
+    def __init__(self, **kwargs):
         """Initialize QualityLab
         
         Args:
-            corpus_manager: CorpusManager instance for document retrieval (None for env creation)
-                           文書取得用のCorpusManagerインスタンス（環境変数作成の場合はNone）
-            config: Configuration for the lab (None for env creation)
-                   ラボの設定（環境変数作成の場合はNone）
-            evaluation_store: Optional evaluation data store for persistence (None for env creation)
-                            評価データ永続化用のオプションストア（環境変数作成の場合はNone）
+            **kwargs: Configuration parameters including:
+                - corpus_manager: CorpusManager instance for document retrieval
+                - config: QualityLabConfig instance or None for environment loading
+                - evaluation_store: Optional evaluation data store for persistence
+                - qa_generation_model: Model for QA generation
+                - qa_pairs_per_document: Number of QA pairs per document
+                - question_types: List of question types to generate
+                - evaluation_timeout: Timeout for evaluation operations
+                - similarity_threshold: Similarity threshold for evaluation
+                - output_format: Output format for reports
+                - include_detailed_analysis: Whether to include detailed analysis
+                - include_contradiction_detection: Whether to include contradiction detection
         """
+        # Extract components from kwargs
+        corpus_manager = kwargs.pop('corpus_manager', None)
+        config = kwargs.pop('config', None)
+        evaluation_store = kwargs.pop('evaluation_store', None)
+        
         # Initialize from environment if components are None
         if corpus_manager is None:
-            self.corpus_manager = CorpusManager.from_env()
+            self.corpus_manager = CorpusManager()
         else:
             self.corpus_manager = corpus_manager
             
-        self.config = config or QualityLabConfig()
+        # Create config from environment if not provided
+        if config is None:
+            self.config = QualityLabConfig.from_env()
+            # Override with any kwargs parameters
+            if kwargs:
+                for key, value in kwargs.items():
+                    if hasattr(self.config, key):
+                        setattr(self.config, key, value)
+        else:
+            self.config = config
         
         if evaluation_store is None:
             db_path = os.getenv("REFINIRE_RAG_EVALUATION_DB_PATH", "./data/evaluation.db")
@@ -185,31 +202,22 @@ class QualityLab:
         
         logger.info(f"Initialized QualityLab with CorpusManager")
     
-    @classmethod
-    def from_env(cls) -> 'QualityLab':
-        """Create QualityLab from environment variables
-        環境変数からQualityLabを作成
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
         
         Returns:
-            QualityLab: Lab instance configured from environment variables
-                       環境変数から設定されたLabインスタンス
+            Current configuration settings
         """
-        logger.info("Creating QualityLab from environment variables")
-        
-        # Create all components from environment
-        corpus_manager = CorpusManager.from_env()
-        config = QualityLabConfig.from_env()
-        
-        # EvaluationStore path from environment
-        db_path = os.getenv("REFINIRE_RAG_EVALUATION_DB_PATH", "./data/evaluation.db")
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        evaluation_store = SQLiteEvaluationStore(db_path)
-        
-        return cls(
-            corpus_manager=corpus_manager,
-            config=config,
-            evaluation_store=evaluation_store
-        )
+        return {
+            'qa_generation_model': self.config.qa_generation_model,
+            'qa_pairs_per_document': self.config.qa_pairs_per_document,
+            'question_types': self.config.question_types,
+            'evaluation_timeout': self.config.evaluation_timeout,
+            'similarity_threshold': self.config.similarity_threshold,
+            'output_format': self.config.output_format,
+            'include_detailed_analysis': self.config.include_detailed_analysis,
+            'include_contradiction_detection': self.config.include_contradiction_detection
+        }
     
     def generate_qa_pairs(self, 
                          qa_set_name: str,

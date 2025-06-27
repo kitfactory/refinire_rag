@@ -107,16 +107,6 @@ class CSVLoader(Loader):
             except Exception as e:
                 raise Exception(f"Error processing CSV file {file_path}: {str(e)}")
     
-    @classmethod
-    def from_env(cls) -> "CSVLoader":
-        """Create CSVLoader instance from environment variables
-        
-        環境変数からCSVLoaderインスタンスを作成
-        
-        Returns:
-            CSVLoader instance configured from environment
-        """
-        return cls()
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration as dictionary

@@ -476,16 +476,6 @@ class OpenAIEmbedder(Embedder):
             user_identifier=user_identifier
         )
     
-    @classmethod
-    def from_env(cls) -> "OpenAIEmbedder":
-        """Create OpenAIEmbedder instance from environment variables
-        
-        環境変数からOpenAIEmbedderインスタンスを作成
-        
-        Returns:
-            OpenAIEmbedder instance configured from environment
-        """
-        return cls()
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration as dictionary

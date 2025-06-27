@@ -112,6 +112,17 @@ class ConcreteChunker(Chunker):
         """Test implementation of estimate_tokens"""
         # Simple estimation: split by whitespace
         return len(text.split()) if text.strip() else 0
+    
+    def get_config(self) -> dict:
+        """Test implementation of get_config"""
+        base_config = super().get_config() or {}
+        base_config.update({
+            'chunk_size': self.config.chunk_size,
+            'overlap': self.config.overlap,
+            'min_chunk_size': self.config.min_chunk_size,
+            'max_chunk_size': self.config.max_chunk_size
+        })
+        return base_config
 
 
 class TestChunkerBase:

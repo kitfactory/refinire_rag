@@ -392,16 +392,3 @@ class IncrementalDirectoryLoader(Loader):
         
         return config_dict
     
-    @classmethod
-    def from_env(cls, document_store: DocumentStore) -> "IncrementalDirectoryLoader":
-        """Create IncrementalDirectoryLoader instance from environment variables
-        
-        環境変数からIncrementalDirectoryLoaderインスタンスを作成
-        
-        Args:
-            document_store: Required DocumentStore instance
-        
-        Returns:
-            IncrementalDirectoryLoader instance configured from environment
-        """
-        return cls(document_store=document_store)
