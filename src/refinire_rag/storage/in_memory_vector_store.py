@@ -19,13 +19,22 @@ logger = logging.getLogger(__name__)
 class InMemoryVectorStore(VectorStore):
     """In-memory vector storage with exact similarity search"""
     
-    def __init__(self, similarity_metric: str = "cosine", config: Optional[Dict] = None):
+    def __init__(self, **kwargs):
         """Initialize in-memory vector store
         
         Args:
-            similarity_metric: Similarity metric to use ("cosine", "euclidean", "dot")
-            config: Optional configuration for DocumentProcessor
+            **kwargs: Configuration options
+                - similarity_metric (str): Similarity metric to use ("cosine", "euclidean", "dot") (default: "cosine", env: REFINIRE_RAG_INMEMORY_SIMILARITY_METRIC)
+                - config (dict): Optional configuration for DocumentProcessor
         """
+        import os
+        
+        # Extract keyword arguments with environment variable fallback
+        config = kwargs.get('config', {})
+        similarity_metric = kwargs.get('similarity_metric', 
+                                     config.get('similarity_metric',
+                                              os.getenv('REFINIRE_RAG_INMEMORY_SIMILARITY_METRIC', 'cosine')))
+        
         # Initialize parent classes
         vector_config = config or {"similarity_metric": similarity_metric}
         super().__init__(config=vector_config)
@@ -341,10 +350,15 @@ class InMemoryVectorStore(VectorStore):
             self._vector_matrix = None
             self._document_ids.clear()
     
-    @classmethod
-    def get_config_class(cls) -> Type[Dict]:
-        """Get the configuration class for this vector store"""
-        return Dict
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this vector store
+        
+        Returns:
+            Dictionary containing current configuration
+        """
+        return {
+            'similarity_metric': self.similarity_metric
+        }
     
     def _matches_filters(self, metadata: Dict[str, Any], filters: Dict[str, Any]) -> bool:
         """Check if metadata matches the given filters"""

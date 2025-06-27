@@ -224,3 +224,21 @@ class SimpleRetriever(Retriever):
             stats["vector_store_stats"] = self.vector_store.get_stats()
         
         return stats
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary"""
+        config_dict = {
+            'top_k': self.config.top_k,
+            'similarity_threshold': self.config.similarity_threshold,
+            'enable_filtering': self.config.enable_filtering,
+            'embedding_model': self.config.embedding_model,
+            'vector_store_name': self.config.vector_store_name,
+            'embedder_name': self.config.embedder_name
+        }
+        
+        # Add any additional attributes from the config
+        for attr_name, attr_value in self.config.__dict__.items():
+            if attr_name not in config_dict:
+                config_dict[attr_name] = attr_value
+                
+        return config_dict

@@ -5,11 +5,12 @@ ContradictionDetector - Claim Extraction + NLI Detection
 矛盾を検出するDocumentProcessor。
 """
 
-from typing import List, Dict, Any, Optional, Tuple, Set
+from typing import List, Dict, Any, Optional, Tuple, Set, Type
 from pydantic import BaseModel, Field
 from dataclasses import dataclass, field
 import re
 import json
+import os
 from pathlib import Path
 from enum import Enum
 
@@ -91,13 +92,138 @@ class ContradictionDetector(DocumentProcessor):
     ドキュメントからクレームを抽出し、NLIを使用して矛盾を検出します。
     """
     
-    @classmethod
-    def get_config_class(cls):
-        return ContradictionDetectorConfig
-    
-    def __init__(self, config: ContradictionDetectorConfig):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        """Initialize ContradictionDetector processor
+        
+        Args:
+            config: Optional ContradictionDetectorConfig object (for backward compatibility)
+            **kwargs: Configuration parameters, supports both individual parameters
+                     and config dict, with environment variable fallback
+        """
+        # Handle backward compatibility with config object
+        if config is not None and hasattr(config, 'enable_claim_extraction'):
+            # Traditional config object passed
+            super().__init__(config)
+            self.enable_claim_extraction = config.enable_claim_extraction
+            self.enable_nli_detection = config.enable_nli_detection
+            self.contradiction_threshold = config.contradiction_threshold
+            self.claim_confidence_threshold = config.claim_confidence_threshold
+            self.max_claims_per_document = config.max_claims_per_document
+            self.extract_factual_claims = config.extract_factual_claims
+            self.extract_evaluative_claims = config.extract_evaluative_claims
+            self.extract_causal_claims = config.extract_causal_claims
+            self.extract_comparative_claims = config.extract_comparative_claims
+            self.extract_temporal_claims = config.extract_temporal_claims
+            self.check_within_document = config.check_within_document
+            self.check_across_documents = config.check_across_documents
+            self.check_against_knowledge_base = config.check_against_knowledge_base
+            self.save_detected_contradictions = config.save_detected_contradictions
+            self.contradictions_output_file = config.contradictions_output_file
+        else:
+            # Extract config dict if provided
+            config_dict = kwargs.get('config', {})
+            
+            # Environment variable fallback with priority: kwargs > config dict > env vars > defaults
+            self.enable_claim_extraction = kwargs.get('enable_claim_extraction', 
+                                                     config_dict.get('enable_claim_extraction', 
+                                                                    os.getenv('REFINIRE_RAG_CONTRADICTION_CLAIM_EXTRACTION', 'true').lower() == 'true'))
+            self.enable_nli_detection = kwargs.get('enable_nli_detection', 
+                                                  config_dict.get('enable_nli_detection', 
+                                                                 os.getenv('REFINIRE_RAG_CONTRADICTION_NLI_DETECTION', 'true').lower() == 'true'))
+            self.contradiction_threshold = kwargs.get('contradiction_threshold', 
+                                                     config_dict.get('contradiction_threshold', 
+                                                                    float(os.getenv('REFINIRE_RAG_CONTRADICTION_THRESHOLD', '0.7'))))
+            self.claim_confidence_threshold = kwargs.get('claim_confidence_threshold', 
+                                                        config_dict.get('claim_confidence_threshold', 
+                                                                       float(os.getenv('REFINIRE_RAG_CONTRADICTION_CLAIM_CONFIDENCE', '0.3'))))
+            self.max_claims_per_document = kwargs.get('max_claims_per_document', 
+                                                     config_dict.get('max_claims_per_document', 
+                                                                    int(os.getenv('REFINIRE_RAG_CONTRADICTION_MAX_CLAIMS', '20'))))
+            self.extract_factual_claims = kwargs.get('extract_factual_claims', 
+                                                    config_dict.get('extract_factual_claims', 
+                                                                   os.getenv('REFINIRE_RAG_CONTRADICTION_FACTUAL', 'true').lower() == 'true'))
+            self.extract_evaluative_claims = kwargs.get('extract_evaluative_claims', 
+                                                       config_dict.get('extract_evaluative_claims', 
+                                                                      os.getenv('REFINIRE_RAG_CONTRADICTION_EVALUATIVE', 'true').lower() == 'true'))
+            self.extract_causal_claims = kwargs.get('extract_causal_claims', 
+                                                   config_dict.get('extract_causal_claims', 
+                                                                  os.getenv('REFINIRE_RAG_CONTRADICTION_CAUSAL', 'true').lower() == 'true'))
+            self.extract_comparative_claims = kwargs.get('extract_comparative_claims', 
+                                                        config_dict.get('extract_comparative_claims', 
+                                                                       os.getenv('REFINIRE_RAG_CONTRADICTION_COMPARATIVE', 'false').lower() == 'true'))
+            self.extract_temporal_claims = kwargs.get('extract_temporal_claims', 
+                                                     config_dict.get('extract_temporal_claims', 
+                                                                    os.getenv('REFINIRE_RAG_CONTRADICTION_TEMPORAL', 'false').lower() == 'true'))
+            self.check_within_document = kwargs.get('check_within_document', 
+                                                   config_dict.get('check_within_document', 
+                                                                  os.getenv('REFINIRE_RAG_CONTRADICTION_WITHIN_DOC', 'true').lower() == 'true'))
+            self.check_across_documents = kwargs.get('check_across_documents', 
+                                                    config_dict.get('check_across_documents', 
+                                                                   os.getenv('REFINIRE_RAG_CONTRADICTION_ACROSS_DOCS', 'true').lower() == 'true'))
+            self.check_against_knowledge_base = kwargs.get('check_against_knowledge_base', 
+                                                          config_dict.get('check_against_knowledge_base', 
+                                                                         os.getenv('REFINIRE_RAG_CONTRADICTION_KNOWLEDGE_BASE', 'false').lower() == 'true'))
+            self.save_detected_contradictions = kwargs.get('save_detected_contradictions', 
+                                                          config_dict.get('save_detected_contradictions', 
+                                                                         os.getenv('REFINIRE_RAG_CONTRADICTION_SAVE', 'true').lower() == 'true'))
+            self.contradictions_output_file = kwargs.get('contradictions_output_file', 
+                                                        config_dict.get('contradictions_output_file', 
+                                                                       os.getenv('REFINIRE_RAG_CONTRADICTION_OUTPUT_FILE')))
+            
+            # Create config object for backward compatibility
+            config = ContradictionDetectorConfig(
+                enable_claim_extraction=self.enable_claim_extraction,
+                enable_nli_detection=self.enable_nli_detection,
+                contradiction_threshold=self.contradiction_threshold,
+                claim_confidence_threshold=self.claim_confidence_threshold,
+                max_claims_per_document=self.max_claims_per_document,
+                extract_factual_claims=self.extract_factual_claims,
+                extract_evaluative_claims=self.extract_evaluative_claims,
+                extract_causal_claims=self.extract_causal_claims,
+                extract_comparative_claims=self.extract_comparative_claims,
+                extract_temporal_claims=self.extract_temporal_claims,
+                check_within_document=self.check_within_document,
+                check_across_documents=self.check_across_documents,
+                check_against_knowledge_base=self.check_against_knowledge_base,
+                save_detected_contradictions=self.save_detected_contradictions,
+                contradictions_output_file=self.contradictions_output_file
+            )
+            
+            super().__init__(config)
+        
         self.extracted_claims: List[Claim] = []
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        
+        Returns:
+            Dict[str, Any]: Current configuration dictionary
+        """
+        return {
+            'enable_claim_extraction': self.enable_claim_extraction,
+            'enable_nli_detection': self.enable_nli_detection,
+            'contradiction_threshold': self.contradiction_threshold,
+            'claim_confidence_threshold': self.claim_confidence_threshold,
+            'max_claims_per_document': self.max_claims_per_document,
+            'extract_factual_claims': self.extract_factual_claims,
+            'extract_evaluative_claims': self.extract_evaluative_claims,
+            'extract_causal_claims': self.extract_causal_claims,
+            'extract_comparative_claims': self.extract_comparative_claims,
+            'extract_temporal_claims': self.extract_temporal_claims,
+            'check_within_document': self.check_within_document,
+            'check_across_documents': self.check_across_documents,
+            'check_against_knowledge_base': self.check_against_knowledge_base,
+            'save_detected_contradictions': self.save_detected_contradictions,
+            'contradictions_output_file': self.contradictions_output_file
+        }
+    
+    @classmethod
+    def get_config_class(cls) -> Type[ContradictionDetectorConfig]:
+        """Get the configuration class for this processor (backward compatibility)
+        このプロセッサーの設定クラスを取得（下位互換性）
+        """
+        return ContradictionDetectorConfig
         self.detected_contradictions: List[ContradictionPair] = []
         self.claim_patterns = self._initialize_claim_patterns()
     

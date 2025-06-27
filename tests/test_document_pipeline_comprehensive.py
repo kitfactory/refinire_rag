@@ -66,6 +66,15 @@ class MockProcessor(DocumentProcessor):
                 )
                 yield output_doc
     
+    def get_config(self):
+        """Get current configuration as dictionary"""
+        return {
+            'name': self.name,
+            'should_error': self.should_error,
+            'output_multiplier': self.output_multiplier,
+            'processing_delay': self.processing_delay
+        }
+    
     def get_processing_stats(self):
         """Mock stats method"""
         return {
@@ -671,6 +680,9 @@ class TestDocumentPipelineEdgeCases:
                     self.call_count += 1
                 # Returns no documents
                 return iter([])
+            
+            def get_config(self):
+                return {"type": "EmptyProcessor"}
             
             def get_processing_stats(self):
                 return {"documents_processed": self.call_count, "processing_time": 0.0, "errors_encountered": 0}

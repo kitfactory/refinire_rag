@@ -296,6 +296,23 @@ Answer:"""
         })
         
         return stats
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary"""
+        config_dict = {
+            'llm_model': self.config.llm_model,
+            'max_context_length': self.config.max_context_length,
+            'max_answer_length': self.config.max_answer_length,
+            'include_source_info': self.config.include_source_info,
+            'temperature': self.config.temperature
+        }
+        
+        # Add any additional attributes from the config
+        for attr_name, attr_value in self.config.__dict__.items():
+            if attr_name not in config_dict:
+                config_dict[attr_name] = attr_value
+                
+        return config_dict
 
 
 # Aliases for backward compatibility and simpler usage

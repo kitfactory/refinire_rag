@@ -359,3 +359,26 @@ class IncrementalDirectoryLoader(Loader):
         return (f"IncrementalDirectoryLoader(directory_path={self.directory_path}, "
                 f"recursive={self.recursive}, "
                 f"filter_config={self.filter_config is not None})")
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary"""
+        base_config = super().get_config()
+        
+        config_dict = {
+            **base_config,
+            'directory_path': str(self.directory_path),
+            'recursive': self.recursive,
+            'has_filter_config': self.filter_config is not None,
+            'document_store_type': type(self.document_store).__name__ if self.document_store else None,
+            'file_tracker_type': type(self.file_tracker).__name__
+        }
+        
+        # Add filter config details if available
+        if self.filter_config:
+            config_dict['filter_config'] = {
+                'has_filters': self.filter_config.has_filters(),
+                'extensions': getattr(self.filter_config, 'allowed_extensions', None),
+                'patterns': getattr(self.filter_config, 'include_patterns', None)
+            }
+        
+        return config_dict

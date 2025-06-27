@@ -134,6 +134,14 @@ class MockDocumentProcessor(DocumentProcessor):
             
             self.processed_documents.append(processed_doc)
             yield processed_doc
+    
+    def get_config(self):
+        """Get current configuration as dictionary"""
+        return {
+            'should_error': self.should_error,
+            'delay': self.delay,
+            'config': self.config
+        }
 
 
 class TestDocumentProcessor:

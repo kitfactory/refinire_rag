@@ -27,22 +27,33 @@ class TFIDFKeywordStore(KeywordSearch):
     scikit-learnのTfidfVectorizerを使用したシンプルな実装。
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, **kwargs):
         """
         Initialize TF-IDF keyword store
         TF-IDFキーワードストアを初期化
         
         Args:
-            config: KeywordStore configuration
-                   KeywordStore設定
+            **kwargs: Configuration options
+                - top_k (int): Maximum number of results to return (default: 10, env: REFINIRE_RAG_TFIDF_TOP_K)
+                - similarity_threshold (float): Minimum similarity threshold (default: 0.0, env: REFINIRE_RAG_TFIDF_SIMILARITY_THRESHOLD)
+                - enable_filtering (bool): Enable metadata filtering (default: True, env: REFINIRE_RAG_TFIDF_ENABLE_FILTERING)
         """
-        super().__init__(config or {})
+        import os
         
-        # Create a config object with default values
+        config = kwargs.pop('config', None) or {}
+        super().__init__(config)
+        
+        # Get values from kwargs, config dict, environment variables, then defaults
         self.config = type('Config', (), {
-            'top_k': (config or {}).get('top_k', 10),
-            'similarity_threshold': (config or {}).get('similarity_threshold', 0.0),
-            'enable_filtering': (config or {}).get('enable_filtering', True)
+            'top_k': kwargs.get('top_k', 
+                               config.get('top_k', 
+                                        int(os.getenv('REFINIRE_RAG_TFIDF_TOP_K', '10')))),
+            'similarity_threshold': kwargs.get('similarity_threshold', 
+                                             config.get('similarity_threshold', 
+                                                      float(os.getenv('REFINIRE_RAG_TFIDF_SIMILARITY_THRESHOLD', '0.0')))),
+            'enable_filtering': kwargs.get('enable_filtering', 
+                                         config.get('enable_filtering', 
+                                                  os.getenv('REFINIRE_RAG_TFIDF_ENABLE_FILTERING', 'true').lower() == 'true'))
         })()
         
         self.documents: Dict[str, Document] = {}
@@ -406,10 +417,17 @@ class TFIDFKeywordStore(KeywordSearch):
         
         return stats
     
-    @classmethod
-    def get_config_class(cls):
-        """Get the configuration class for this keyword search"""
-        return dict  # Simple dict config for TF-IDF
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this keyword search
+        
+        Returns:
+            Dictionary containing current configuration
+        """
+        return {
+            'top_k': self.config.top_k,
+            'similarity_threshold': self.config.similarity_threshold,
+            'enable_filtering': self.config.enable_filtering
+        }
     
     def add_document(self, document: Document) -> None:
         """Add a document to the store (alias for index_document)"""

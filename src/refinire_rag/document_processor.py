@@ -91,6 +91,17 @@ class DocumentProcessor(ABC):
         """
         pass
     
+    @abstractmethod
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        
+        Returns:
+            Dict[str, Any]: Current configuration dictionary
+                           現在の設定辞書
+        """
+        pass
+    
     def process_with_stats(self, document: Document, config: Optional[Any] = None) -> List[Document]:
         """Process a single document with statistics tracking
         統計追跡付きで単一文書を処理

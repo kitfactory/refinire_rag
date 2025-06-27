@@ -6,9 +6,10 @@ using a Markdown dictionary file created by DictionaryMaker.
 """
 
 import logging
+import os
 import re
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Type, Tuple
+from typing import List, Dict, Optional, Type, Tuple, Any
 from pathlib import Path
 
 from ..document_processor import DocumentProcessor, DocumentProcessorConfig
@@ -62,13 +63,109 @@ class Normalizer(DocumentProcessor):
     5. Expands abbreviations with full forms
     """
     
-    def __init__(self, config: Optional[NormalizerConfig] = None):
+    def __init__(self, config=None, **kwargs):
         """Initialize Normalizer processor
         
         Args:
-            config: Configuration for the processor
+            config: Optional NormalizerConfig object (for backward compatibility)
+            **kwargs: Configuration parameters, supports both individual parameters
+                     and config dict, with environment variable fallback
         """
-        super().__init__(config or NormalizerConfig())
+        # Handle backward compatibility with config object
+        if config is not None and hasattr(config, 'dictionary_file_path'):
+            # Traditional config object passed
+            super().__init__(config)
+            self.dictionary_file_path = config.dictionary_file_path
+            self.auto_detect_dictionary_path = config.auto_detect_dictionary_path
+            self.normalize_variations = config.normalize_variations
+            self.expand_abbreviations = config.expand_abbreviations
+            self.standardize_technical_terms = config.standardize_technical_terms
+            self.case_sensitive_replacement = config.case_sensitive_replacement
+            self.whole_word_only = config.whole_word_only
+            self.preserve_original_in_parentheses = config.preserve_original_in_parentheses
+            self.skip_if_no_dictionary = config.skip_if_no_dictionary
+            self.validate_replacements = config.validate_replacements
+            self.max_replacements_per_term = config.max_replacements_per_term
+            self.add_normalization_metadata = config.add_normalization_metadata
+            self.preserve_original_document = config.preserve_original_document
+            
+            # Add processing statistics and logging for traditional config path too
+            self._normalization_mappings = {}
+            self._dictionary_last_modified = None
+            
+            self.processing_stats.update({
+                "documents_processed": 0,
+                "total_replacements": 0,
+                "variations_normalized": 0,
+                "abbreviations_expanded": 0,
+                "dictionary_load_errors": 0
+            })
+            
+            logger.info(f"Initialized Normalizer with dictionary: {self.dictionary_file_path}")
+            return
+        
+        # Extract config dict if provided
+        config_dict = kwargs.get('config', {})
+        
+        # Environment variable fallback with priority: kwargs > config dict > env vars > defaults
+        self.dictionary_file_path = kwargs.get('dictionary_file_path', 
+                                             config_dict.get('dictionary_file_path', 
+                                                            os.getenv('REFINIRE_RAG_NORMALIZER_DICTIONARY_PATH', './domain_dictionary.md')))
+        self.auto_detect_dictionary_path = kwargs.get('auto_detect_dictionary_path', 
+                                                     config_dict.get('auto_detect_dictionary_path', 
+                                                                    os.getenv('REFINIRE_RAG_NORMALIZER_AUTO_DETECT', 'true').lower() == 'true'))
+        self.normalize_variations = kwargs.get('normalize_variations', 
+                                              config_dict.get('normalize_variations', 
+                                                             os.getenv('REFINIRE_RAG_NORMALIZER_VARIATIONS', 'true').lower() == 'true'))
+        self.expand_abbreviations = kwargs.get('expand_abbreviations', 
+                                              config_dict.get('expand_abbreviations', 
+                                                             os.getenv('REFINIRE_RAG_NORMALIZER_ABBREVIATIONS', 'true').lower() == 'true'))
+        self.standardize_technical_terms = kwargs.get('standardize_technical_terms', 
+                                                     config_dict.get('standardize_technical_terms', 
+                                                                    os.getenv('REFINIRE_RAG_NORMALIZER_TECHNICAL_TERMS', 'true').lower() == 'true'))
+        self.case_sensitive_replacement = kwargs.get('case_sensitive_replacement', 
+                                                    config_dict.get('case_sensitive_replacement', 
+                                                                   os.getenv('REFINIRE_RAG_NORMALIZER_CASE_SENSITIVE', 'false').lower() == 'true'))
+        self.whole_word_only = kwargs.get('whole_word_only', 
+                                         config_dict.get('whole_word_only', 
+                                                        os.getenv('REFINIRE_RAG_NORMALIZER_WHOLE_WORD', 'true').lower() == 'true'))
+        self.preserve_original_in_parentheses = kwargs.get('preserve_original_in_parentheses', 
+                                                          config_dict.get('preserve_original_in_parentheses', 
+                                                                         os.getenv('REFINIRE_RAG_NORMALIZER_PRESERVE_ORIGINAL', 'true').lower() == 'true'))
+        self.skip_if_no_dictionary = kwargs.get('skip_if_no_dictionary', 
+                                               config_dict.get('skip_if_no_dictionary', 
+                                                              os.getenv('REFINIRE_RAG_NORMALIZER_SKIP_NO_DICT', 'false').lower() == 'true'))
+        self.validate_replacements = kwargs.get('validate_replacements', 
+                                               config_dict.get('validate_replacements', 
+                                                              os.getenv('REFINIRE_RAG_NORMALIZER_VALIDATE', 'true').lower() == 'true'))
+        self.max_replacements_per_term = kwargs.get('max_replacements_per_term', 
+                                                   config_dict.get('max_replacements_per_term', 
+                                                                  int(os.getenv('REFINIRE_RAG_NORMALIZER_MAX_REPLACEMENTS', '1000'))))
+        self.add_normalization_metadata = kwargs.get('add_normalization_metadata', 
+                                                    config_dict.get('add_normalization_metadata', 
+                                                                   os.getenv('REFINIRE_RAG_NORMALIZER_ADD_METADATA', 'true').lower() == 'true'))
+        self.preserve_original_document = kwargs.get('preserve_original_document', 
+                                                   config_dict.get('preserve_original_document', 
+                                                                  os.getenv('REFINIRE_RAG_NORMALIZER_PRESERVE_ORIGINAL', 'true').lower() == 'true'))
+        
+        # Create config object for backward compatibility
+        config = NormalizerConfig(
+            dictionary_file_path=self.dictionary_file_path,
+            auto_detect_dictionary_path=self.auto_detect_dictionary_path,
+            normalize_variations=self.normalize_variations,
+            expand_abbreviations=self.expand_abbreviations,
+            standardize_technical_terms=self.standardize_technical_terms,
+            case_sensitive_replacement=self.case_sensitive_replacement,
+            whole_word_only=self.whole_word_only,
+            preserve_original_in_parentheses=self.preserve_original_in_parentheses,
+            skip_if_no_dictionary=self.skip_if_no_dictionary,
+            validate_replacements=self.validate_replacements,
+            max_replacements_per_term=self.max_replacements_per_term,
+            add_normalization_metadata=self.add_normalization_metadata,
+            preserve_original_document=self.preserve_original_document
+        )
+        
+        super().__init__(config)
         
         # Cached normalization mappings
         self._normalization_mappings = {}
@@ -83,11 +180,36 @@ class Normalizer(DocumentProcessor):
             "dictionary_load_errors": 0
         })
         
-        logger.info(f"Initialized Normalizer with dictionary: {self.config.dictionary_file_path}")
+        logger.info(f"Initialized Normalizer with dictionary: {self.dictionary_file_path}")
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        
+        Returns:
+            Dict[str, Any]: Current configuration dictionary
+        """
+        return {
+            'dictionary_file_path': self.dictionary_file_path,
+            'auto_detect_dictionary_path': self.auto_detect_dictionary_path,
+            'normalize_variations': self.normalize_variations,
+            'expand_abbreviations': self.expand_abbreviations,
+            'standardize_technical_terms': self.standardize_technical_terms,
+            'case_sensitive_replacement': self.case_sensitive_replacement,
+            'whole_word_only': self.whole_word_only,
+            'preserve_original_in_parentheses': self.preserve_original_in_parentheses,
+            'skip_if_no_dictionary': self.skip_if_no_dictionary,
+            'validate_replacements': self.validate_replacements,
+            'max_replacements_per_term': self.max_replacements_per_term,
+            'add_normalization_metadata': self.add_normalization_metadata,
+            'preserve_original_document': self.preserve_original_document
+        }
     
     @classmethod
     def get_config_class(cls) -> Type[NormalizerConfig]:
-        """Get the configuration class for this processor"""
+        """Get the configuration class for this processor (backward compatibility)
+        このプロセッサーの設定クラスを取得（下位互換性）
+        """
         return NormalizerConfig
     
     def process(self, document: Document, config: Optional[NormalizerConfig] = None) -> List[Document]:
@@ -417,7 +539,7 @@ class Normalizer(DocumentProcessor):
         Returns:
             Number of normalization mappings loaded
         """
-        path = dictionary_path or self.config.dictionary_file_path
+        path = dictionary_path or self.dictionary_file_path
         if path:
             # Force reload by clearing cache
             self._dictionary_last_modified = None
@@ -429,7 +551,7 @@ class Normalizer(DocumentProcessor):
         """Get normalization statistics"""
         return {
             **self.get_processing_stats(),
-            "dictionary_file": self.config.dictionary_file_path,
+            "dictionary_file": self.dictionary_file_path,
             "mappings_loaded": len(self._normalization_mappings),
-            "auto_detect_dictionary": self.config.auto_detect_dictionary_path
+            "auto_detect_dictionary": self.auto_detect_dictionary_path
         }

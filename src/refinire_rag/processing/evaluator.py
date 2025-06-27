@@ -5,10 +5,11 @@ Evaluator - Metrics Aggregation
 複数の評価指標を統合して包括的な評価レポートを生成します。
 """
 
-from typing import List, Dict, Any, Optional, Union
+from typing import List, Dict, Any, Optional, Union, Type
 from pydantic import BaseModel, Field
 from dataclasses import dataclass, field
 import json
+import os
 import statistics
 from pathlib import Path
 
@@ -83,15 +84,103 @@ class Evaluator(DocumentProcessor):
     テスト結果ドキュメントを処理し、システム性能の包括的な評価を行います。
     """
     
-    @classmethod
-    def get_config_class(cls):
-        return EvaluatorConfig
-    
-    def __init__(self, config: EvaluatorConfig):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        """Initialize Evaluator processor
+        
+        Args:
+            config: Optional EvaluatorConfig object (for backward compatibility)
+            **kwargs: Configuration parameters, supports both individual parameters
+                     and config dict, with environment variable fallback
+        """
+        # Handle backward compatibility with config object
+        if config is not None and hasattr(config, 'include_category_analysis'):
+            # Traditional config object passed
+            super().__init__(config)
+            self.include_category_analysis = config.include_category_analysis
+            self.include_temporal_analysis = config.include_temporal_analysis
+            self.include_failure_analysis = config.include_failure_analysis
+            self.confidence_threshold = config.confidence_threshold
+            self.response_time_threshold = config.response_time_threshold
+            self.accuracy_threshold = config.accuracy_threshold
+            self.output_format = config.output_format
+            self.metric_weights = config.metric_weights
+        else:
+            # Extract config dict if provided
+            config_dict = kwargs.get('config', {})
+            
+            # Environment variable fallback with priority: kwargs > config dict > env vars > defaults
+            self.include_category_analysis = kwargs.get('include_category_analysis', 
+                                                       config_dict.get('include_category_analysis', 
+                                                                      os.getenv('REFINIRE_RAG_EVALUATOR_CATEGORY_ANALYSIS', 'true').lower() == 'true'))
+            self.include_temporal_analysis = kwargs.get('include_temporal_analysis', 
+                                                       config_dict.get('include_temporal_analysis', 
+                                                                      os.getenv('REFINIRE_RAG_EVALUATOR_TEMPORAL_ANALYSIS', 'false').lower() == 'true'))
+            self.include_failure_analysis = kwargs.get('include_failure_analysis', 
+                                                      config_dict.get('include_failure_analysis', 
+                                                                     os.getenv('REFINIRE_RAG_EVALUATOR_FAILURE_ANALYSIS', 'true').lower() == 'true'))
+            self.confidence_threshold = kwargs.get('confidence_threshold', 
+                                                  config_dict.get('confidence_threshold', 
+                                                                 float(os.getenv('REFINIRE_RAG_EVALUATOR_CONFIDENCE_THRESHOLD', '0.7'))))
+            self.response_time_threshold = kwargs.get('response_time_threshold', 
+                                                     config_dict.get('response_time_threshold', 
+                                                                    float(os.getenv('REFINIRE_RAG_EVALUATOR_RESPONSE_TIME_THRESHOLD', '2.0'))))
+            self.accuracy_threshold = kwargs.get('accuracy_threshold', 
+                                                config_dict.get('accuracy_threshold', 
+                                                               float(os.getenv('REFINIRE_RAG_EVALUATOR_ACCURACY_THRESHOLD', '0.8'))))
+            self.output_format = kwargs.get('output_format', 
+                                           config_dict.get('output_format', 
+                                                          os.getenv('REFINIRE_RAG_EVALUATOR_OUTPUT_FORMAT', 'markdown')))
+            self.metric_weights = kwargs.get('metric_weights', 
+                                            config_dict.get('metric_weights', {
+                                                "accuracy": 0.3,
+                                                "response_time": 0.2,
+                                                "confidence": 0.2,
+                                                "source_accuracy": 0.15,
+                                                "coverage": 0.15
+                                            }))
+            
+            # Create config object for backward compatibility
+            config = EvaluatorConfig(
+                include_category_analysis=self.include_category_analysis,
+                include_temporal_analysis=self.include_temporal_analysis,
+                include_failure_analysis=self.include_failure_analysis,
+                confidence_threshold=self.confidence_threshold,
+                response_time_threshold=self.response_time_threshold,
+                accuracy_threshold=self.accuracy_threshold,
+                output_format=self.output_format,
+                metric_weights=self.metric_weights
+            )
+            
+            super().__init__(config)
+        
         self.evaluation_results: List[Dict[str, Any]] = []
         self.computed_metrics: Optional[EvaluationMetrics] = None
         self.category_metrics: Dict[str, CategoryMetrics] = {}
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        
+        Returns:
+            Dict[str, Any]: Current configuration dictionary
+        """
+        return {
+            'include_category_analysis': self.include_category_analysis,
+            'include_temporal_analysis': self.include_temporal_analysis,
+            'include_failure_analysis': self.include_failure_analysis,
+            'confidence_threshold': self.confidence_threshold,
+            'response_time_threshold': self.response_time_threshold,
+            'accuracy_threshold': self.accuracy_threshold,
+            'output_format': self.output_format,
+            'metric_weights': self.metric_weights
+        }
+    
+    @classmethod
+    def get_config_class(cls) -> Type[EvaluatorConfig]:
+        """Get the configuration class for this processor (backward compatibility)
+        このプロセッサーの設定クラスを取得（下位互換性）
+        """
+        return EvaluatorConfig
     
     def process(self, document: Document) -> List[Document]:
         """
@@ -116,13 +205,13 @@ class Evaluator(DocumentProcessor):
         
         # カテゴリ別分析
         category_analysis = {}
-        if self.config.include_category_analysis:
+        if self.include_category_analysis:
             category_analysis = self._analyze_by_category(test_results)
             self.category_metrics.update(category_analysis)
         
         # 失敗分析
         failure_analysis = {}
-        if self.config.include_failure_analysis:
+        if self.include_failure_analysis:
             failure_analysis = self._analyze_failures(test_results)
         
         # 評価レポートドキュメントを作成

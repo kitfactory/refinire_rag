@@ -6,9 +6,10 @@ token count, sentence boundaries, and configurable overlap.
 """
 
 import logging
+import os
 import re
 from dataclasses import dataclass
-from typing import List, Optional, Type
+from typing import List, Optional, Type, Dict, Any
 from uuid import uuid4
 
 from ..document_processor import DocumentProcessor, DocumentProcessorConfig
@@ -50,13 +51,92 @@ class Chunker(DocumentProcessor):
     maintains lineage information pointing back to the original document.
     """
     
-    def __init__(self, config: Optional[ChunkingConfig] = None):
+    def __init__(self, config=None, **kwargs):
         """Initialize Chunker processor
         
         Args:
-            config: Configuration for the processor
+            config: Optional ChunkingConfig object (for backward compatibility)
+            **kwargs: Configuration parameters, supports both individual parameters
+                     and config dict, with environment variable fallback
         """
-        super().__init__(config or ChunkingConfig())
+        # Handle backward compatibility with config object
+        if config is not None and hasattr(config, 'chunk_size'):
+            # Traditional config object passed
+            super().__init__(config)
+            self.chunk_size = config.chunk_size
+            self.overlap = config.overlap
+            self.split_by_sentence = config.split_by_sentence
+            self.min_chunk_size = config.min_chunk_size
+            self.max_chunk_size = config.max_chunk_size
+            self.preserve_paragraphs = config.preserve_paragraphs
+            self.strip_whitespace = config.strip_whitespace
+            self.add_chunk_metadata = config.add_chunk_metadata
+            self.preserve_original_metadata = config.preserve_original_metadata
+            self.chunking_strategy = config.chunking_strategy
+            
+            # Add processing statistics and logging for traditional config path too
+            self.processing_stats.update({
+                "documents_processed": 0,
+                "chunks_created": 0,
+                "total_tokens_processed": 0,
+                "average_chunk_size": 0.0,
+                "overlap_tokens": 0
+            })
+            
+            logger.info(f"Initialized Chunker with chunk_size={self.chunk_size}, "
+                       f"overlap={self.overlap}")
+            return
+        
+        # Extract config dict if provided
+        config_dict = kwargs.get('config', {})
+        
+        # Environment variable fallback with priority: kwargs > config dict > env vars > defaults
+        self.chunk_size = kwargs.get('chunk_size', 
+                                   config_dict.get('chunk_size', 
+                                                  int(os.getenv('REFINIRE_RAG_CHUNK_SIZE', '512'))))
+        self.overlap = kwargs.get('overlap', 
+                                config_dict.get('overlap', 
+                                               int(os.getenv('REFINIRE_RAG_CHUNK_OVERLAP', '50'))))
+        self.split_by_sentence = kwargs.get('split_by_sentence', 
+                                          config_dict.get('split_by_sentence', 
+                                                         os.getenv('REFINIRE_RAG_CHUNK_SPLIT_BY_SENTENCE', 'true').lower() == 'true'))
+        self.min_chunk_size = kwargs.get('min_chunk_size', 
+                                        config_dict.get('min_chunk_size', 
+                                                       int(os.getenv('REFINIRE_RAG_CHUNK_MIN_SIZE', '50'))))
+        self.max_chunk_size = kwargs.get('max_chunk_size', 
+                                        config_dict.get('max_chunk_size', 
+                                                       int(os.getenv('REFINIRE_RAG_CHUNK_MAX_SIZE', '1024'))))
+        self.preserve_paragraphs = kwargs.get('preserve_paragraphs', 
+                                             config_dict.get('preserve_paragraphs', 
+                                                            os.getenv('REFINIRE_RAG_CHUNK_PRESERVE_PARAGRAPHS', 'true').lower() == 'true'))
+        self.strip_whitespace = kwargs.get('strip_whitespace', 
+                                          config_dict.get('strip_whitespace', 
+                                                         os.getenv('REFINIRE_RAG_CHUNK_STRIP_WHITESPACE', 'true').lower() == 'true'))
+        self.add_chunk_metadata = kwargs.get('add_chunk_metadata', 
+                                            config_dict.get('add_chunk_metadata', 
+                                                           os.getenv('REFINIRE_RAG_CHUNK_ADD_METADATA', 'true').lower() == 'true'))
+        self.preserve_original_metadata = kwargs.get('preserve_original_metadata', 
+                                                    config_dict.get('preserve_original_metadata', 
+                                                                   os.getenv('REFINIRE_RAG_CHUNK_PRESERVE_ORIGINAL_METADATA', 'true').lower() == 'true'))
+        self.chunking_strategy = kwargs.get('chunking_strategy', 
+                                           config_dict.get('chunking_strategy', 
+                                                          os.getenv('REFINIRE_RAG_CHUNK_STRATEGY', 'token_based')))
+        
+        # Create config object for backward compatibility
+        config = ChunkingConfig(
+            chunk_size=self.chunk_size,
+            overlap=self.overlap,
+            split_by_sentence=self.split_by_sentence,
+            min_chunk_size=self.min_chunk_size,
+            max_chunk_size=self.max_chunk_size,
+            preserve_paragraphs=self.preserve_paragraphs,
+            strip_whitespace=self.strip_whitespace,
+            add_chunk_metadata=self.add_chunk_metadata,
+            preserve_original_metadata=self.preserve_original_metadata,
+            chunking_strategy=self.chunking_strategy
+        )
+        
+        super().__init__(config)
         
         # Processing statistics
         self.processing_stats.update({
@@ -67,12 +147,34 @@ class Chunker(DocumentProcessor):
             "overlap_tokens": 0
         })
         
-        logger.info(f"Initialized Chunker with chunk_size={self.config.chunk_size}, "
-                   f"overlap={self.config.overlap}")
+        logger.info(f"Initialized Chunker with chunk_size={self.chunk_size}, "
+                   f"overlap={self.overlap}")
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        
+        Returns:
+            Dict[str, Any]: Current configuration dictionary
+        """
+        return {
+            'chunk_size': self.chunk_size,
+            'overlap': self.overlap,
+            'split_by_sentence': self.split_by_sentence,
+            'min_chunk_size': self.min_chunk_size,
+            'max_chunk_size': self.max_chunk_size,
+            'preserve_paragraphs': self.preserve_paragraphs,
+            'strip_whitespace': self.strip_whitespace,
+            'add_chunk_metadata': self.add_chunk_metadata,
+            'preserve_original_metadata': self.preserve_original_metadata,
+            'chunking_strategy': self.chunking_strategy
+        }
     
     @classmethod
     def get_config_class(cls) -> Type[ChunkingConfig]:
-        """Get the configuration class for this processor"""
+        """Get the configuration class for this processor (backward compatibility)
+        このプロセッサーの設定クラスを取得（下位互換性）
+        """
         return ChunkingConfig
     
     def process(self, documents, config: Optional[ChunkingConfig] = None):
@@ -327,8 +429,8 @@ class Chunker(DocumentProcessor):
         """Get chunking-specific statistics"""
         return {
             **self.get_processing_stats(),
-            "chunk_size": self.config.chunk_size,
-            "overlap": self.config.overlap,
-            "chunking_strategy": self.config.chunking_strategy,
-            "split_by_sentence": self.config.split_by_sentence
+            "chunk_size": self.chunk_size,
+            "overlap": self.overlap,
+            "chunking_strategy": self.chunking_strategy,
+            "split_by_sentence": self.split_by_sentence
         }

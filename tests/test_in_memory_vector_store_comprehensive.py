@@ -61,12 +61,15 @@ class TestInMemoryVectorStoreConfiguration:
         store_dot = InMemoryVectorStore(similarity_metric="dot")
         assert store_dot.similarity_metric == "dot"
 
-    def test_get_config_class(self):
+    def test_get_config(self):
         """
-        Test get_config_class method
-        get_config_classメソッドのテスト
+        Test get_config method
+        get_configメソッドのテスト
         """
-        assert InMemoryVectorStore.get_config_class() == Dict
+        store = InMemoryVectorStore(similarity_metric="euclidean")
+        config = store.get_config()
+        
+        assert config['similarity_metric'] == "euclidean"
 
 
 class TestInMemoryVectorStoreCRUD:

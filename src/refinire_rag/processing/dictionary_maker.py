@@ -9,7 +9,7 @@ import logging
 import os
 import json
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Type
+from typing import List, Dict, Optional, Type, Any
 from pathlib import Path
 
 from ..document_processor import DocumentProcessor, DocumentProcessorConfig
@@ -73,13 +73,94 @@ class DictionaryMaker(DocumentProcessor):
     5. Maintains one dictionary across all processed documents
     """
     
-    def __init__(self, config: Optional[DictionaryMakerConfig] = None):
+    def __init__(self, config=None, **kwargs):
         """Initialize DictionaryMaker processor
         
         Args:
-            config: Configuration for the processor
+            config: Optional DictionaryMakerConfig object (for backward compatibility)
+            **kwargs: Configuration parameters, supports both individual parameters
+                     and config dict, with environment variable fallback
         """
-        super().__init__(config or DictionaryMakerConfig())
+        # Handle backward compatibility with config object
+        if config is not None and hasattr(config, 'dictionary_file_path'):
+            # Traditional config object passed
+            super().__init__(config)
+            self.dictionary_file_path = config.dictionary_file_path
+            self.backup_dictionary = config.backup_dictionary
+            self.llm_model = config.llm_model
+            self.llm_temperature = config.llm_temperature
+            self.max_tokens = config.max_tokens
+            self.focus_on_technical_terms = config.focus_on_technical_terms
+            self.extract_abbreviations = config.extract_abbreviations
+            self.detect_expression_variations = config.detect_expression_variations
+            self.min_term_importance = config.min_term_importance
+            self.skip_if_no_new_terms = config.skip_if_no_new_terms
+            self.validate_extracted_terms = config.validate_extracted_terms
+            self.update_document_metadata = config.update_document_metadata
+            self.preserve_original_document = config.preserve_original_document
+        else:
+            # Extract config dict if provided
+            config_dict = kwargs.get('config', {})
+            
+            # Environment variable fallback with priority: kwargs > config dict > env vars > defaults
+            self.dictionary_file_path = kwargs.get('dictionary_file_path', 
+                                                 config_dict.get('dictionary_file_path', 
+                                                                os.getenv('REFINIRE_RAG_DICT_FILE_PATH', './domain_dictionary.md')))
+            self.backup_dictionary = kwargs.get('backup_dictionary', 
+                                               config_dict.get('backup_dictionary', 
+                                                              os.getenv('REFINIRE_RAG_DICT_BACKUP', 'true').lower() == 'true'))
+            self.llm_model = kwargs.get('llm_model', 
+                                       config_dict.get('llm_model', 
+                                                      os.getenv('REFINIRE_RAG_DICT_LLM_MODEL', get_default_llm_model())))
+            self.llm_temperature = kwargs.get('llm_temperature', 
+                                             config_dict.get('llm_temperature', 
+                                                            float(os.getenv('REFINIRE_RAG_DICT_TEMPERATURE', '0.3'))))
+            self.max_tokens = kwargs.get('max_tokens', 
+                                        config_dict.get('max_tokens', 
+                                                       int(os.getenv('REFINIRE_RAG_DICT_MAX_TOKENS', '2000'))))
+            self.focus_on_technical_terms = kwargs.get('focus_on_technical_terms', 
+                                                      config_dict.get('focus_on_technical_terms', 
+                                                                     os.getenv('REFINIRE_RAG_DICT_TECHNICAL_TERMS', 'true').lower() == 'true'))
+            self.extract_abbreviations = kwargs.get('extract_abbreviations', 
+                                                   config_dict.get('extract_abbreviations', 
+                                                                  os.getenv('REFINIRE_RAG_DICT_ABBREVIATIONS', 'true').lower() == 'true'))
+            self.detect_expression_variations = kwargs.get('detect_expression_variations', 
+                                                          config_dict.get('detect_expression_variations', 
+                                                                         os.getenv('REFINIRE_RAG_DICT_VARIATIONS', 'true').lower() == 'true'))
+            self.min_term_importance = kwargs.get('min_term_importance', 
+                                                 config_dict.get('min_term_importance', 
+                                                                os.getenv('REFINIRE_RAG_DICT_MIN_IMPORTANCE', 'medium')))
+            self.skip_if_no_new_terms = kwargs.get('skip_if_no_new_terms', 
+                                                  config_dict.get('skip_if_no_new_terms', 
+                                                                 os.getenv('REFINIRE_RAG_DICT_SKIP_NO_NEW', 'false').lower() == 'true'))
+            self.validate_extracted_terms = kwargs.get('validate_extracted_terms', 
+                                                      config_dict.get('validate_extracted_terms', 
+                                                                     os.getenv('REFINIRE_RAG_DICT_VALIDATE', 'true').lower() == 'true'))
+            self.update_document_metadata = kwargs.get('update_document_metadata', 
+                                                      config_dict.get('update_document_metadata', 
+                                                                     os.getenv('REFINIRE_RAG_DICT_UPDATE_METADATA', 'true').lower() == 'true'))
+            self.preserve_original_document = kwargs.get('preserve_original_document', 
+                                                        config_dict.get('preserve_original_document', 
+                                                                       os.getenv('REFINIRE_RAG_DICT_PRESERVE_ORIGINAL', 'true').lower() == 'true'))
+            
+            # Create config object for backward compatibility
+            config = DictionaryMakerConfig(
+                dictionary_file_path=self.dictionary_file_path,
+                backup_dictionary=self.backup_dictionary,
+                llm_model=self.llm_model,
+                llm_temperature=self.llm_temperature,
+                max_tokens=self.max_tokens,
+                focus_on_technical_terms=self.focus_on_technical_terms,
+                extract_abbreviations=self.extract_abbreviations,
+                detect_expression_variations=self.detect_expression_variations,
+                min_term_importance=self.min_term_importance,
+                skip_if_no_new_terms=self.skip_if_no_new_terms,
+                validate_extracted_terms=self.validate_extracted_terms,
+                update_document_metadata=self.update_document_metadata,
+                preserve_original_document=self.preserve_original_document
+            )
+            
+            super().__init__(config)
         
         # Initialize Refinire LLM Pipeline
         if LLMPipeline is not None:
@@ -87,9 +168,9 @@ class DictionaryMaker(DocumentProcessor):
                 self._llm_pipeline = LLMPipeline(
                     name="dictionary_maker",
                     generation_instructions="You are a domain expert that extracts technical terms and their variations from documents.",
-                    model=self.config.llm_model
+                    model=self.llm_model
                 )
-                logger.info(f"Initialized Refinire LLMPipeline with model: {self.config.llm_model}")
+                logger.info(f"Initialized Refinire LLMPipeline with model: {self.llm_model}")
             except Exception as e:
                 self._llm_pipeline = None
                 logger.warning(f"Failed to initialize Refinire LLMPipeline: {e}. DictionaryMaker will use mock data.")
@@ -106,11 +187,36 @@ class DictionaryMaker(DocumentProcessor):
             "llm_api_calls": 0
         })
         
-        logger.info(f"Initialized DictionaryMaker with dictionary: {self.config.dictionary_file_path}")
+        logger.info(f"Initialized DictionaryMaker with dictionary: {self.dictionary_file_path}")
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        
+        Returns:
+            Dict[str, Any]: Current configuration dictionary
+        """
+        return {
+            'dictionary_file_path': self.dictionary_file_path,
+            'backup_dictionary': self.backup_dictionary,
+            'llm_model': self.llm_model,
+            'llm_temperature': self.llm_temperature,
+            'max_tokens': self.max_tokens,
+            'focus_on_technical_terms': self.focus_on_technical_terms,
+            'extract_abbreviations': self.extract_abbreviations,
+            'detect_expression_variations': self.detect_expression_variations,
+            'min_term_importance': self.min_term_importance,
+            'skip_if_no_new_terms': self.skip_if_no_new_terms,
+            'validate_extracted_terms': self.validate_extracted_terms,
+            'update_document_metadata': self.update_document_metadata,
+            'preserve_original_document': self.preserve_original_document
+        }
     
     @classmethod
     def get_config_class(cls) -> Type[DictionaryMakerConfig]:
-        """Get the configuration class for this processor"""
+        """Get the configuration class for this processor (backward compatibility)
+        このプロセッサーの設定クラスを取得（下位互換性）
+        """
         return DictionaryMakerConfig
     
     def process(self, document: Document, config: Optional[DictionaryMakerConfig] = None) -> List[Document]:

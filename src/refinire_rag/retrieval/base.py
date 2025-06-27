@@ -113,10 +113,13 @@ class QueryComponent(ABC):
             "errors_encountered": 0
         }
     
-    @classmethod
     @abstractmethod
-    def get_config_class(cls) -> Type[QueryComponentConfig]:
-        """Get the configuration class for this component"""
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this component
+        
+        Returns:
+            Dictionary containing current configuration
+        """
         pass
     
     def get_processing_stats(self) -> Dict[str, Any]:
@@ -134,10 +137,13 @@ class Retriever(QueryComponent):
     の統一インターフェース。
     """
     
-    @classmethod
     @abstractmethod
-    def get_config_class(cls) -> Type[RetrieverConfig]:
-        """Get the configuration class for this retriever"""
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this retriever
+        
+        Returns:
+            Dictionary containing current configuration
+        """
         pass
     
     @abstractmethod
@@ -256,10 +262,13 @@ class Indexer:
 class Reranker(QueryComponent):
     """Base class for result rerankers"""
     
-    @classmethod
     @abstractmethod
-    def get_config_class(cls) -> Type[RerankerConfig]:
-        """Get the configuration class for this reranker"""
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this reranker
+        
+        Returns:
+            Dictionary containing current configuration
+        """
         pass
     
     @abstractmethod
@@ -286,10 +295,13 @@ class AnswerSynthesizer(QueryComponent):
     回答を合成する基底クラス。
     """
     
-    @classmethod
     @abstractmethod
-    def get_config_class(cls) -> Type[AnswerSynthesizerConfig]:
-        """Get the configuration class for this synthesizer"""
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this synthesizer
+        
+        Returns:
+            Dictionary containing current configuration
+        """
         pass
     
     @abstractmethod
@@ -336,10 +348,13 @@ class KeywordSearch(DocumentProcessor, Indexer, Retriever):
             "index_size": 0
         })
     
-    @classmethod
     @abstractmethod  
-    def get_config_class(cls) -> Type[Dict]:
-        """Get the configuration class for this keyword search"""
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this keyword search
+        
+        Returns:
+            Dictionary containing current configuration
+        """
         pass
     
     def process(self, documents: Iterable[Document], config: Optional[Any] = None) -> Iterator[Document]:

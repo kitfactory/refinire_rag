@@ -82,10 +82,13 @@ class VectorStore(DocumentProcessor):
         # Default embedder (can be overridden)
         self._embedder = None
     
-    @classmethod
     @abstractmethod
-    def get_config_class(cls) -> Type[Dict]:
-        """Get the configuration class for this vector store"""
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this vector store
+        
+        Returns:
+            Dictionary containing current configuration
+        """
         pass
     
     def set_embedder(self, embedder):

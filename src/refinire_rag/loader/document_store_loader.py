@@ -577,3 +577,21 @@ class DocumentStoreLoader(Loader):
         return (f"DocumentStoreLoader(strategy={self.load_config.strategy.value}, "
                 f"batch_size={self.load_config.batch_size}, "
                 f"validate={self.load_config.validate_documents})")
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary"""
+        base_config = super().get_config()
+        
+        config_dict = {
+            **base_config,
+            'strategy': self.load_config.strategy.value,
+            'batch_size': self.load_config.batch_size,
+            'max_documents': self.load_config.max_documents,
+            'metadata_filters': self.load_config.metadata_filters,
+            'content_query': self.load_config.content_query,
+            'document_ids': self.load_config.document_ids,
+            'validate_documents': self.load_config.validate_documents,
+            'document_store_type': type(self.document_store).__name__
+        }
+        
+        return config_dict

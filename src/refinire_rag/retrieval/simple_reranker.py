@@ -266,3 +266,21 @@ class SimpleReranker(Reranker):
         })
         
         return stats
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary"""
+        config_dict = {
+            'top_k': self.config.top_k,
+            'rerank_model': self.config.rerank_model,
+            'score_threshold': self.config.score_threshold,
+            'boost_exact_matches': self.config.boost_exact_matches,
+            'boost_recent_docs': self.config.boost_recent_docs,
+            'length_penalty_factor': self.config.length_penalty_factor
+        }
+        
+        # Add any additional attributes from the config
+        for attr_name, attr_value in self.config.__dict__.items():
+            if attr_name not in config_dict:
+                config_dict[attr_name] = attr_value
+                
+        return config_dict

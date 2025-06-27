@@ -35,6 +35,13 @@ class MockRetriever(Retriever):
             "errors_encountered": 0
         }
     
+    def get_config(self):
+        """Get current configuration as dictionary"""
+        return {
+            'name': self.name,
+            'result_count': len(self.results)
+        }
+    
     @classmethod
     def get_config_class(cls):
         return dict

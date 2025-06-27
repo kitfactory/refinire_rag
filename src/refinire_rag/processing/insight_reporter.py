@@ -5,12 +5,13 @@ InsightReporter - Threshold-based Interpretation and Reporting
 評価結果を分析し、実用的なインサイトと推奨事項を生成します。
 """
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Type
 from pydantic import BaseModel, Field
-from dataclasses import field
+from dataclasses import field, dataclass
 from enum import Enum
 import statistics
 import json
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -53,6 +54,7 @@ class Threshold(BaseModel):
     comparison_operator: str = "greater_than"  # "greater_than", "less_than", "equals"
 
 
+@dataclass
 class InsightReporterConfig(DocumentProcessorConfig):
     """InsightReporter設定"""
     
@@ -76,15 +78,98 @@ class InsightReporter(DocumentProcessor):
     評価結果を分析し、閾値ベースの解釈とインサイトを生成します。
     """
     
-    @classmethod
-    def get_config_class(cls):
-        return InsightReporterConfig
-    
-    def __init__(self, config: InsightReporterConfig):
-        super().__init__(config)
+    def __init__(self, config=None, **kwargs):
+        """Initialize InsightReporter processor
+        
+        Args:
+            config: Optional InsightReporterConfig object (for backward compatibility)
+            **kwargs: Configuration parameters, supports both individual parameters
+                     and config dict, with environment variable fallback
+        """
+        # Handle backward compatibility with config object
+        if config is not None and hasattr(config, 'enable_trend_analysis'):
+            # Traditional config object passed
+            super().__init__(config)
+            self.enable_trend_analysis = config.enable_trend_analysis
+            self.enable_comparative_analysis = config.enable_comparative_analysis
+            self.enable_root_cause_analysis = config.enable_root_cause_analysis
+            self.min_confidence_for_insight = config.min_confidence_for_insight
+            self.include_executive_summary = config.include_executive_summary
+            self.include_detailed_analysis = config.include_detailed_analysis
+            self.include_action_items = config.include_action_items
+            self.report_format = config.report_format
+        else:
+            # Extract config dict if provided
+            config_dict = kwargs.get('config', {})
+            
+            # Environment variable fallback with priority: kwargs > config dict > env vars > defaults
+            self.enable_trend_analysis = kwargs.get('enable_trend_analysis', 
+                                                   config_dict.get('enable_trend_analysis', 
+                                                                  os.getenv('REFINIRE_RAG_INSIGHT_TREND_ANALYSIS', 'true').lower() == 'true'))
+            self.enable_comparative_analysis = kwargs.get('enable_comparative_analysis', 
+                                                         config_dict.get('enable_comparative_analysis', 
+                                                                        os.getenv('REFINIRE_RAG_INSIGHT_COMPARATIVE_ANALYSIS', 'true').lower() == 'true'))
+            self.enable_root_cause_analysis = kwargs.get('enable_root_cause_analysis', 
+                                                        config_dict.get('enable_root_cause_analysis', 
+                                                                       os.getenv('REFINIRE_RAG_INSIGHT_ROOT_CAUSE', 'true').lower() == 'true'))
+            self.min_confidence_for_insight = kwargs.get('min_confidence_for_insight', 
+                                                        config_dict.get('min_confidence_for_insight', 
+                                                                       float(os.getenv('REFINIRE_RAG_INSIGHT_MIN_CONFIDENCE', '0.6'))))
+            self.include_executive_summary = kwargs.get('include_executive_summary', 
+                                                       config_dict.get('include_executive_summary', 
+                                                                      os.getenv('REFINIRE_RAG_INSIGHT_EXECUTIVE_SUMMARY', 'true').lower() == 'true'))
+            self.include_detailed_analysis = kwargs.get('include_detailed_analysis', 
+                                                       config_dict.get('include_detailed_analysis', 
+                                                                      os.getenv('REFINIRE_RAG_INSIGHT_DETAILED_ANALYSIS', 'true').lower() == 'true'))
+            self.include_action_items = kwargs.get('include_action_items', 
+                                                  config_dict.get('include_action_items', 
+                                                                 os.getenv('REFINIRE_RAG_INSIGHT_ACTION_ITEMS', 'true').lower() == 'true'))
+            self.report_format = kwargs.get('report_format', 
+                                           config_dict.get('report_format', 
+                                                          os.getenv('REFINIRE_RAG_INSIGHT_REPORT_FORMAT', 'markdown')))
+            
+            # Create config object for backward compatibility
+            config = InsightReporterConfig(
+                enable_trend_analysis=self.enable_trend_analysis,
+                enable_comparative_analysis=self.enable_comparative_analysis,
+                enable_root_cause_analysis=self.enable_root_cause_analysis,
+                min_confidence_for_insight=self.min_confidence_for_insight,
+                include_executive_summary=self.include_executive_summary,
+                include_detailed_analysis=self.include_detailed_analysis,
+                include_action_items=self.include_action_items,
+                report_format=self.report_format
+            )
+            
+            super().__init__(config)
+        
         self.generated_insights: List[Insight] = []
         self.all_thresholds = self._initialize_thresholds()
         self.historical_data: List[Dict[str, Any]] = []
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        
+        Returns:
+            Dict[str, Any]: Current configuration dictionary
+        """
+        return {
+            'enable_trend_analysis': self.enable_trend_analysis,
+            'enable_comparative_analysis': self.enable_comparative_analysis,
+            'enable_root_cause_analysis': self.enable_root_cause_analysis,
+            'min_confidence_for_insight': self.min_confidence_for_insight,
+            'include_executive_summary': self.include_executive_summary,
+            'include_detailed_analysis': self.include_detailed_analysis,
+            'include_action_items': self.include_action_items,
+            'report_format': self.report_format
+        }
+    
+    @classmethod
+    def get_config_class(cls) -> Type[InsightReporterConfig]:
+        """Get the configuration class for this processor (backward compatibility)
+        このプロセッサーの設定クラスを取得（下位互換性）
+        """
+        return InsightReporterConfig
     
     def process(self, document: Document) -> List[Document]:
         """

@@ -52,12 +52,11 @@ class TestTFIDFKeywordStoreInitialization:
         Test initialization with custom configuration
         カスタム設定での初期化テスト
         """
-        config = {
-            'top_k': 20,
-            'similarity_threshold': 0.1,
-            'enable_filtering': False
-        }
-        store = TFIDFKeywordStore(config)
+        store = TFIDFKeywordStore(
+            top_k=20,
+            similarity_threshold=0.1,
+            enable_filtering=False
+        )
         
         assert store.config.top_k == 20
         assert store.config.similarity_threshold == 0.1
@@ -68,19 +67,23 @@ class TestTFIDFKeywordStoreInitialization:
         Test initialization with partial configuration
         部分設定での初期化テスト
         """
-        config = {'top_k': 15}
-        store = TFIDFKeywordStore(config)
+        store = TFIDFKeywordStore(top_k=15)
         
         assert store.config.top_k == 15
         assert store.config.similarity_threshold == 0.0  # Default
         assert store.config.enable_filtering is True     # Default
     
-    def test_get_config_class(self):
+    def test_get_config(self):
         """
-        Test get_config_class method
-        get_config_classメソッドのテスト
+        Test get_config method
+        get_configメソッドのテスト
         """
-        assert TFIDFKeywordStore.get_config_class() == dict
+        store = TFIDFKeywordStore(top_k=20, similarity_threshold=0.1)
+        config = store.get_config()
+        
+        assert config['top_k'] == 20
+        assert config['similarity_threshold'] == 0.1
+        assert config['enable_filtering'] is True
 
 
 class TestTFIDFKeywordStoreDocumentManagement:
@@ -494,8 +497,7 @@ class TestTFIDFKeywordStoreRetrieve:
         Test retrieve with similarity threshold filtering
         類似度閾値フィルタリングでの取得テスト
         """
-        config = {"similarity_threshold": 0.5, "enable_filtering": True}
-        store = TFIDFKeywordStore(config)
+        store = TFIDFKeywordStore(similarity_threshold=0.5, enable_filtering=True)
         document = Document(id="doc1", content="Test content", metadata={})
         store.index_document(document)
         store.index_built = True
@@ -540,8 +542,7 @@ class TestTFIDFKeywordStoreRetrieve:
         Test retrieve with filtering disabled
         フィルタリング無効での取得テスト
         """
-        config = {"enable_filtering": False, "similarity_threshold": 0.5}
-        store = TFIDFKeywordStore(config)
+        store = TFIDFKeywordStore(enable_filtering=False, similarity_threshold=0.5)
         document = Document(id="doc1", content="Test content", metadata={})
         store.index_document(document)
         store.index_built = True
@@ -592,8 +593,7 @@ class TestTFIDFKeywordStoreRetrieve:
         Test retrieve uses config limit when not specified
         未指定時に設定制限を使用することのテスト
         """
-        config = {"top_k": 3}
-        store = TFIDFKeywordStore(config)
+        store = TFIDFKeywordStore(top_k=3)
         store.index_built = True
         
         with patch.object(store, '_search_index') as mock_search:
@@ -782,8 +782,7 @@ class TestTFIDFKeywordStoreProcessingStats:
         Test getting processing statistics
         処理統計取得テスト
         """
-        config = {"top_k": 15, "similarity_threshold": 0.2}
-        store = TFIDFKeywordStore(config)
+        store = TFIDFKeywordStore(top_k=15, similarity_threshold=0.2)
         document = Document(id="doc1", content="Test content", metadata={})
         store.index_document(document)
         

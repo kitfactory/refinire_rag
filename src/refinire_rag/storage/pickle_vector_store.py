@@ -25,23 +25,34 @@ class PickleVectorStore(InMemoryVectorStore):
     Data is kept in memory for fast access and periodically saved to disk.
     """
     
-    def __init__(
-        self, 
-        file_path: str = "./data/vectors.pkl",
-        similarity_metric: str = "cosine",
-        auto_save: bool = True,
-        save_interval: int = 10,
-        config: Optional[Dict] = None
-    ):
+    def __init__(self, **kwargs):
         """Initialize pickle-based vector store
         
         Args:
-            file_path: Path to pickle file for persistence
-            similarity_metric: Similarity metric to use
-            auto_save: Whether to automatically save changes
-            save_interval: Number of operations before auto-save (if auto_save=True)
-            config: Optional configuration for DocumentProcessor
+            **kwargs: Configuration options
+                - file_path (str): Path to pickle file for persistence (default: "./data/vectors.pkl", env: REFINIRE_RAG_PICKLE_FILE_PATH)
+                - similarity_metric (str): Similarity metric to use (default: "cosine", env: REFINIRE_RAG_PICKLE_SIMILARITY_METRIC)
+                - auto_save (bool): Whether to automatically save changes (default: True, env: REFINIRE_RAG_PICKLE_AUTO_SAVE)
+                - save_interval (int): Number of operations before auto-save (default: 10, env: REFINIRE_RAG_PICKLE_SAVE_INTERVAL)
+                - config (dict): Optional configuration for DocumentProcessor
         """
+        import os
+        
+        # Extract keyword arguments with environment variable fallback
+        config = kwargs.get('config', {})
+        file_path = kwargs.get('file_path', 
+                             config.get('file_path', 
+                                      os.getenv('REFINIRE_RAG_PICKLE_FILE_PATH', './data/vectors.pkl')))
+        similarity_metric = kwargs.get('similarity_metric', 
+                                     config.get('similarity_metric', 
+                                              os.getenv('REFINIRE_RAG_PICKLE_SIMILARITY_METRIC', 'cosine')))
+        auto_save = kwargs.get('auto_save', 
+                             config.get('auto_save', 
+                                      os.getenv('REFINIRE_RAG_PICKLE_AUTO_SAVE', 'true').lower() == 'true'))
+        save_interval = kwargs.get('save_interval', 
+                                 config.get('save_interval', 
+                                          int(os.getenv('REFINIRE_RAG_PICKLE_SAVE_INTERVAL', '10'))))
+        
         pickle_config = config or {
             "file_path": file_path,
             "similarity_metric": similarity_metric,
@@ -297,6 +308,19 @@ class PickleVectorStore(InMemoryVectorStore):
             self.save_to_disk()
         logger.info("PickleVectorStore closed")
     
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this vector store
+        
+        Returns:
+            Dictionary containing current configuration
+        """
+        return {
+            'file_path': str(self.file_path),
+            'similarity_metric': self.similarity_metric,
+            'auto_save': self.auto_save,
+            'save_interval': self.save_interval
+        }
+
     def __del__(self):
         """Cleanup on deletion"""
         try:

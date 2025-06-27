@@ -9,7 +9,7 @@ import logging
 import os
 import json
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Type
+from typing import List, Dict, Optional, Type, Any
 from pathlib import Path
 
 from ..document_processor import DocumentProcessor, DocumentProcessorConfig
@@ -81,13 +81,119 @@ class GraphBuilder(DocumentProcessor):
     6. Maintains one graph across all processed documents
     """
     
-    def __init__(self, config: Optional[GraphBuilderConfig] = None):
+    def __init__(self, config=None, **kwargs):
         """Initialize GraphBuilder processor
         
         Args:
-            config: Configuration for the processor
+            config: Optional GraphBuilderConfig object (for backward compatibility)
+            **kwargs: Configuration parameters, supports both individual parameters
+                     and config dict, with environment variable fallback
         """
-        super().__init__(config or GraphBuilderConfig())
+        # Handle backward compatibility with config object
+        if config is not None and hasattr(config, 'graph_file_path'):
+            # Traditional config object passed
+            super().__init__(config)
+            self.graph_file_path = config.graph_file_path
+            self.dictionary_file_path = config.dictionary_file_path
+            self.backup_graph = config.backup_graph
+            self.llm_model = config.llm_model
+            self.llm_temperature = config.llm_temperature
+            self.max_tokens = config.max_tokens
+            self.focus_on_important_relationships = config.focus_on_important_relationships
+            self.extract_hierarchical_relationships = config.extract_hierarchical_relationships
+            self.extract_causal_relationships = config.extract_causal_relationships
+            self.extract_composition_relationships = config.extract_composition_relationships
+            self.min_relationship_importance = config.min_relationship_importance
+            self.use_dictionary_terms = config.use_dictionary_terms
+            self.auto_detect_dictionary_path = config.auto_detect_dictionary_path
+            self.skip_if_no_new_relationships = config.skip_if_no_new_relationships
+            self.validate_extracted_relationships = config.validate_extracted_relationships
+            self.deduplicate_relationships = config.deduplicate_relationships
+            self.update_document_metadata = config.update_document_metadata
+            self.preserve_original_document = config.preserve_original_document
+        else:
+            # Extract config dict if provided
+            config_dict = kwargs.get('config', {})
+            
+            # Environment variable fallback with priority: kwargs > config dict > env vars > defaults
+            self.graph_file_path = kwargs.get('graph_file_path', 
+                                             config_dict.get('graph_file_path', 
+                                                            os.getenv('REFINIRE_RAG_GRAPH_FILE_PATH', './domain_knowledge_graph.md')))
+            self.dictionary_file_path = kwargs.get('dictionary_file_path', 
+                                                  config_dict.get('dictionary_file_path', 
+                                                                 os.getenv('REFINIRE_RAG_GRAPH_DICT_PATH', './domain_dictionary.md')))
+            self.backup_graph = kwargs.get('backup_graph', 
+                                          config_dict.get('backup_graph', 
+                                                         os.getenv('REFINIRE_RAG_GRAPH_BACKUP', 'true').lower() == 'true'))
+            self.llm_model = kwargs.get('llm_model', 
+                                       config_dict.get('llm_model', 
+                                                      os.getenv('REFINIRE_RAG_GRAPH_LLM_MODEL', get_default_llm_model())))
+            self.llm_temperature = kwargs.get('llm_temperature', 
+                                             config_dict.get('llm_temperature', 
+                                                            float(os.getenv('REFINIRE_RAG_GRAPH_TEMPERATURE', '0.3'))))
+            self.max_tokens = kwargs.get('max_tokens', 
+                                        config_dict.get('max_tokens', 
+                                                       int(os.getenv('REFINIRE_RAG_GRAPH_MAX_TOKENS', '3000'))))
+            self.focus_on_important_relationships = kwargs.get('focus_on_important_relationships', 
+                                                             config_dict.get('focus_on_important_relationships', 
+                                                                            os.getenv('REFINIRE_RAG_GRAPH_IMPORTANT_RELATIONSHIPS', 'true').lower() == 'true'))
+            self.extract_hierarchical_relationships = kwargs.get('extract_hierarchical_relationships', 
+                                                               config_dict.get('extract_hierarchical_relationships', 
+                                                                              os.getenv('REFINIRE_RAG_GRAPH_HIERARCHICAL', 'true').lower() == 'true'))
+            self.extract_causal_relationships = kwargs.get('extract_causal_relationships', 
+                                                          config_dict.get('extract_causal_relationships', 
+                                                                         os.getenv('REFINIRE_RAG_GRAPH_CAUSAL', 'true').lower() == 'true'))
+            self.extract_composition_relationships = kwargs.get('extract_composition_relationships', 
+                                                              config_dict.get('extract_composition_relationships', 
+                                                                             os.getenv('REFINIRE_RAG_GRAPH_COMPOSITION', 'true').lower() == 'true'))
+            self.min_relationship_importance = kwargs.get('min_relationship_importance', 
+                                                         config_dict.get('min_relationship_importance', 
+                                                                        os.getenv('REFINIRE_RAG_GRAPH_MIN_IMPORTANCE', 'medium')))
+            self.use_dictionary_terms = kwargs.get('use_dictionary_terms', 
+                                                  config_dict.get('use_dictionary_terms', 
+                                                                 os.getenv('REFINIRE_RAG_GRAPH_USE_DICT', 'true').lower() == 'true'))
+            self.auto_detect_dictionary_path = kwargs.get('auto_detect_dictionary_path', 
+                                                         config_dict.get('auto_detect_dictionary_path', 
+                                                                        os.getenv('REFINIRE_RAG_GRAPH_AUTO_DETECT_DICT', 'true').lower() == 'true'))
+            self.skip_if_no_new_relationships = kwargs.get('skip_if_no_new_relationships', 
+                                                          config_dict.get('skip_if_no_new_relationships', 
+                                                                         os.getenv('REFINIRE_RAG_GRAPH_SKIP_NO_NEW', 'false').lower() == 'true'))
+            self.validate_extracted_relationships = kwargs.get('validate_extracted_relationships', 
+                                                              config_dict.get('validate_extracted_relationships', 
+                                                                             os.getenv('REFINIRE_RAG_GRAPH_VALIDATE', 'true').lower() == 'true'))
+            self.deduplicate_relationships = kwargs.get('deduplicate_relationships', 
+                                                       config_dict.get('deduplicate_relationships', 
+                                                                      os.getenv('REFINIRE_RAG_GRAPH_DEDUPLICATE', 'true').lower() == 'true'))
+            self.update_document_metadata = kwargs.get('update_document_metadata', 
+                                                      config_dict.get('update_document_metadata', 
+                                                                     os.getenv('REFINIRE_RAG_GRAPH_UPDATE_METADATA', 'true').lower() == 'true'))
+            self.preserve_original_document = kwargs.get('preserve_original_document', 
+                                                        config_dict.get('preserve_original_document', 
+                                                                       os.getenv('REFINIRE_RAG_GRAPH_PRESERVE_ORIGINAL', 'true').lower() == 'true'))
+            
+            # Create config object for backward compatibility
+            config = GraphBuilderConfig(
+                graph_file_path=self.graph_file_path,
+                dictionary_file_path=self.dictionary_file_path,
+                backup_graph=self.backup_graph,
+                llm_model=self.llm_model,
+                llm_temperature=self.llm_temperature,
+                max_tokens=self.max_tokens,
+                focus_on_important_relationships=self.focus_on_important_relationships,
+                extract_hierarchical_relationships=self.extract_hierarchical_relationships,
+                extract_causal_relationships=self.extract_causal_relationships,
+                extract_composition_relationships=self.extract_composition_relationships,
+                min_relationship_importance=self.min_relationship_importance,
+                use_dictionary_terms=self.use_dictionary_terms,
+                auto_detect_dictionary_path=self.auto_detect_dictionary_path,
+                skip_if_no_new_relationships=self.skip_if_no_new_relationships,
+                validate_extracted_relationships=self.validate_extracted_relationships,
+                deduplicate_relationships=self.deduplicate_relationships,
+                update_document_metadata=self.update_document_metadata,
+                preserve_original_document=self.preserve_original_document
+            )
+            
+            super().__init__(config)
         
         # Initialize Refinire LLM Pipeline
         if LLMPipeline is not None:
@@ -95,9 +201,9 @@ class GraphBuilder(DocumentProcessor):
                 self._llm_pipeline = LLMPipeline(
                     name="graph_builder",
                     generation_instructions="You are a knowledge graph expert that extracts important relationships from documents.",
-                    model=self.config.llm_model
+                    model=self.llm_model
                 )
-                logger.info(f"Initialized Refinire LLMPipeline with model: {self.config.llm_model}")
+                logger.info(f"Initialized Refinire LLMPipeline with model: {self.llm_model}")
             except Exception as e:
                 self._llm_pipeline = None
                 logger.warning(f"Failed to initialize Refinire LLMPipeline: {e}. GraphBuilder will use mock data.")
@@ -114,11 +220,41 @@ class GraphBuilder(DocumentProcessor):
             "duplicate_relationships_avoided": 0
         })
         
-        logger.info(f"Initialized GraphBuilder with graph: {self.config.graph_file_path}")
+        logger.info(f"Initialized GraphBuilder with graph: {self.graph_file_path}")
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        
+        Returns:
+            Dict[str, Any]: Current configuration dictionary
+        """
+        return {
+            'graph_file_path': self.graph_file_path,
+            'dictionary_file_path': self.dictionary_file_path,
+            'backup_graph': self.backup_graph,
+            'llm_model': self.llm_model,
+            'llm_temperature': self.llm_temperature,
+            'max_tokens': self.max_tokens,
+            'focus_on_important_relationships': self.focus_on_important_relationships,
+            'extract_hierarchical_relationships': self.extract_hierarchical_relationships,
+            'extract_causal_relationships': self.extract_causal_relationships,
+            'extract_composition_relationships': self.extract_composition_relationships,
+            'min_relationship_importance': self.min_relationship_importance,
+            'use_dictionary_terms': self.use_dictionary_terms,
+            'auto_detect_dictionary_path': self.auto_detect_dictionary_path,
+            'skip_if_no_new_relationships': self.skip_if_no_new_relationships,
+            'validate_extracted_relationships': self.validate_extracted_relationships,
+            'deduplicate_relationships': self.deduplicate_relationships,
+            'update_document_metadata': self.update_document_metadata,
+            'preserve_original_document': self.preserve_original_document
+        }
     
     @classmethod
     def get_config_class(cls) -> Type[GraphBuilderConfig]:
-        """Get the configuration class for this processor"""
+        """Get the configuration class for this processor (backward compatibility)
+        このプロセッサーの設定クラスを取得（下位互換性）
+        """
         return GraphBuilderConfig
     
     def process(self, document: Document, config: Optional[GraphBuilderConfig] = None) -> List[Document]:

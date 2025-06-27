@@ -133,4 +133,10 @@ class Loader(DocumentProcessor):
             Iterator of processed Document objects with metadata
             メタデータが適用された処理済みドキュメントのイテレータ
         """
-        pass 
+        pass
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary"""
+        return {
+            'metadata_processors': [type(proc).__name__ for proc in self.metadata_processors] if self.metadata_processors else []
+        } 

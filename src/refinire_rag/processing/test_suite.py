@@ -394,3 +394,16 @@ class TestSuite(DocumentProcessor):
             "average_processing_time": avg_processing_time,
             "category_stats": category_stats
         }
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary"""
+        return {
+            'test_cases_file': self.config.test_cases_file,
+            'auto_generate_cases': self.config.auto_generate_cases,
+            'num_cases_per_document': self.config.num_cases_per_document,
+            'question_types': self.config.question_types,
+            'difficulty_levels': self.config.difficulty_levels,
+            'output_format': self.config.output_format,
+            'test_cases_count': len(self.test_cases),
+            'test_results_count': len(self.test_results)
+        }
