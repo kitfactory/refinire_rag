@@ -4,7 +4,7 @@
 
 ## 概要
 
-各splitterクラスは`from_env()`クラスメソッドを通じて環境変数からの設定読み込みをサポートしています。これにより、コードを変更することなく、環境変数を使用してsplitterの動作を柔軟に設定できます。
+各splitterクラスは統一された**kwargsコンストラクタパターンにより環境変数からの設定読み込みを自動サポートしています。これにより、コードを変更することなく、環境変数を使用してsplitterの動作を柔軟に設定できます。
 
 ## 対応splitterクラス一覧
 
@@ -24,7 +24,7 @@ export REFINIRE_RAG_CHARACTER_OVERLAP=100
 
 python -c "
 from refinire_rag.splitter.character_splitter import CharacterTextSplitter
-splitter = CharacterTextSplitter.from_env()
+splitter = CharacterTextSplitter()
 print(f'Chunk size: {splitter.chunk_size}')
 print(f'Overlap size: {splitter.overlap_size}')
 "
@@ -48,7 +48,7 @@ export REFINIRE_RAG_TOKEN_SEPARATOR="|"
 
 python -c "
 from refinire_rag.splitter.token_splitter import TokenTextSplitter
-splitter = TokenTextSplitter.from_env()
+splitter = TokenTextSplitter()
 print(f'Chunk size: {splitter.config[\"chunk_size\"]}')
 print(f'Overlap size: {splitter.config[\"overlap_size\"]}')
 print(f'Separator: {splitter.config[\"separator\"]}')
@@ -71,7 +71,7 @@ export REFINIRE_RAG_MD_OVERLAP=150
 
 python -c "
 from refinire_rag.splitter.markdown_splitter import MarkdownTextSplitter
-splitter = MarkdownTextSplitter.from_env()
+splitter = MarkdownTextSplitter()
 print(f'Chunk size: {splitter.chunk_size}')
 print(f'Overlap size: {splitter.overlap_size}')
 "
@@ -97,7 +97,7 @@ export REFINIRE_RAG_RECURSIVE_SEPARATORS="\\n\\n,\\n,;, ,"
 
 python -c "
 from refinire_rag.splitter.recursive_character_splitter import RecursiveCharacterTextSplitter
-splitter = RecursiveCharacterTextSplitter.from_env()
+splitter = RecursiveCharacterTextSplitter()
 print(f'Chunk size: {splitter.config[\"chunk_size\"]}')
 print(f'Overlap size: {splitter.config[\"overlap_size\"]}')
 print(f'Separators: {splitter.config[\"separators\"]}')
@@ -120,7 +120,7 @@ export REFINIRE_RAG_HTML_OVERLAP=120
 
 python -c "
 from refinire_rag.splitter.html_splitter import HTMLTextSplitter
-splitter = HTMLTextSplitter.from_env()
+splitter = HTMLTextSplitter()
 print(f'Chunk size: {splitter.chunk_size}')
 print(f'Overlap size: {splitter.overlap_size}')
 "
@@ -144,7 +144,7 @@ export REFINIRE_RAG_CODE_LANGUAGE=python
 
 python -c "
 from refinire_rag.splitter.code_splitter import CodeTextSplitter
-splitter = CodeTextSplitter.from_env()
+splitter = CodeTextSplitter()
 print(f'Chunk size: {splitter.chunk_size}')
 print(f'Overlap size: {splitter.overlap_size}')
 print(f'Language: {splitter.language}')
@@ -167,7 +167,7 @@ export REFINIRE_RAG_SIZE_OVERLAP=256
 
 python -c "
 from refinire_rag.splitter.size_splitter import SizeSplitter
-splitter = SizeSplitter.from_env()
+splitter = SizeSplitter()
 print(f'Chunk size: {splitter.chunk_size}')
 print(f'Overlap size: {splitter.overlap_size}')
 "
@@ -214,9 +214,9 @@ from refinire_rag.splitter.token_splitter import TokenTextSplitter
 from refinire_rag.splitter.markdown_splitter import MarkdownTextSplitter
 
 # 環境変数から設定を読み込み
-char_splitter = CharacterTextSplitter.from_env()
-token_splitter = TokenTextSplitter.from_env()
-md_splitter = MarkdownTextSplitter.from_env()
+char_splitter = CharacterTextSplitter()
+token_splitter = TokenTextSplitter()
+md_splitter = MarkdownTextSplitter()
 
 print('Character Splitter:', char_splitter.chunk_size, char_splitter.overlap_size)
 print('Token Splitter:', token_splitter.config['chunk_size'], token_splitter.config['overlap_size'])
@@ -265,7 +265,7 @@ from refinire_rag.splitter.character_splitter import CharacterTextSplitter
 load_dotenv()
 
 # 環境変数を使用してsplitterを作成
-splitter = CharacterTextSplitter.from_env()
+splitter = CharacterTextSplitter()
 ```
 
 ## エラーハンドリング
@@ -280,7 +280,7 @@ export REFINIRE_RAG_CHARACTER_CHUNK_SIZE="invalid_value"
 python -c "
 from refinire_rag.splitter.character_splitter import CharacterTextSplitter
 try:
-    splitter = CharacterTextSplitter.from_env()
+    splitter = CharacterTextSplitter()
 except ValueError as e:
     print(f'Error: {e}')
 "
@@ -296,7 +296,7 @@ export REFINIRE_RAG_TOKEN_CHUNK_SIZE=1500
 
 python -c "
 from refinire_rag.splitter.token_splitter import TokenTextSplitter
-splitter = TokenTextSplitter.from_env()
+splitter = TokenTextSplitter()
 print(f'Chunk size: {splitter.config[\"chunk_size\"]}')  # 1500 (環境変数より)
 print(f'Overlap size: {splitter.config[\"overlap_size\"]}')  # 0 (デフォルト値)
 print(f'Separator: {splitter.config[\"separator\"]}')  # \" \" (デフォルト値)
@@ -310,5 +310,6 @@ print(f'Separator: {splitter.config[\"separator\"]}')  # \" \" (デフォルト�
 3. **型安全性**: すべての数値パラメータは整数として解析されるため、適切な値を設定してください
 4. **セパレータのエスケープ**: RecursiveCharacterTextSplitterでは、エスケープシーケンス（`\\n`, `\\t`）が正しく処理されます
 5. **テスト環境**: 本番環境に適用する前に、テスト環境で設定値を検証してください
+
 
 このドキュメントを参考に、用途に応じて適切な環境変数を設定してsplitterの動作をカスタマイズしてください。

@@ -329,16 +329,6 @@ print(f'Separator: {splitter.config[\"separator\"]}')  # \" \" (デフォルト�
 5. **明示的引数の優先**: 必要に応じて明示的引数で環境変数をオーバーライドできます
 6. **テスト環境**: 本番環境に適用する前に、テスト環境で設定値を検証してください
 
-## 移行について
-
-以前のバージョンで`from_env()`メソッドを使用していた場合は、以下のように変更してください：
-
-**旧バージョン:**
-```python
-splitter = CharacterTextSplitter.from_env()
-```
-
-**新バージョン:**
 ```python
 splitter = CharacterTextSplitter()  # 環境変数は自動的に読み取られます
 ```

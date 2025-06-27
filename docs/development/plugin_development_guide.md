@@ -29,15 +29,25 @@ from typing import List, Optional, Dict, Any
 class CustomKeywordSearch(KeywordSearch):
     """Custom keyword search implementation"""
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize with DocumentProcessor integration"""
-        super().__init__(config or {})
+    def __init__(self, **kwargs):
+        """Initialize with unified configuration support
+        
+        Args:
+            **kwargs: Configuration parameters, merged with environment variables
+                     設定パラメータ、環境変数とマージされます
+        """
+        super().__init__(**kwargs)
         # Your initialization code here
     
-    @classmethod
-    def get_config_class(cls) -> Type[Dict]:
-        """Get the configuration class for this keyword search"""
-        return Dict
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        """
+        return {
+            'setting1': getattr(self, 'setting1', 'default_value1'),
+            'setting2': getattr(self, 'setting2', 'default_value2'),
+            # Add your configuration parameters here
+        }
     
     # Core KeywordSearch methods
     def add_document(self, document: Document) -> None:
@@ -108,23 +118,35 @@ class ElasticsearchKeywordStore(KeywordSearch):
     全文検索機能を提供します。
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize Elasticsearch keyword store
+    def __init__(self, **kwargs):
+        """Initialize Elasticsearch keyword store with environment variable support
         
         Args:
-            config: Configuration including ES connection details
-                   ES接続詳細を含む設定
+            **kwargs: Configuration parameters, supporting:
+                     host: Elasticsearch host (REFINIRE_RAG_ELASTICSEARCH_HOST)
+                     port: Elasticsearch port (REFINIRE_RAG_ELASTICSEARCH_PORT) 
+                     index_name: Index name (REFINIRE_RAG_ELASTICSEARCH_INDEX_NAME)
+                     similarity_threshold: Score threshold (REFINIRE_RAG_ELASTICSEARCH_THRESHOLD)
+                     top_k: Result limit (REFINIRE_RAG_ELASTICSEARCH_TOP_K)
         """
-        super().__init__(config or {})
+        super().__init__(**kwargs)
         
-        # Default configuration
+        # Configuration with environment variable support and priorities
+        import os
+        self.host = kwargs.get('host', os.getenv('REFINIRE_RAG_ELASTICSEARCH_HOST', 'localhost'))
+        self.port = int(kwargs.get('port', os.getenv('REFINIRE_RAG_ELASTICSEARCH_PORT', '9200')))
+        self.index_name = kwargs.get('index_name', os.getenv('REFINIRE_RAG_ELASTICSEARCH_INDEX_NAME', 'documents'))
+        self.similarity_threshold = float(kwargs.get('similarity_threshold', 
+                                                    os.getenv('REFINIRE_RAG_ELASTICSEARCH_THRESHOLD', '0.0')))
+        self.top_k = int(kwargs.get('top_k', os.getenv('REFINIRE_RAG_ELASTICSEARCH_TOP_K', '10')))
+        
+        # Legacy config dict for backward compatibility with internal methods
         self.config = {
-            "host": "localhost",
-            "port": 9200,
-            "index_name": "documents",
-            "similarity_threshold": 0.0,
-            "top_k": 10,
-            **self.config
+            "host": self.host,
+            "port": self.port,
+            "index_name": self.index_name,
+            "similarity_threshold": self.similarity_threshold,
+            "top_k": self.top_k
         }
         
         # Initialize Elasticsearch client
@@ -142,10 +164,17 @@ class ElasticsearchKeywordStore(KeywordSearch):
         except Exception as e:
             raise StorageError(f"Failed to initialize Elasticsearch client: {e}") from e
     
-    @classmethod
-    def get_config_class(cls) -> Type[Dict]:
-        """Get the configuration class for this keyword search"""
-        return Dict
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        """
+        return {
+            'host': self.host,
+            'port': self.port,
+            'index_name': self.index_name,
+            'similarity_threshold': self.similarity_threshold,
+            'top_k': self.top_k
+        }
     
     def add_document(self, document: Document) -> None:
         """Add a document to the Elasticsearch index"""
@@ -481,15 +510,25 @@ import numpy as np
 class CustomVectorStore(VectorStore):
     """Custom vector store implementation"""
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        """Initialize with DocumentProcessor integration"""
-        super().__init__(config or {})
+    def __init__(self, **kwargs):
+        """Initialize with unified configuration support
+        
+        Args:
+            **kwargs: Configuration parameters, merged with environment variables
+                     設定パラメータ、環境変数とマージされます
+        """
+        super().__init__(**kwargs)
         # Your initialization code here
     
-    @classmethod
-    def get_config_class(cls) -> Type[Dict]:
-        """Get the configuration class for this vector store"""
-        return Dict
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        """
+        return {
+            'setting1': getattr(self, 'setting1', 'default_value1'),
+            'setting2': getattr(self, 'setting2', 'default_value2'),
+            # Add your configuration parameters here
+        }
     
     # Core VectorStore methods
     def add_vector(self, entry: VectorEntry) -> str:
@@ -621,10 +660,16 @@ class ChromaVectorStore(VectorStore):
         except Exception as e:
             raise StorageError(f"Failed to initialize ChromaDB client: {e}") from e
     
-    @classmethod
-    def get_config_class(cls) -> Type[Dict]:
-        """Get the configuration class for this vector store"""
-        return Dict
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        現在の設定を辞書として取得
+        """
+        return {
+            'host': getattr(self, 'host', 'localhost'),
+            'port': getattr(self, 'port', 8000),
+            'collection_name': getattr(self, 'collection_name', 'documents'),
+            'similarity_metric': getattr(self, 'similarity_metric', 'cosine')
+        }
     
     def add_vector(self, entry: VectorEntry) -> str:
         """Add a vector entry to ChromaDB"""

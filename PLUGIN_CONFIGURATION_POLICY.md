@@ -90,34 +90,20 @@ When implementing plugin classes:
    - コンストラクタが環境変数を自動処理するため不要
 
 ### Configクラス
-Config classes may retain `from_env()` methods for backward compatibility and explicit config creation:
+Config classes retain `from_env()` methods for backward compatibility and explicit config creation:
 
 ```python
 class SomePluginConfig:
     @classmethod
     def from_env(cls) -> 'SomePluginConfig':
-        # Config-specific environment loading
-        pass
+        # Config-specific environment loading for legacy support
+        import os
+        return cls(
+            setting1=os.getenv('REFINIRE_RAG_PLUGIN_SETTING1', 'default'),
+            setting2=os.getenv('REFINIRE_RAG_PLUGIN_SETTING2', 'default')
+        )
 ```
 
-## 移行ガイド / Migration Guide
-
-### Before (旧パターン)
-```python
-# 旧方式
-loader = CSVLoader.from_env()
-config = SomePluginConfig.from_env()
-plugin = SomePlugin(config)
-```
-
-### After (新パターン)
-```python
-# 新方式
-loader = CSVLoader()  # 環境変数自動取得
-plugin = SomePlugin()  # 環境変数自動取得
-# または明示的設定
-plugin = SomePlugin(setting1='value1', setting2='value2')
-```
 
 ## 利点 / Benefits
 

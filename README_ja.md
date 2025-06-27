@@ -16,7 +16,7 @@
 ```python
 # LangChain: 50行以上の複雑なセットアップ
 # refinire-rag: 本番対応RAGを5行で
-manager = CorpusManager.from_env()
+manager = CorpusManager()
 results = manager.import_original_documents("my_corpus", "documents/", "*.md")
 processed = manager.rebuild_corpus_from_original("my_corpus")
 query_engine = QueryEngine(corpus_name="my_corpus", retrievers=manager.retrievers)

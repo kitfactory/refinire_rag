@@ -15,9 +15,9 @@ CorpusManager provides core operations for document corpus management with plugi
 ```python
 from refinire_rag.application import CorpusManager
 
-# Method 1: Create from environment variables (recommended)
+# Method 1: Create with environment variables (recommended)
 # Set environment: REFINIRE_RAG_RETRIEVERS=chroma,bm25s
-corpus_manager = CorpusManager.from_env()
+corpus_manager = CorpusManager()
 
 # Method 2: Manual initialization with specific retrievers
 from refinire_rag.storage import SQLiteStore
@@ -140,9 +140,9 @@ CorpusManager follows a consistent file naming convention for tracking and knowl
 - **Dictionary file**: `{corpus_name}_dictionary.md`
 - **Knowledge graph file**: `{corpus_name}_knowledge_graph.md`
 
-### from_env (Class Method)
+### Constructor with Environment Variables
 
-Create CorpusManager from environment variables.
+Create CorpusManager with environment variable support.
 
 ```python
 # Set environment variables
@@ -151,7 +151,7 @@ os.environ["REFINIRE_RAG_RETRIEVERS"] = "chroma,bm25s"
 os.environ["REFINIRE_RAG_DOCUMENT_STORES"] = "sqlite"
 
 # Create from environment
-corpus_manager = CorpusManager.from_env()
+corpus_manager = CorpusManager()
 ```
 
 ### get_corpus_info
@@ -218,7 +218,7 @@ CorpusManager supports multiple retrievers simultaneously:
 # Environment-based configuration
 os.environ["REFINIRE_RAG_RETRIEVERS"] = "chroma,bm25s,faiss"
 
-corpus_manager = CorpusManager.from_env()
+corpus_manager = CorpusManager()
 
 # Check configured retrievers
 info = corpus_manager.get_corpus_info()
@@ -245,7 +245,7 @@ print(f"Available retriever plugins: {available}")
 
 # Create corpus manager with specific plugins
 os.environ["REFINIRE_RAG_RETRIEVERS"] = ",".join(available)
-corpus_manager = CorpusManager.from_env()
+corpus_manager = CorpusManager()
 ```
 
 ## CorpusStats Return Object

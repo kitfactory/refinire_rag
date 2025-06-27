@@ -327,20 +327,29 @@ class ChromaRetriever(Retriever):
     Chromaベースの文書検索器
     """
     
-    def __init__(self, config: Optional[ChromaConfig] = None):
-        """Initialize ChromaRetriever
+    def __init__(self, **kwargs):
+        """Initialize ChromaRetriever with environment variable support
         
-        ChromaRetrieverを初期化
+        ChromaRetrieverを環境変数サポート付きで初期化
         
         Args:
-            config: Optional configuration object. If None, uses environment variables
-                   オプションの設定オブジェクト。Noneの場合は環境変数を使用
+            **kwargs: Configuration parameters, supporting:
+                     host: Chroma host (REFINIRE_RAG_CHROMA_HOST)
+                     port: Chroma port (REFINIRE_RAG_CHROMA_PORT)
+                     collection_name: Collection name (REFINIRE_RAG_CHROMA_COLLECTION)
         """
-        self.config = config or ChromaConfig()
+        super().__init__(**kwargs)
+        
+        # Environment variable support with priority: kwargs > env vars > defaults
+        import os
+        self.host = kwargs.get('host', os.getenv('REFINIRE_RAG_CHROMA_HOST', 'localhost'))
+        self.port = int(kwargs.get('port', os.getenv('REFINIRE_RAG_CHROMA_PORT', '8000')))
+        self.collection_name = kwargs.get('collection_name', 
+                                         os.getenv('REFINIRE_RAG_CHROMA_COLLECTION', 'documents'))
         self._client = None
         self._collection = None
         
-        logger.info(f"Initialized ChromaRetriever with host: {self.config.host}:{self.config.port}")
+        logger.info(f"Initialized ChromaRetriever with host: {self.host}:{self.port}")
     
     @property
     def client(self):
@@ -531,13 +540,27 @@ class BERTScoreEvaluator(ReferenceBasedEvaluator):
     BERTScoreによるセマンティック類似度評価
     """
     
-    def __init__(self, config: Optional[BERTScoreConfig] = None):
-        """Initialize BERTScoreEvaluator
+    def __init__(self, **kwargs):
+        """Initialize BERTScoreEvaluator with environment variable support
         
-        BERTScoreEvaluatorを初期化
+        BERTScoreEvaluatorを環境変数サポート付きで初期化
+        
+        Args:
+            **kwargs: Configuration parameters, supporting:
+                     model_type: BERT model type (REFINIRE_RAG_BERTSCORE_MODEL)
+                     num_layers: Number of layers (REFINIRE_RAG_BERTSCORE_LAYERS)
+                     lang: Language code (REFINIRE_RAG_BERTSCORE_LANG)
         """
-        self.config = config or BERTScoreConfig()
-        logger.info(f"Initialized BERTScoreEvaluator with model: {self.config.model_name}")
+        super().__init__(**kwargs)
+        
+        # Environment variable support with priority: kwargs > env vars > defaults
+        import os
+        self.model_type = kwargs.get('model_type', 
+                                   os.getenv('REFINIRE_RAG_BERTSCORE_MODEL', 'microsoft/deberta-xlarge-mnli'))
+        self.num_layers = int(kwargs.get('num_layers', 
+                                       os.getenv('REFINIRE_RAG_BERTSCORE_LAYERS', '40')))
+        self.lang = kwargs.get('lang', os.getenv('REFINIRE_RAG_BERTSCORE_LANG', 'en'))
+        logger.info(f"Initialized BERTScoreEvaluator with model: {self.model_type}")
     
     def evaluate(self, 
                  predictions: List[str], 
@@ -643,14 +666,27 @@ class SentenceBERTReranker(Reranker):
     Sentence-BERTベースの検索結果リランキング
     """
     
-    def __init__(self, config: Optional[SentenceBERTRerankerConfig] = None):
-        """Initialize SentenceBERTReranker
+    def __init__(self, **kwargs):
+        """Initialize SentenceBERTReranker with environment variable support
         
-        SentenceBERTRerankerを初期化
+        SentenceBERTRerankerを環境変数サポート付きで初期化
+        
+        Args:
+            **kwargs: Configuration parameters, supporting:
+                     model_name: Sentence-BERT model (REFINIRE_RAG_SBERT_MODEL)
+                     top_k: Number of results to return (REFINIRE_RAG_SBERT_TOP_K)
+                     batch_size: Processing batch size (REFINIRE_RAG_SBERT_BATCH_SIZE)
         """
-        self.config = config or SentenceBERTRerankerConfig()
+        super().__init__(**kwargs)
+        
+        # Environment variable support with priority: kwargs > env vars > defaults
+        import os
+        self.model_name = kwargs.get('model_name', 
+                                   os.getenv('REFINIRE_RAG_SBERT_MODEL', 'all-MiniLM-L6-v2'))
+        self.top_k = int(kwargs.get('top_k', os.getenv('REFINIRE_RAG_SBERT_TOP_K', '10')))
+        self.batch_size = int(kwargs.get('batch_size', os.getenv('REFINIRE_RAG_SBERT_BATCH_SIZE', '32')))
         self._model = None
-        logger.info(f"Initialized SentenceBERTReranker with model: {self.config.model_name}")
+        logger.info(f"Initialized SentenceBERTReranker with model: {self.model_name}")
     
     @property
     def model(self):

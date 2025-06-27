@@ -16,7 +16,7 @@ Traditional RAG frameworks are powerful but complex. refinire-rag refines the de
 ```python
 # LangChain: 50+ lines of complex setup
 # refinire-rag: 5 lines to production-ready RAG
-manager = CorpusManager.from_env()
+manager = CorpusManager()
 results = manager.import_original_documents("my_corpus", "documents/", "*.md")
 processed = manager.rebuild_corpus_from_original("my_corpus")
 query_engine = QueryEngine(corpus_name="my_corpus", retrievers=manager.retrievers)
