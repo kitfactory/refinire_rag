@@ -185,10 +185,9 @@ Complete 3-part tutorial series covering the entire RAG workflow:
 - [Tutorial 7: RAG Evaluation](docs/tutorials/tutorial_07_rag_evaluation.md) - Advanced evaluation
 
 #### **🔧 Plugin Development**
-- [Plugin Development Guide](docs/plugins/plugin_development.md) - Create custom processors
-- [Embedder Plugin Tutorial](docs/plugins/embedder_plugin.md) - Custom embedding models
-- [Loader Plugin Tutorial](docs/plugins/loader_plugin.md) - Custom document formats
-- [Plugin Registry](docs/plugins/plugin_registry.md) - Available community plugins
+- [Plugin Development Guide](docs/development/plugin_development.md) - Create custom processors
+- [Plugin Development Guide (Detailed)](docs/development/plugin_development_guide.md) - Comprehensive plugin development
+- [Plugin Configuration Policy](PLUGIN_CONFIGURATION_POLICY.md) - Unified configuration patterns
 
 ### 📖 API Reference
 Detailed API documentation for each module.

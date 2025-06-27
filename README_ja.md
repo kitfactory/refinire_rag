@@ -135,10 +135,9 @@ RAGワークフロー全体をカバーする完全な3部構成チュートリ�
 - [チュートリアル7: RAG評価](docs/tutorials/tutorial_07_rag_evaluation_ja.md) - 高度な評価
 
 #### **🔧 プラグイン開発**
-- [プラグイン開発ガイド](docs/plugins/plugin_development_ja.md) - カスタムプロセッサの作成
-- [埋め込みプラグインチュートリアル](docs/plugins/embedder_plugin_ja.md) - カスタム埋め込みモデル
-- [ローダープラグインチュートリアル](docs/plugins/loader_plugin_ja.md) - カスタム文書形式
-- [プラグインレジストリ](docs/plugins/plugin_registry_ja.md) - 利用可能なコミュニティプラグイン
+- [プラグイン開発ガイド](docs/development/plugin_development.md) - カスタムプロセッサの作成
+- [プラグイン開発ガイド（詳細版）](docs/development/plugin_development_guide.md) - 包括的なプラグイン開発
+- [プラグイン設定方針](PLUGIN_CONFIGURATION_POLICY.md) - 統一された設定パターン
 
 ### 📖 APIリファレンス
 各モジュールの詳細APIドキュメント。
