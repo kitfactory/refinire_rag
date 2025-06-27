@@ -46,8 +46,8 @@ class TestOpenAIEmbedderBasics:
         """Test initialization with configuration"""
         config = OpenAIEmbeddingConfig(api_key="test-key")
         
-        with patch('refinire_rag.embedding.openai_embedder.openai.OpenAI'):
-            embedder = OpenAIEmbedder(config)
+        with patch('src.refinire_rag.embedding.openai_embedder.openai.OpenAI'):
+            embedder = OpenAIEmbedder(config=config)
             assert embedder.config.api_key == "test-key"
     
     @patch.dict(os.environ, {}, clear=True)
@@ -60,8 +60,8 @@ class TestOpenAIEmbedderBasics:
         """Test getting embedding dimension"""
         config = OpenAIEmbeddingConfig(api_key="test-key")
         
-        with patch('refinire_rag.embedding.openai_embedder.openai.OpenAI'):
-            embedder = OpenAIEmbedder(config)
+        with patch('src.refinire_rag.embedding.openai_embedder.openai.OpenAI'):
+            embedder = OpenAIEmbedder(config=config)
             assert embedder.get_embedding_dimension() == 1536
 
 
@@ -72,8 +72,8 @@ class TestOpenAIEmbedderEmbedding:
         """Set up test fixtures"""
         self.config = OpenAIEmbeddingConfig(api_key="test-key")
         
-        with patch('refinire_rag.embedding.openai_embedder.openai.OpenAI'):
-            self.embedder = OpenAIEmbedder(self.config)
+        with patch('src.refinire_rag.embedding.openai_embedder.openai.OpenAI'):
+            self.embedder = OpenAIEmbedder(config=self.config)
             self.embedder._client = Mock()
     
     def test_embed_text_success(self):
@@ -158,8 +158,8 @@ class TestOpenAIEmbedderUtilities:
         """Set up test fixtures"""
         self.config = OpenAIEmbeddingConfig(api_key="test-key")
         
-        with patch('refinire_rag.embedding.openai_embedder.openai.OpenAI'):
-            self.embedder = OpenAIEmbedder(self.config)
+        with patch('src.refinire_rag.embedding.openai_embedder.openai.OpenAI'):
+            self.embedder = OpenAIEmbedder(config=self.config)
     
     def test_is_available_with_client(self):
         """Test availability check with client"""
@@ -192,8 +192,8 @@ class TestOpenAIEmbedderModelDimensions:
             model_name="text-embedding-3-small"
         )
         
-        with patch('refinire_rag.embedding.openai_embedder.openai.OpenAI'):
-            embedder = OpenAIEmbedder(config)
+        with patch('src.refinire_rag.embedding.openai_embedder.openai.OpenAI'):
+            embedder = OpenAIEmbedder(config=config)
             assert embedder.config.embedding_dimension == 1536
     
     def test_text_embedding_3_large_dimensions(self):
@@ -203,8 +203,8 @@ class TestOpenAIEmbedderModelDimensions:
             model_name="text-embedding-3-large"
         )
         
-        with patch('refinire_rag.embedding.openai_embedder.openai.OpenAI'):
-            embedder = OpenAIEmbedder(config)
+        with patch('src.refinire_rag.embedding.openai_embedder.openai.OpenAI'):
+            embedder = OpenAIEmbedder(config=config)
             assert embedder.config.embedding_dimension == 3072
     
     def test_ada_002_dimensions(self):
@@ -214,6 +214,6 @@ class TestOpenAIEmbedderModelDimensions:
             model_name="text-embedding-ada-002"
         )
         
-        with patch('refinire_rag.embedding.openai_embedder.openai.OpenAI'):
-            embedder = OpenAIEmbedder(config)
+        with patch('src.refinire_rag.embedding.openai_embedder.openai.OpenAI'):
+            embedder = OpenAIEmbedder(config=config)
             assert embedder.config.embedding_dimension == 1536

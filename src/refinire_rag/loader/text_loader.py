@@ -1,4 +1,4 @@
-from typing import Iterable, Iterator, Optional, Any
+from typing import Iterable, Iterator, Optional, Any, Dict
 from pathlib import Path
 from refinire_rag.loader.loader import Loader
 from refinire_rag.models.document import Document
@@ -12,16 +12,31 @@ class TextLoader(Loader):
         encoding (str): File encoding (default: 'utf-8')
         encoding (str): ファイルのエンコーディング（デフォルト: 'utf-8'）
     """
-    def __init__(self, encoding: str = 'utf-8'):
+    def __init__(self, **kwargs):
         """
         Initialize TextLoader.
         TextLoaderを初期化する。
 
         Args:
-            encoding (str): File encoding
-            encoding (str): ファイルのエンコーディング
+            **kwargs: Configuration parameters, environment variables used as fallback
+                     設定パラメータ、環境変数をフォールバックとして使用
+                encoding (str): File encoding
+                               ファイルのエンコーディング
+                strip_whitespace (bool): Strip leading/trailing whitespace
+                                       前後の空白を削除するか
+                autodetect_encoding (bool): Attempt to auto-detect encoding
+                                          エンコーディングの自動検出を試行するか
         """
-        self.encoding = encoding
+        super().__init__()
+        
+        # Environment variable support with priority: kwargs > env vars > defaults
+        import os
+        
+        self.encoding = kwargs.get('encoding', os.getenv('REFINIRE_RAG_TEXT_ENCODING', 'utf-8'))
+        self.strip_whitespace = kwargs.get('strip_whitespace', os.getenv('REFINIRE_RAG_TEXT_STRIP_WHITESPACE', 'true').lower() == 'true')
+        self.autodetect_encoding = kwargs.get('autodetect_encoding', os.getenv('REFINIRE_RAG_TEXT_AUTODETECT_ENCODING', 'false').lower() == 'true')
+        self.max_file_size = int(kwargs.get('max_file_size', os.getenv('REFINIRE_RAG_TEXT_MAX_FILE_SIZE', '10485760')))  # 10MB default
+        self.skip_empty_files = kwargs.get('skip_empty_files', os.getenv('REFINIRE_RAG_TEXT_SKIP_EMPTY_FILES', 'true').lower() == 'true')
 
     def process(self, documents: Iterable[Document], config: Optional[Any] = None) -> Iterator[Document]:
         """
@@ -70,6 +85,34 @@ class TextLoader(Loader):
                     **doc.metadata,
                     'file_path': str(file_path),
                     'encoding': self.encoding,
-                    'file_type': 'text'
+                    'file_type': 'text',
+                    'file_size': len(content)
                 }
-            ) 
+            )
+    
+    @classmethod
+    def from_env(cls) -> "TextLoader":
+        """Create TextLoader instance from environment variables
+        
+        環境変数からTextLoaderインスタンスを作成
+        
+        Returns:
+            TextLoader instance configured from environment
+        """
+        return cls()
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        
+        Returns:
+            Dict[str, Any]: Current configuration parameters
+        """
+        config = super().get_config()
+        config.update({
+            'encoding': self.encoding,
+            'strip_whitespace': self.strip_whitespace,
+            'autodetect_encoding': self.autodetect_encoding,
+            'max_file_size': self.max_file_size,
+            'skip_empty_files': self.skip_empty_files
+        })
+        return config 

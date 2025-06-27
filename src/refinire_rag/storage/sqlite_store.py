@@ -19,17 +19,43 @@ logger = logging.getLogger(__name__)
 class SQLiteDocumentStore(DocumentStore):
     """SQLite-based document storage implementation"""
     
-    def __init__(self, db_path: str = "./data/documents.db"):
+    def __init__(self, **kwargs):
         """Initialize SQLite document store
         
         Args:
-            db_path: Path to SQLite database file
+            **kwargs: Configuration parameters, environment variables used as fallback
+                     設定パラメータ、環境変数をフォールバックとして使用
+                db_path (str): Path to SQLite database file
+                              SQLiteデータベースファイルのパス
+                timeout (float): Database timeout in seconds
+                               データベースタイムアウト（秒）
+                enable_wal (bool): Enable WAL mode for better performance
+                                 パフォーマンス向上のWALモードを有効にするか
+                auto_vacuum (bool): Enable automatic database vacuuming
+                                  自動データベースバキュームを有効にするか
         """
+        # Environment variable support with priority: kwargs > env vars > defaults
+        import os
+        
+        db_path = kwargs.get('db_path', os.getenv('REFINIRE_RAG_SQLITE_PATH', './data/documents.db'))
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         
-        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        # Additional configuration parameters
+        self.timeout = float(kwargs.get('timeout', os.getenv('REFINIRE_RAG_SQLITE_TIMEOUT', '30.0')))
+        self.enable_wal = kwargs.get('enable_wal', os.getenv('REFINIRE_RAG_SQLITE_ENABLE_WAL', 'true').lower() == 'true')
+        self.auto_vacuum = kwargs.get('auto_vacuum', os.getenv('REFINIRE_RAG_SQLITE_AUTO_VACUUM', 'false').lower() == 'true')
+        self.page_size = int(kwargs.get('page_size', os.getenv('REFINIRE_RAG_SQLITE_PAGE_SIZE', '4096')))
+        self.cache_size = int(kwargs.get('cache_size', os.getenv('REFINIRE_RAG_SQLITE_CACHE_SIZE', '2000')))  # Pages
+        self.synchronous = kwargs.get('synchronous', os.getenv('REFINIRE_RAG_SQLITE_SYNCHRONOUS', 'NORMAL'))
+        self.journal_mode = kwargs.get('journal_mode', os.getenv('REFINIRE_RAG_SQLITE_JOURNAL_MODE', 'WAL' if self.enable_wal else 'DELETE'))
+        
+        # Configure connection with timeout and other settings
+        self.conn = sqlite3.connect(str(self.db_path), check_same_thread=False, timeout=self.timeout)
         self.conn.row_factory = sqlite3.Row  # Enable column access by name
+        
+        # Apply database configuration
+        self._configure_database()
         
         # Check for JSON1 extension
         try:
@@ -42,6 +68,27 @@ class SQLiteDocumentStore(DocumentStore):
         
         self._init_schema()
         logger.info(f"Initialized SQLiteDocumentStore at {self.db_path}")
+    
+    def _configure_database(self):
+        """Configure SQLite database settings"""
+        try:
+            # Set performance and reliability configurations
+            self.conn.execute(f"PRAGMA journal_mode = {self.journal_mode}")
+            self.conn.execute(f"PRAGMA synchronous = {self.synchronous}")
+            self.conn.execute(f"PRAGMA cache_size = -{self.cache_size}")
+            self.conn.execute(f"PRAGMA page_size = {self.page_size}")
+            
+            if self.auto_vacuum:
+                self.conn.execute("PRAGMA auto_vacuum = FULL")
+            
+            # Enable foreign keys
+            self.conn.execute("PRAGMA foreign_keys = ON")
+            
+            self.conn.commit()
+            logger.info(f"SQLite configured: journal_mode={self.journal_mode}, synchronous={self.synchronous}")
+            
+        except sqlite3.Error as e:
+            logger.warning(f"Failed to configure SQLite settings: {e}")
     
     def _init_schema(self):
         """Initialize database schema"""
@@ -675,3 +722,34 @@ class SQLiteDocumentStore(DocumentStore):
             self.close()
         except:
             pass
+    
+    @classmethod
+    def from_env(cls) -> "SQLiteDocumentStore":
+        """Create SQLiteDocumentStore instance from environment variables
+        
+        環境変数からSQLiteDocumentStoreインスタンスを作成
+        
+        Returns:
+            SQLiteDocumentStore instance configured from environment
+        """
+        return cls()
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        
+        Returns:
+            Dict[str, Any]: Current configuration parameters
+        """
+        return {
+            'db_path': str(self.db_path),
+            'timeout': self.timeout,
+            'enable_wal': self.enable_wal,
+            'auto_vacuum': self.auto_vacuum,
+            'page_size': self.page_size,
+            'cache_size': self.cache_size,
+            'synchronous': self.synchronous,
+            'journal_mode': self.journal_mode,
+            'json_enabled': self.json_enabled,
+            'fts_initialized': getattr(self, 'fts_initialized', False),
+            'connection_open': self.conn is not None
+        }

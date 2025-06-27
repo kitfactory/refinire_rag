@@ -26,17 +26,37 @@ class TokenBasedChunker(Chunker):
     """Token-based document chunker
     トークンベースの文書チャンカー"""
     
-    def __init__(self, config: Optional[ChunkingConfig] = None):
+    def __init__(self, **kwargs):
         """Initialize token-based chunker
         トークンベースチャンカーを初期化
         
         Args:
-            config: Optional chunking configuration
+            **kwargs: Configuration parameters, environment variables used as fallback
+                     設定パラメータ、環境変数をフォールバックとして使用
+                config: Optional chunking configuration
+                chunk_size (int): Size of each chunk in tokens
+                             各チャンクのトークン数でのサイズ
+                overlap (int): Number of overlapping tokens between chunks
+                             チャンク間のオーバーラップするトークン数
+                token_pattern (str): Regular expression pattern for tokenization
+                                   トークン化用の正規表現パターン
         """
+        # Create config with environment variable support
+        config = kwargs.get('config')
+        if config is None:
+            config = self._create_config_from_env(**kwargs)
+        
         super().__init__(config)
         
-        # Simple tokenization pattern (can be enhanced)
-        self.token_pattern = re.compile(r'\b\w+\b')
+        # Environment variable support for token pattern
+        import os
+        token_pattern_str = kwargs.get('token_pattern', os.getenv('REFINIRE_RAG_TOKEN_PATTERN', r'\b\w+\b'))
+        self.token_pattern = re.compile(token_pattern_str)
+        
+        # Additional token-based configuration
+        self.preserve_sentences = kwargs.get('preserve_sentences', os.getenv('REFINIRE_RAG_TOKEN_PRESERVE_SENTENCES', 'true').lower() == 'true')
+        self.min_tokens_per_chunk = int(kwargs.get('min_tokens_per_chunk', os.getenv('REFINIRE_RAG_TOKEN_MIN_TOKENS_PER_CHUNK', '10')))
+        self.max_tokens_per_chunk = int(kwargs.get('max_tokens_per_chunk', os.getenv('REFINIRE_RAG_TOKEN_MAX_TOKENS_PER_CHUNK', '1000')))
         
         logger.info(f"Initialized TokenBasedChunker with chunk_size={self.config.chunk_size}, overlap={self.config.overlap}")
     
@@ -94,6 +114,70 @@ class TokenBasedChunker(Chunker):
         logger.debug(f"Created {len(chunk_docs)} token-based chunks from document {document.id}")
         
         return chunk_docs
+    
+    def _create_config_from_env(self, **kwargs):
+        """Create ChunkingConfig from environment variables and kwargs
+        
+        環境変数とkwargsからChunkingConfigを作成
+        """
+        import os
+        from refinire_rag.chunking.chunker import ChunkingConfig
+        
+        # Priority: kwargs > env vars > defaults
+        chunk_size = int(kwargs.get('chunk_size', os.getenv('REFINIRE_RAG_TOKEN_CHUNK_SIZE', '500')))
+        overlap = int(kwargs.get('overlap', os.getenv('REFINIRE_RAG_TOKEN_OVERLAP', '50')))
+        min_chunk_size = int(kwargs.get('min_chunk_size', os.getenv('REFINIRE_RAG_TOKEN_MIN_CHUNK_SIZE', '10')))
+        max_chunk_size = int(kwargs.get('max_chunk_size', os.getenv('REFINIRE_RAG_TOKEN_MAX_CHUNK_SIZE', '1000')))
+        
+        return ChunkingConfig(
+            chunk_size=chunk_size,
+            overlap=overlap,
+            min_chunk_size=min_chunk_size,
+            max_chunk_size=max_chunk_size
+        )
+    
+    @classmethod
+    def from_env(cls) -> "TokenBasedChunker":
+        """Create TokenBasedChunker instance from environment variables
+        
+        環境変数からTokenBasedChunkerインスタンスを作成
+        
+        Returns:
+            TokenBasedChunker instance configured from environment
+        """
+        return cls()
+    
+    def get_config(self) -> dict:
+        """Get current configuration as dictionary
+        
+        Returns:
+            Dict[str, Any]: Current configuration parameters
+        """
+        # Get parent config or start with empty dict
+        config = super().get_config() if hasattr(super(), 'get_config') else {}
+        if config is None:
+            config = {}
+        
+        # Add chunking config parameters
+        if hasattr(self, 'config') and self.config:
+            config.update({
+                'chunk_size': self.config.chunk_size,
+                'overlap': self.config.overlap,
+                'split_by_sentence': getattr(self.config, 'split_by_sentence', True),
+                'preserve_formatting': getattr(self.config, 'preserve_formatting', False),
+                'min_chunk_size': getattr(self.config, 'min_chunk_size', 10),
+                'max_chunk_size': getattr(self.config, 'max_chunk_size', 1024)
+            })
+        
+        # Add token-specific config
+        config.update({
+            'token_pattern': self.token_pattern.pattern,
+            'preserve_sentences': self.preserve_sentences,
+            'min_tokens_per_chunk': self.min_tokens_per_chunk,
+            'max_tokens_per_chunk': self.max_tokens_per_chunk
+        })
+        
+        return config
     
     def estimate_tokens(self, text: str) -> int:
         """Estimate token count using simple tokenization

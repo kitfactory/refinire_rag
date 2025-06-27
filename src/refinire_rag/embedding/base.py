@@ -213,6 +213,16 @@ class Embedder(ABC):
         """Get the dimension of embeddings produced by this embedder"""
         pass
     
+    @abstractmethod
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        
+        Returns:
+            Dict[str, Any]: Current configuration parameters
+                           現在の設定パラメータ
+        """
+        pass
+    
     def validate_text_length(self, text: str) -> bool:
         """Validate that text length is within limits"""
         # Simple token estimation (4 characters per token average)

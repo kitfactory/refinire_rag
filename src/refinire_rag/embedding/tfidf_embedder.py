@@ -67,9 +67,25 @@ class TFIDFEmbedder(Embedder):
     """TF-IDF embeddings implementation
     TF-IDF埋め込みの実装"""
     
-    def __init__(self, config: Optional[TFIDFEmbeddingConfig] = None):
-        """Initialize TF-IDF embedder"""
-        self.config = config or TFIDFEmbeddingConfig()
+    def __init__(self, **kwargs):
+        """Initialize TF-IDF embedder
+        
+        Args:
+            **kwargs: Configuration parameters, environment variables used as fallback
+                     設定パラメータ、環境変数をフォールバックとして使用
+        """
+        # Create config with environment variable support
+        config = kwargs.get('config')
+        if config is None:
+            config = self._create_config_from_env(**kwargs)
+        elif not isinstance(config, TFIDFEmbeddingConfig):
+            # If dict config provided, merge with env vars
+            env_config = self._create_config_from_env()
+            config_dict = config if isinstance(config, dict) else {}
+            merged_config = {**env_config.to_dict(), **config_dict, **kwargs}
+            config = TFIDFEmbeddingConfig(**merged_config)
+        
+        self.config = config
         super().__init__(self.config)
         
         # TF-IDF components
@@ -462,6 +478,135 @@ class TFIDFEmbedder(Embedder):
         # Compute cosine similarity
         similarity = np.dot(embedding1, embedding2) / (norm1 * norm2)
         return float(similarity)
+    
+    def _create_config_from_env(self, **kwargs) -> TFIDFEmbeddingConfig:
+        """Create configuration from environment variables and kwargs
+        
+        環境変数とkwargsから設定を作成
+        """
+        import os
+        
+        # Priority: kwargs > config dict > env vars > defaults
+        def get_value(key, default, env_var):
+            return kwargs.get(key, os.getenv(env_var, default))
+        
+        # Map configuration parameters to environment variables
+        model_name = get_value('model_name', 'tfidf', 'REFINIRE_RAG_TFIDF_MODEL_NAME')
+        
+        # Vocabulary settings
+        max_features = int(get_value('max_features', '10000', 'REFINIRE_RAG_TFIDF_MAX_FEATURES'))
+        min_df = int(get_value('min_df', '2', 'REFINIRE_RAG_TFIDF_MIN_DF'))
+        max_df = float(get_value('max_df', '0.95', 'REFINIRE_RAG_TFIDF_MAX_DF'))
+        
+        # N-gram range (parse tuple from string)
+        ngram_range_str = get_value('ngram_range', '1,2', 'REFINIRE_RAG_TFIDF_NGRAM_RANGE')
+        if isinstance(ngram_range_str, str):
+            ngram_parts = ngram_range_str.split(',')
+            ngram_range = (int(ngram_parts[0]), int(ngram_parts[1])) if len(ngram_parts) == 2 else (1, 2)
+        else:
+            ngram_range = ngram_range_str or (1, 2)
+        
+        # Boolean parameters
+        lowercase = get_value('lowercase', 'true', 'REFINIRE_RAG_TFIDF_LOWERCASE').lower() == 'true'
+        remove_stopwords = get_value('remove_stopwords', 'true', 'REFINIRE_RAG_TFIDF_REMOVE_STOPWORDS').lower() == 'true'
+        use_idf = get_value('use_idf', 'true', 'REFINIRE_RAG_TFIDF_USE_IDF').lower() == 'true'
+        smooth_idf = get_value('smooth_idf', 'true', 'REFINIRE_RAG_TFIDF_SMOOTH_IDF').lower() == 'true'
+        sublinear_tf = get_value('sublinear_tf', 'true', 'REFINIRE_RAG_TFIDF_SUBLINEAR_TF').lower() == 'true'
+        normalize_vectors = get_value('normalize_vectors', 'true', 'REFINIRE_RAG_TFIDF_NORMALIZE_VECTORS').lower() == 'true'
+        auto_save_model = get_value('auto_save_model', 'true', 'REFINIRE_RAG_TFIDF_AUTO_SAVE_MODEL').lower() == 'true'
+        enable_caching = get_value('enable_caching', 'true', 'REFINIRE_RAG_TFIDF_ENABLE_CACHING').lower() == 'true'
+        fail_on_error = get_value('fail_on_error', 'true', 'REFINIRE_RAG_TFIDF_FAIL_ON_ERROR').lower() == 'true'
+        
+        # Numeric parameters
+        embedding_dimension = int(get_value('embedding_dimension', '10000', 'REFINIRE_RAG_TFIDF_EMBEDDING_DIMENSION'))
+        batch_size = int(get_value('batch_size', '1000', 'REFINIRE_RAG_TFIDF_BATCH_SIZE'))
+        max_tokens = int(get_value('max_tokens', '8192', 'REFINIRE_RAG_TFIDF_MAX_TOKENS'))
+        cache_ttl_seconds = int(get_value('cache_ttl_seconds', '3600', 'REFINIRE_RAG_TFIDF_CACHE_TTL'))
+        max_retries = int(get_value('max_retries', '3', 'REFINIRE_RAG_TFIDF_MAX_RETRIES'))
+        retry_delay_seconds = float(get_value('retry_delay_seconds', '1.0', 'REFINIRE_RAG_TFIDF_RETRY_DELAY'))
+        
+        # String parameters
+        language = get_value('language', 'english', 'REFINIRE_RAG_TFIDF_LANGUAGE')
+        model_path = get_value('model_path', None, 'REFINIRE_RAG_TFIDF_MODEL_PATH')
+        
+        # Custom stopwords (parse from comma-separated string)
+        custom_stopwords_str = get_value('custom_stopwords', None, 'REFINIRE_RAG_TFIDF_CUSTOM_STOPWORDS')
+        custom_stopwords = None
+        if custom_stopwords_str:
+            custom_stopwords = set(word.strip() for word in custom_stopwords_str.split(','))
+        
+        return TFIDFEmbeddingConfig(
+            model_name=model_name,
+            max_features=max_features,
+            min_df=min_df,
+            max_df=max_df,
+            ngram_range=ngram_range,
+            lowercase=lowercase,
+            remove_stopwords=remove_stopwords,
+            custom_stopwords=custom_stopwords,
+            use_idf=use_idf,
+            smooth_idf=smooth_idf,
+            sublinear_tf=sublinear_tf,
+            normalize_vectors=normalize_vectors,
+            normalize_embeddings=normalize_vectors,  # Alias for compatibility
+            model_path=model_path,
+            auto_save_model=auto_save_model,
+            embedding_dimension=embedding_dimension,
+            batch_size=batch_size,
+            language=language,
+            enable_caching=enable_caching,
+            cache_ttl_seconds=cache_ttl_seconds,
+            max_tokens=max_tokens,
+            max_retries=max_retries,
+            retry_delay_seconds=retry_delay_seconds,
+            fail_on_error=fail_on_error
+        )
+    
+    @classmethod
+    def from_env(cls) -> "TFIDFEmbedder":
+        """Create TFIDFEmbedder instance from environment variables
+        
+        環境変数からTFIDFEmbedderインスタンスを作成
+        
+        Returns:
+            TFIDFEmbedder instance configured from environment
+        """
+        return cls()
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        
+        Returns:
+            Dict[str, Any]: Current configuration parameters
+        """
+        return {
+            'model_name': self.config.model_name,
+            'max_features': self.config.max_features,
+            'min_df': self.config.min_df,
+            'max_df': self.config.max_df,
+            'ngram_range': self.config.ngram_range,
+            'lowercase': self.config.lowercase,
+            'remove_stopwords': self.config.remove_stopwords,
+            'custom_stopwords': list(self.config.custom_stopwords) if self.config.custom_stopwords else None,
+            'use_idf': self.config.use_idf,
+            'smooth_idf': self.config.smooth_idf,
+            'sublinear_tf': self.config.sublinear_tf,
+            'normalize_vectors': self.config.normalize_vectors,
+            'normalize_embeddings': self.config.normalize_embeddings,
+            'model_path': self.config.model_path,
+            'auto_save_model': self.config.auto_save_model,
+            'embedding_dimension': self.config.embedding_dimension,
+            'batch_size': self.config.batch_size,
+            'language': self.config.language,
+            'enable_caching': self.config.enable_caching,
+            'cache_ttl_seconds': self.config.cache_ttl_seconds,
+            'max_tokens': self.config.max_tokens,
+            'max_retries': self.config.max_retries,
+            'retry_delay_seconds': self.config.retry_delay_seconds,
+            'fail_on_error': self.config.fail_on_error,
+            'is_fitted': self._is_fitted,
+            'vocabulary_size': len(self._vocabulary) if self._is_fitted else 0
+        }
     
     def embed_batch(self, texts: List[str]) -> List[np.ndarray]:
         """Alias for embed_texts for compatibility

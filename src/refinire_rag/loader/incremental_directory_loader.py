@@ -29,45 +29,54 @@ class IncrementalDirectoryLoader(Loader):
     削除されたファイルのみを処理します。
     """
     
-    def __init__(self, 
-                 directory_path: Union[str, Path],
-                 document_store: DocumentStore,
-                 filter_config: Optional[FilterConfig] = None,
-                 tracking_file_path: Optional[Path] = None,
-                 recursive: bool = True,
-                 metadata_processors: Optional[List[Metadata]] = None,
-                 additional_metadata: Optional[Dict[str, Any]] = None):
+    def __init__(self, **kwargs):
         """
         Initialize the incremental directory loader
         インクリメンタルディレクトリローダーを初期化
         
         Args:
-            directory_path: Path to the directory to monitor
-            document_store: DocumentStore instance for document storage operations
-            filter_config: Optional filter configuration for file inclusion/exclusion
-            tracking_file_path: Optional path to persist file tracking data
-            recursive: Whether to scan subdirectories recursively
-            metadata_processors: Optional metadata processors
-            additional_metadata: Additional metadata to add to all documents
-            directory_path: 監視するディレクトリのパス
-            document_store: 文書ストレージ操作用のDocumentStoreインスタンス
-            filter_config: ファイル包含/除外用のオプションフィルター設定
-            tracking_file_path: ファイル追跡データを永続化するオプションのパス
-            recursive: サブディレクトリを再帰的にスキャンするかどうか
-            metadata_processors: オプションのメタデータプロセッサー
-            additional_metadata: すべての文書に追加する追加メタデータ
+            **kwargs: Configuration parameters, environment variables used as fallback
+                     設定パラメータ、環境変数をフォールバックとして使用
+                directory_path: Path to the directory to monitor
+                document_store: DocumentStore instance for document storage operations
+                filter_config: Optional filter configuration for file inclusion/exclusion
+                tracking_file_path: Optional path to persist file tracking data
+                recursive: Whether to scan subdirectories recursively
+                metadata_processors: Optional metadata processors
+                additional_metadata: Additional metadata to add to all documents
         """
+        # Environment variable support with priority: kwargs > env vars > defaults
+        import os
+        
+        metadata_processors = kwargs.get('metadata_processors')
         super().__init__(metadata_processors)
         
+        # Required parameters with fallbacks
+        directory_path = kwargs.get('directory_path', os.getenv('REFINIRE_RAG_INCREMENTAL_DIRECTORY_PATH', '.'))
         self.directory_path = Path(directory_path)
-        self.document_store = document_store
-        self.filter_config = filter_config
-        self.recursive = recursive
-        self.additional_metadata = additional_metadata or {}
+        
+        # Get document_store (required, no default)
+        self.document_store = kwargs.get('document_store')
+        if self.document_store is None:
+            raise ValueError("document_store is required for IncrementalDirectoryLoader")
+        
+        # Optional parameters with environment variable support
+        self.filter_config = kwargs.get('filter_config')
+        
+        tracking_file_path = kwargs.get('tracking_file_path', os.getenv('REFINIRE_RAG_INCREMENTAL_TRACKING_FILE'))
+        self.tracking_file_path = Path(tracking_file_path) if tracking_file_path else None
+        
+        self.recursive = kwargs.get('recursive', os.getenv('REFINIRE_RAG_INCREMENTAL_RECURSIVE', 'true').lower() == 'true')
+        self.additional_metadata = kwargs.get('additional_metadata', {})
+        
+        # Scan intervals and thresholds
+        self.scan_interval = int(kwargs.get('scan_interval', os.getenv('REFINIRE_RAG_INCREMENTAL_SCAN_INTERVAL', '300')))  # 5 minutes
+        self.batch_size = int(kwargs.get('batch_size', os.getenv('REFINIRE_RAG_INCREMENTAL_BATCH_SIZE', '100')))
+        self.max_file_size = int(kwargs.get('max_file_size', os.getenv('REFINIRE_RAG_INCREMENTAL_MAX_FILE_SIZE', '10485760')))  # 10MB
         
         # Initialize file tracker
         # ファイルトラッカーを初期化
-        self.file_tracker = FileTracker(tracking_file_path)
+        self.file_tracker = FileTracker(self.tracking_file_path)
         
         # Validate directory
         # ディレクトリを検証
@@ -382,3 +391,17 @@ class IncrementalDirectoryLoader(Loader):
             }
         
         return config_dict
+    
+    @classmethod
+    def from_env(cls, document_store: DocumentStore) -> "IncrementalDirectoryLoader":
+        """Create IncrementalDirectoryLoader instance from environment variables
+        
+        環境変数からIncrementalDirectoryLoaderインスタンスを作成
+        
+        Args:
+            document_store: Required DocumentStore instance
+        
+        Returns:
+            IncrementalDirectoryLoader instance configured from environment
+        """
+        return cls(document_store=document_store)

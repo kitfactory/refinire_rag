@@ -22,7 +22,7 @@ class TestTFIDFEmbedderSimple:
             ngram_range=(1, 2)
         )
         
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         assert embedder.config.max_features == 100
         assert embedder.config.min_df == 1
         assert embedder.config.ngram_range == (1, 2)
@@ -30,7 +30,7 @@ class TestTFIDFEmbedderSimple:
     def test_fit_and_embed(self):
         """Test fitting and embedding text"""
         config = TFIDFEmbeddingConfig(max_features=50, min_df=1)
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         # Test texts
         texts = [
@@ -53,7 +53,7 @@ class TestTFIDFEmbedderSimple:
     def test_embed_documents(self):
         """Test embedding documents"""
         config = TFIDFEmbeddingConfig(max_features=30, min_df=1)
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         docs = [
             Document(id="doc1", content="machine learning", metadata={}),
@@ -68,7 +68,7 @@ class TestTFIDFEmbedderSimple:
     def test_get_dimension(self):
         """Test getting embedding dimension"""
         config = TFIDFEmbeddingConfig(max_features=20, min_df=1)
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         texts = ["test text", "another text"]
         embedder.fit(texts)
@@ -81,7 +81,7 @@ class TestTFIDFEmbedderSimple:
     def test_vocabulary_access(self):
         """Test vocabulary access"""
         config = TFIDFEmbeddingConfig(max_features=15, min_df=1)
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         texts = ["machine learning", "data science"]
         embedder.fit(texts)
@@ -97,7 +97,7 @@ class TestTFIDFEmbedderSimple:
     def test_similarity_calculation(self):
         """Test similarity calculation"""
         config = TFIDFEmbeddingConfig(max_features=25, min_df=1)
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         texts = ["machine learning", "data science", "programming"]
         embedder.fit(texts)
@@ -113,7 +113,7 @@ class TestTFIDFEmbedderSimple:
     def test_batch_embedding(self):
         """Test batch embedding"""
         config = TFIDFEmbeddingConfig(max_features=40, min_df=1)
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         texts = ["text one", "text two", "text three"]
         embedder.fit(texts)
@@ -155,7 +155,7 @@ class TestTFIDFEmbedderSimple:
     def test_empty_text_handling(self):
         """Test empty text handling"""
         config = TFIDFEmbeddingConfig(max_features=5, min_df=1)
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         texts = ["some text"]
         embedder.fit(texts)
@@ -172,7 +172,7 @@ class TestTFIDFEmbedderSimple:
             min_df=1,
             normalize_embeddings=True
         )
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         texts = ["machine learning", "data science"]
         embedder.fit(texts)
@@ -195,7 +195,7 @@ class TestTFIDFEmbedderAdvanced:
             ngram_range=(1, 2),
             min_df=1
         )
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         
         texts = ["machine learning", "deep learning"]
         embedder.fit(texts)
@@ -225,7 +225,7 @@ class TestTFIDFEmbedderAdvanced:
             max_features=100
         )
         
-        embedder = TFIDFEmbedder(config)
+        embedder = TFIDFEmbedder(config=config)
         embedder.fit(texts)
         
         feature_names = embedder.get_feature_names()
@@ -266,21 +266,21 @@ class TestTFIDFEmbedderError:
     
     def test_embed_before_fit(self):
         """Test embedding before fitting"""
-        embedder = TFIDFEmbedder(TFIDFEmbeddingConfig())
+        embedder = TFIDFEmbedder(config=TFIDFEmbeddingConfig())
         
         with pytest.raises(ValueError):
             embedder.embed_text("test")
     
     def test_fit_empty_corpus(self):
         """Test fitting with empty corpus"""
-        embedder = TFIDFEmbedder(TFIDFEmbeddingConfig())
+        embedder = TFIDFEmbedder(config=TFIDFEmbeddingConfig())
         
         with pytest.raises(ValueError):
             embedder.fit([])
     
     def test_fit_with_empty_strings(self):
         """Test fitting with all empty strings"""
-        embedder = TFIDFEmbedder(TFIDFEmbeddingConfig(min_df=1))
+        embedder = TFIDFEmbedder(config=TFIDFEmbeddingConfig(min_df=1))
         
         # This might raise an error or handle gracefully
         try:

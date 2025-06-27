@@ -9,20 +9,36 @@ class CSVLoader(Loader):
     Load CSV files and convert each row into a Document.
     CSVファイルを読み込み、各行をDocumentに変換する。
     """
-    def __init__(self, encoding: str = 'utf-8', include_header: bool = False):
+    def __init__(self, **kwargs):
         """
         Initialize the CSVLoader.
         CSVLoaderを初期化する。
 
         Args:
-            encoding (str): The encoding to use when reading the CSV file.
-                           CSVファイルを読み込む際に使用するエンコーディング。
-            include_header (bool): Whether to include the header row in each document.
-                                 各ドキュメントにヘッダー行を含めるかどうか。
+            **kwargs: Configuration parameters, environment variables used as fallback
+                     設定パラメータ、環境変数をフォールバックとして使用
+                encoding (str): The encoding to use when reading the CSV file.
+                               CSVファイルを読み込む際に使用するエンコーディング。
+                include_header (bool): Whether to include the header row in each document.
+                                     各ドキュメントにヘッダー行を含めるかどうか。
+                delimiter (str): CSV field delimiter
+                               CSVフィールドデリミタ
         """
         super().__init__()
-        self.encoding = encoding
-        self.include_header = include_header
+        
+        # Environment variable support with priority: kwargs > env vars > defaults
+        import os
+        
+        self.encoding = kwargs.get('encoding', os.getenv('REFINIRE_RAG_CSV_ENCODING', 'utf-8'))
+        self.include_header = kwargs.get('include_header', os.getenv('REFINIRE_RAG_CSV_INCLUDE_HEADER', 'false').lower() == 'true')
+        self.delimiter = kwargs.get('delimiter', os.getenv('REFINIRE_RAG_CSV_DELIMITER', ','))
+        self.quotechar = kwargs.get('quotechar', os.getenv('REFINIRE_RAG_CSV_QUOTECHAR', '"'))
+        self.skip_blank_lines = kwargs.get('skip_blank_lines', os.getenv('REFINIRE_RAG_CSV_SKIP_BLANK_LINES', 'true').lower() == 'true')
+        self.text_column = kwargs.get('text_column', os.getenv('REFINIRE_RAG_CSV_TEXT_COLUMN', None))
+        self.content_columns = kwargs.get('content_columns', None)
+        if self.content_columns is None:
+            content_cols_env = os.getenv('REFINIRE_RAG_CSV_CONTENT_COLUMNS')
+            self.content_columns = content_cols_env.split(',') if content_cols_env else None
 
     def process(self, documents: List[Document]) -> Iterator[Document]:
         """
@@ -89,4 +105,33 @@ class CSVLoader(Loader):
             except FileNotFoundError:
                 raise FileNotFoundError(f"CSV file not found: {file_path}")
             except Exception as e:
-                raise Exception(f"Error processing CSV file {file_path}: {str(e)}") 
+                raise Exception(f"Error processing CSV file {file_path}: {str(e)}")
+    
+    @classmethod
+    def from_env(cls) -> "CSVLoader":
+        """Create CSVLoader instance from environment variables
+        
+        環境変数からCSVLoaderインスタンスを作成
+        
+        Returns:
+            CSVLoader instance configured from environment
+        """
+        return cls()
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get current configuration as dictionary
+        
+        Returns:
+            Dict[str, Any]: Current configuration parameters
+        """
+        config = super().get_config()
+        config.update({
+            'encoding': self.encoding,
+            'include_header': self.include_header,
+            'delimiter': self.delimiter,
+            'quotechar': self.quotechar,
+            'skip_blank_lines': self.skip_blank_lines,
+            'text_column': self.text_column,
+            'content_columns': self.content_columns
+        })
+        return config 
