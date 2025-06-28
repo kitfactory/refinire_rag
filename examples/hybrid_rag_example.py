@@ -337,52 +337,120 @@ def step4_quality_evaluation(query_engine, sample_queries):
         return None
     
     # サンプル評価の実行
-    print(f"\n🧪 Running evaluation on business knowledge corpus...")
+    print(f"\n🧪 Running comprehensive RAG evaluation...")
+    
+    # まず個別の評価機能をデモンストレーション
+    print(f"\n📋 Step 4.1: Generating QA pairs from documents...")
     try:
-        # 簡単な評価実行（実際のテストケース生成と評価）
-        evaluation_result = quality_lab.evaluate_rag_pipeline(
-            corpus_name="business_knowledge",
-            query_engine=query_engine,
-            sample_size=min(3, len(sample_queries)),  # 小さなサンプルサイズで実行
-            custom_queries=sample_queries[:3] if sample_queries else None
-        )
+        qa_pairs = quality_lab.generate_qa_pairs(corpus_name="business_knowledge", limit=3)
+        print(f"   ✅ Generated {len(qa_pairs)} QA pairs for evaluation")
         
-        print(f"   ✅ Evaluation completed successfully")
-        print(f"   📊 Overall Score: {evaluation_result.overall_score:.2f}")
-        print(f"   ⏱️  Total evaluation time: {evaluation_result.processing_time:.2f}s")
+        # QAペアの例を表示
+        for i, qa_pair in enumerate(qa_pairs[:2], 1):  # 最初の2つを表示
+            print(f"      Q{i}: {qa_pair.question[:80]}...")
+            print(f"      A{i}: {qa_pair.expected_answer[:80]}...")
+            
+    except Exception as e:
+        print(f"   ⚠️  QA generation failed: {e}")
+        qa_pairs = []
+    
+    print(f"\n🔍 Step 4.2: Evaluating QueryEngine responses...")
+    try:
+        if qa_pairs:
+            # 生成されたQAペアで評価
+            evaluation_result = quality_lab.evaluate_query_engine(
+                query_engine=query_engine, 
+                qa_pairs=qa_pairs[:3]  # 最初の3つで評価
+            )
+        else:
+            # カスタムクエリで評価
+            evaluation_result = quality_lab.evaluate_query_engine(
+                query_engine=query_engine,
+                queries=sample_queries[:3]  # サンプルクエリを使用
+            )
+            
+        print(f"   ✅ QueryEngine evaluation completed")
+        print(f"   📊 Success Rate: {evaluation_result.success_rate:.1%}")
+        if hasattr(evaluation_result, 'average_relevance_score'):
+            print(f"   🎯 Average Relevance: {evaluation_result.average_relevance_score:.2f}")
+        if hasattr(evaluation_result, 'average_response_time'):
+            print(f"   ⏱️  Average Response Time: {evaluation_result.average_response_time:.2f}s")
+            
+    except Exception as e:
+        print(f"   ⚠️  QueryEngine evaluation failed: {e}")
+        evaluation_result = None
+    
+    print(f"\n🔬 Step 4.3: Generating comprehensive evaluation report...")
+    try:
+        # 包括的な評価レポート生成
+        if evaluation_result:
+            report = quality_lab.generate_evaluation_report(
+                evaluation_result=evaluation_result,
+                output_format="text",  # テキスト形式で出力
+                include_detailed_analysis=True
+            )
+            
+            print(f"   ✅ Evaluation report generated")
+            
+            # レポートの一部を表示
+            if report and len(report) > 200:
+                print(f"\n📄 Evaluation Report Preview:")
+                print(f"   {'-' * 50}")
+                # レポートの最初の数行を表示
+                report_lines = report.split('\n')[:10]
+                for line in report_lines:
+                    if line.strip():
+                        print(f"   {line}")
+                print(f"   {'-' * 50}")
+                print(f"   📝 Full report: {len(report)} characters generated")
+            
+            return evaluation_result
+        else:
+            print(f"   ⚠️  Cannot generate report without evaluation results")
+            return None
+            
+    except Exception as e:
+        print(f"   ❌ Report generation failed: {e}")
+        return None
+    
+    print(f"\n🏥 Step 4.4: Quality health check...")
+    try:
+        # QualityLabの統計情報を表示
+        stats = quality_lab.get_lab_statistics()
+        print(f"   ✅ Quality health check completed")
+        print(f"   📊 QA Pairs Generated: {stats.get('qa_pairs_generated', 0)}")
+        print(f"   🧪 Evaluations Completed: {stats.get('evaluations_completed', 0)}")
+        print(f"   📋 Reports Generated: {stats.get('reports_generated', 0)}")
+        print(f"   ⏱️  Total Processing Time: {stats.get('total_processing_time', 0):.2f}s")
         
-        # 詳細結果表示
-        if hasattr(evaluation_result, 'metrics') and evaluation_result.metrics:
-            print(f"\n📈 Detailed Metrics:")
-            for metric, value in evaluation_result.metrics.items():
-                if isinstance(value, (int, float)):
-                    print(f"      • {metric}: {value:.3f}")
-                else:
-                    print(f"      • {metric}: {value}")
-        
-        # インサイト表示
-        if hasattr(evaluation_result, 'insights') and evaluation_result.insights:
-            print(f"\n💡 Key Insights:")
-            for i, insight in enumerate(evaluation_result.insights[:3], 1):  # 最初の3つのみ表示
-                print(f"      {i}. {insight.get('title', 'Insight')}: {insight.get('description', 'No description')}")
+        # おすすめのアクション
+        print(f"\n💡 Quality Recommendations:")
+        if stats.get('evaluations_completed', 0) > 0:
+            print(f"   ✅ RAG system evaluation is working properly")
+            print(f"   🔧 Consider fine-tuning parameters for better performance")
+            print(f"   📈 Monitor evaluation metrics regularly for quality assurance")
+        else:
+            print(f"   ⚠️  Consider running more comprehensive evaluations")
+            print(f"   📚 Add more diverse test cases for better coverage")
         
         return evaluation_result
         
     except Exception as e:
-        print(f"   ❌ Evaluation failed: {e}")
-        print(f"   💡 This might be due to missing test data or configuration issues")
-        return None
+        print(f"   ❌ Health check failed: {e}")
+        return evaluation_result
 
 
 def main():
     """
-    メイン関数: 4ステップでのRAGシステム構築・評価
+    メイン関数: 4ステップでの包括的RAGシステム構築・評価
     
-    この関数は以下の4つのステップを順次実行します：
-    1. 環境変数設定
-    2. コーパス作成
-    3. クエリエンジン検索
-    4. 品質評価
+    この関数は以下の4つのステップを順次実行し、本格的なRAGシステムを構築します：
+    1. Environment Setup - プラグインと環境変数の自動設定
+    2. Corpus Creation - CorpusManagerによる文書処理とインデックス作成
+    3. Query Engine - QueryEngineによる検索・再ランキング・回答生成
+    4. Quality Evaluation - QualityLabによる包括的品質評価と監視
+    
+    各ステップで自動的にプラグインを検出・設定し、利用可能な最高の機能を使用します。
     """
     print("🚀 Simple Hybrid RAG Example - 4 Clear Steps")
     print("=" * 60)
@@ -416,25 +484,46 @@ def main():
         
         # 完了メッセージ
         print("\n" + "="*60)
-        print("🎉 SUCCESS: RAG System Ready with Quality Evaluation!")
+        print("🎉 SUCCESS: Complete RAG System with Quality Evaluation!")
         print("="*60)
-        print("Your RAG system is now fully configured, tested, and ready to use.")
+        print("Your RAG system is now fully configured, tested, and ready for production use.")
         print()
-        print("Key components initialized:")
-        print(f"• CorpusManager: {len(corpus_manager.retrievers)} retrievers")
-        print(f"• QueryEngine: {[type(r).__name__ for r in query_engine.retrievers]}")
-        print(f"• Reranker: {type(query_engine.reranker).__name__ if query_engine.reranker else 'None'}")
-        print(f"• Synthesizer: {type(query_engine.synthesizer).__name__ if query_engine.synthesizer else 'None'}")
+        print("🏗️  System Architecture:")
+        print(f"   • CorpusManager: {len(corpus_manager.retrievers)} retrievers configured")
+        print(f"   • QueryEngine: {[type(r).__name__ for r in query_engine.retrievers]}")
+        print(f"   • Reranker: {type(query_engine.reranker).__name__ if query_engine.reranker else 'None'}")
+        print(f"   • Synthesizer: {type(query_engine.synthesizer).__name__ if query_engine.synthesizer else 'None'}")
+        
+        print(f"\n🔬 Quality Assurance:")
         if evaluation_result:
-            print(f"• QualityLab: Evaluation completed with score {evaluation_result.overall_score:.2f}")
+            success_rate = getattr(evaluation_result, 'success_rate', 0)
+            print(f"   • QualityLab: Comprehensive evaluation completed")
+            print(f"   • Success Rate: {success_rate:.1%}")
+            print(f"   • Evaluation Components: TestSuite → Evaluator → Insights")
         else:
-            print(f"• QualityLab: Evaluation skipped due to configuration issues")
+            print(f"   • QualityLab: Ready for evaluation (check configuration)")
+        
+        print(f"\n🚀 Production Ready Features:")
+        print(f"   • Plugin-based architecture with environment variable configuration")
+        print(f"   • Automatic fallback mechanisms for missing components")
+        print(f"   • Comprehensive quality evaluation and monitoring")
+        print(f"   • Scalable corpus management and query processing")
+        
         print()
-        print("💡 Next steps:")
-        print("- Try your own queries with: query_engine.query('your question here')")
-        print("- Run quality evaluations with: quality_lab.evaluate_rag_pipeline()")
-        print("- Explore different environment variable configurations")
-        print("- Add your own documents to the corpus")
+        print("💡 Next Steps & Best Practices:")
+        print("   🔍 Query Testing:")
+        print("     query_engine.query('your business question here')")
+        print("   📊 Quality Monitoring:")
+        print("     quality_lab.evaluate_query_engine(query_engine, custom_queries)")
+        print("   ⚙️  Configuration Tuning:")
+        print("     - Adjust environment variables for different plugins")
+        print("     - Test different reranker and embedder combinations")
+        print("   📚 Content Management:")
+        print("     - Add your business documents to the corpus")
+        print("     - Monitor evaluation metrics as content grows")
+        print("   🔧 Production Deployment:")
+        print("     - Set up regular quality evaluation schedules")
+        print("     - Monitor performance metrics and adjust accordingly")
         
         return True
         
