@@ -1,0 +1,142 @@
+{
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_001.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_001.txt",
+    "size": 668,
+    "modified_at": "2025-06-27T17:25:57.123430",
+    "hash_md5": "68760c8735cfe50d47323903e0b52d1a",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_002.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_002.txt",
+    "size": 663,
+    "modified_at": "2025-06-27T17:26:05.919585",
+    "hash_md5": "23f4ce51bec2c2fdd021f8511a7ee6e9",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_003.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_003.txt",
+    "size": 646,
+    "modified_at": "2025-06-27T17:26:15.798120",
+    "hash_md5": "a95b02e6683ff34ec0611a87e50f7fe0",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_004.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_004.txt",
+    "size": 646,
+    "modified_at": "2025-06-27T17:26:25.117939",
+    "hash_md5": "f12056cbb5936bbbfd489d294233984c",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_005.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_005.txt",
+    "size": 637,
+    "modified_at": "2025-06-27T17:26:34.280855",
+    "hash_md5": "1ee7c120db83efe469509cba43793ae6",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_006.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_006.txt",
+    "size": 643,
+    "modified_at": "2025-06-27T17:26:43.066691",
+    "hash_md5": "dc4464355b6c50650d902de7cd69d1b7",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_007.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_007.txt",
+    "size": 634,
+    "modified_at": "2025-06-27T17:26:51.911303",
+    "hash_md5": "61f3ff0109fbd15244cfbf59e6e4a25e",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_008.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_008.txt",
+    "size": 650,
+    "modified_at": "2025-06-27T17:27:01.594265",
+    "hash_md5": "8843dc7e27fe1d4039e84c3a32f978ea",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_009.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_009.txt",
+    "size": 668,
+    "modified_at": "2025-06-27T17:27:09.855500",
+    "hash_md5": "117d8d56c23b8453fe81a90229090b94",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_010.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_010.txt",
+    "size": 680,
+    "modified_at": "2025-06-27T17:27:18.963668",
+    "hash_md5": "d64133020fb423689b9eeda385f121dd",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_011.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_011.txt",
+    "size": 714,
+    "modified_at": "2025-06-27T17:27:28.519985",
+    "hash_md5": "e7ea6a08a0de428ab01fa6730cc7062e",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_012.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_012.txt",
+    "size": 776,
+    "modified_at": "2025-06-27T17:27:38.584883",
+    "hash_md5": "bd44e48e1f9fefb9bef44b9514876abf",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_013.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_013.txt",
+    "size": 677,
+    "modified_at": "2025-06-27T17:27:47.982743",
+    "hash_md5": "d5b5d5a9d6ca20eb03b10f6f5ae54909",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_014.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_014.txt",
+    "size": 695,
+    "modified_at": "2025-06-27T17:27:57.339797",
+    "hash_md5": "08c9baaba4aa7d6fc2b9a5f7453ade1a",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_015.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_015.txt",
+    "size": 680,
+    "modified_at": "2025-06-27T17:28:06.192232",
+    "hash_md5": "50c8cae582a6ae006b72e8bac7b28635",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_016.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_016.txt",
+    "size": 647,
+    "modified_at": "2025-06-27T17:28:15.294586",
+    "hash_md5": "ca0326282913f71158d62752c28ef20f",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_017.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_017.txt",
+    "size": 678,
+    "modified_at": "2025-06-27T17:28:24.065982",
+    "hash_md5": "9c2b6615e4d03a6e7102e07837d30102",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_018.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_018.txt",
+    "size": 662,
+    "modified_at": "2025-06-27T17:28:33.145335",
+    "hash_md5": "eb3ed02c8bc13f55416256a3494d3f09",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_019.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_019.txt",
+    "size": 703,
+    "modified_at": "2025-06-27T17:28:41.742290",
+    "hash_md5": "062c3aa2605957d8cea7426425f620ea",
+    "file_type": "text"
+  },
+  "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_020.txt": {
+    "path": "/mnt/c/Users/kitad/workspace/refinire-rag/tests/data/business_dataset/business_020.txt",
+    "size": 731,
+    "modified_at": "2025-06-27T17:28:49.901150",
+    "hash_md5": "ac41cc565a1b0b49a47627869f89f60a",
+    "file_type": "text"
+  }
+}

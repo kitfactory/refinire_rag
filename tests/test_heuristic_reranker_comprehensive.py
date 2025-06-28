@@ -1,10 +1,10 @@
 """
-Comprehensive tests for SimpleReranker functionality
-SimpleReranker機能の包括的テスト
+Comprehensive tests for HeuristicReranker functionality
+HeuristicReranker機能の包括的テスト
 
-This module provides comprehensive coverage for the SimpleReranker class,
+This module provides comprehensive coverage for the HeuristicReranker class,
 testing all configuration options, reranking strategies, scoring adjustments, and edge cases.
-このモジュールは、SimpleRerankerクラスの包括的カバレッジを提供し、
+このモジュールは、HeuristicRerankerクラスの包括的カバレッジを提供し、
 全ての設定オプション、再ランク戦略、スコア調整、エッジケースをテストします。
 """
 
@@ -13,15 +13,15 @@ import os
 from unittest.mock import Mock, patch
 from typing import List
 
-from refinire_rag.retrieval.simple_reranker import SimpleReranker, SimpleRerankerConfig
+from refinire_rag.retrieval.heuristic_reranker import HeuristicReranker, HeuristicRerankerConfig
 from refinire_rag.retrieval.base import SearchResult, RerankerConfig
 from refinire_rag.models.document import Document
 
 
-class TestSimpleRerankerConfig:
+class TestHeuristicRerankerConfig:
     """
-    Test SimpleRerankerConfig configuration and validation
-    SimpleRerankerConfigの設定と検証のテスト
+    Test HeuristicRerankerConfig configuration and validation
+    HeuristicRerankerConfigの設定と検証のテスト
     """
     
     def test_default_configuration(self):
@@ -29,12 +29,12 @@ class TestSimpleRerankerConfig:
         Test default configuration values
         デフォルト設定値のテスト
         """
-        config = SimpleRerankerConfig()
+        config = HeuristicRerankerConfig()
         
         # Test default values
         assert config.top_k == 5
         assert config.score_threshold == 0.0
-        assert config.rerank_model == "simple_heuristic"
+        assert config.rerank_model == "heuristic"
         assert config.boost_exact_matches is True
         assert config.boost_recent_docs is False
         assert config.length_penalty_factor == 0.1
@@ -44,7 +44,7 @@ class TestSimpleRerankerConfig:
         Test custom configuration settings
         カスタム設定のテスト
         """
-        config = SimpleRerankerConfig(
+        config = HeuristicRerankerConfig(
             top_k=10,
             score_threshold=0.3,
             boost_exact_matches=False,
@@ -54,7 +54,7 @@ class TestSimpleRerankerConfig:
         
         assert config.top_k == 10
         assert config.score_threshold == 0.3
-        assert config.rerank_model == "simple_heuristic"
+        assert config.rerank_model == "heuristic"
         assert config.boost_exact_matches is False
         assert config.boost_recent_docs is True
         assert config.length_penalty_factor == 0.2
@@ -64,7 +64,7 @@ class TestSimpleRerankerConfig:
         Test configuration with additional kwargs
         追加kwargs設定のテスト
         """
-        config = SimpleRerankerConfig(
+        config = HeuristicRerankerConfig(
             top_k=7,
             custom_param="custom_value",
             another_param=42
@@ -80,7 +80,7 @@ class TestSimpleRerankerConfig:
         'REFINIRE_RAG_RERANKER_BOOST_RECENT_DOCS': 'true',
         'REFINIRE_RAG_RERANKER_LENGTH_PENALTY_FACTOR': '0.15'
     })
-    @patch('refinire_rag.retrieval.simple_reranker.RefinireRAGConfig')
+    @patch('refinire_rag.retrieval.heuristic_reranker.RefinireRAGConfig')
     def test_from_env_configuration(self, mock_config_class):
         """
         Test configuration from environment variables
@@ -90,7 +90,7 @@ class TestSimpleRerankerConfig:
         mock_config.reranker_top_k = 8
         mock_config_class.return_value = mock_config
         
-        config = SimpleRerankerConfig.from_env()
+        config = HeuristicRerankerConfig.from_env()
         
         assert config.top_k == 8
         assert config.score_threshold == 0.4
@@ -99,7 +99,7 @@ class TestSimpleRerankerConfig:
         assert config.length_penalty_factor == 0.15
     
     @patch.dict(os.environ, {}, clear=True)
-    @patch('refinire_rag.retrieval.simple_reranker.RefinireRAGConfig')
+    @patch('refinire_rag.retrieval.heuristic_reranker.RefinireRAGConfig')
     def test_from_env_defaults(self, mock_config_class):
         """
         Test from_env with default values when environment variables are not set
@@ -109,7 +109,7 @@ class TestSimpleRerankerConfig:
         mock_config.reranker_top_k = 5
         mock_config_class.return_value = mock_config
         
-        config = SimpleRerankerConfig.from_env()
+        config = HeuristicRerankerConfig.from_env()
         
         assert config.top_k == 5
         assert config.score_threshold == 0.0
@@ -118,10 +118,10 @@ class TestSimpleRerankerConfig:
         assert config.length_penalty_factor == 0.1
 
 
-class TestSimpleRerankerInitialization:
+class TestHeuristicRerankerInitialization:
     """
-    Test SimpleReranker initialization and setup
-    SimpleRerankerの初期化とセットアップのテスト
+    Test HeuristicReranker initialization and setup
+    HeuristicRerankerの初期化とセットアップのテスト
     """
     
     def test_initialization_with_config(self):
@@ -129,20 +129,20 @@ class TestSimpleRerankerInitialization:
         Test initialization with custom configuration
         カスタム設定での初期化テスト
         """
-        config = SimpleRerankerConfig(
+        config = HeuristicRerankerConfig(
             top_k=8,
             score_threshold=0.2,
             boost_exact_matches=False
         )
         
-        reranker = SimpleReranker(config=config)
+        reranker = HeuristicReranker(config=config)
         
         assert reranker.config == config
         assert reranker.config.top_k == 8
         assert reranker.config.score_threshold == 0.2
         assert reranker.config.boost_exact_matches is False
     
-    @patch('refinire_rag.retrieval.simple_reranker.SimpleRerankerConfig')
+    @patch('refinire_rag.retrieval.heuristic_reranker.HeuristicRerankerConfig')
     def test_initialization_from_env_when_no_config(self, mock_config_class):
         """
         Test initialization from environment when no config provided
@@ -151,44 +151,63 @@ class TestSimpleRerankerInitialization:
         mock_config = Mock()
         mock_config_class.from_env.return_value = mock_config
         
-        reranker = SimpleReranker()
+        reranker = HeuristicReranker()
         
         mock_config_class.from_env.assert_called_once()
         assert reranker.config == mock_config
     
     def test_initialization_with_none_config(self):
         """
-        Test initialization with None config defaults to SimpleRerankerConfig
-        None設定での初期化でSimpleRerankerConfigがデフォルトになることのテスト
+        Test initialization with None config defaults to HeuristicRerankerConfig
+        None設定での初期化でHeuristicRerankerConfigがデフォルトになることのテスト
         """
-        reranker = SimpleReranker(config=SimpleRerankerConfig())
+        reranker = HeuristicReranker(config=HeuristicRerankerConfig())
         
-        assert isinstance(reranker.config, SimpleRerankerConfig)
+        assert isinstance(reranker.config, HeuristicRerankerConfig)
         assert reranker.config.top_k == 5  # Default value
     
-    @patch('refinire_rag.retrieval.simple_reranker.SimpleRerankerConfig')
-    def test_from_env_class_method(self, mock_config_class):
+    def test_environment_variable_fallback(self):
         """
-        Test from_env class method
-        from_envクラスメソッドテスト
+        Test environment variable fallback in constructor
+        コンストラクタでの環境変数フォールバックテスト
         """
-        mock_config = Mock()
-        mock_config_class.from_env.return_value = mock_config
+        import os
         
-        reranker = SimpleReranker.from_env()
+        # Set environment variables
+        original_env = {}
+        test_env = {
+            'REFINIRE_RAG_RERANKER_TOP_K': '8',
+            'REFINIRE_RAG_RERANKER_SCORE_THRESHOLD': '0.3'
+        }
         
-        mock_config_class.from_env.assert_called_once()
-        assert reranker.config == mock_config
+        for key, value in test_env.items():
+            original_env[key] = os.environ.get(key)
+            os.environ[key] = value
+        
+        try:
+            # Test environment variable fallback
+            reranker = HeuristicReranker()
+            
+            assert reranker.config.top_k == 8
+            assert reranker.config.score_threshold == 0.3
+            
+        finally:
+            # Restore original environment
+            for key in test_env:
+                if original_env[key] is not None:
+                    os.environ[key] = original_env[key]
+                else:
+                    os.environ.pop(key, None)
     
     def test_get_config_class(self):
         """
         Test get_config_class method
         get_config_classメソッドテスト
         """
-        assert SimpleReranker.get_config_class() == SimpleRerankerConfig
+        assert HeuristicReranker.get_config_class() == HeuristicRerankerConfig
 
 
-class TestSimpleRerankerReranking:
+class TestHeuristicRerankerReranking:
     """
     Test document reranking functionality
     文書再ランク機能のテスト
@@ -199,7 +218,7 @@ class TestSimpleRerankerReranking:
         Set up test environment for each test
         各テストのためのテスト環境を設定
         """
-        self.config = SimpleRerankerConfig(
+        self.config = HeuristicRerankerConfig(
             top_k=3,
             score_threshold=0.1,
             boost_exact_matches=True,
@@ -207,7 +226,7 @@ class TestSimpleRerankerReranking:
             length_penalty_factor=0.1
         )
         
-        self.reranker = SimpleReranker(config=self.config)
+        self.reranker = HeuristicReranker(config=self.config)
         
         # Create test search results
         self.test_results = [
@@ -260,7 +279,7 @@ class TestSimpleRerankerReranking:
             assert "original_score" in result.metadata
             assert "score_adjustments" in result.metadata
             assert "reranked_by" in result.metadata
-            assert result.metadata["reranked_by"] == "SimpleReranker"
+            assert result.metadata["reranked_by"] == "HeuristicReranker"
         
         # Results should be sorted by score (descending)
         for i in range(len(results) - 1):
@@ -323,8 +342,8 @@ class TestSimpleRerankerReranking:
         スコア閾値フィルタリング付き再ランクテスト
         """
         # Use higher threshold
-        config = SimpleRerankerConfig(top_k=5, score_threshold=0.7)
-        reranker = SimpleReranker(config=config)
+        config = HeuristicRerankerConfig(top_k=5, score_threshold=0.7)
+        reranker = HeuristicReranker(config=config)
         
         query = "test"
         
@@ -339,8 +358,8 @@ class TestSimpleRerankerReranking:
         Test reranking with exact match boost disabled
         完全マッチブースト無効での再ランクテスト
         """
-        config = SimpleRerankerConfig(boost_exact_matches=False)
-        reranker = SimpleReranker(config=config)
+        config = HeuristicRerankerConfig(boost_exact_matches=False)
+        reranker = HeuristicReranker(config=config)
         
         query = "machine learning"
         
@@ -378,7 +397,7 @@ class TestSimpleRerankerReranking:
         assert result.metadata["score_adjustments"]["exact_match_boost"] > 0
 
 
-class TestSimpleRerankerScoreAdjustments:
+class TestHeuristicRerankerScoreAdjustments:
     """
     Test individual score adjustment calculations
     個別スコア調整計算のテスト
@@ -389,7 +408,7 @@ class TestSimpleRerankerScoreAdjustments:
         Set up test environment
         テスト環境をセットアップ
         """
-        self.reranker = SimpleReranker()
+        self.reranker = HeuristicReranker()
     
     def test_extract_query_terms(self):
         """
@@ -516,7 +535,7 @@ class TestSimpleRerankerScoreAdjustments:
             assert "recency_boost" in adjustments
 
 
-class TestSimpleRerankerStatistics:
+class TestHeuristicRerankerStatistics:
     """
     Test processing statistics functionality
     処理統計機能のテスト
@@ -527,14 +546,14 @@ class TestSimpleRerankerStatistics:
         Set up test environment
         テスト環境をセットアップ
         """
-        self.config = SimpleRerankerConfig(
+        self.config = HeuristicRerankerConfig(
             top_k=5,
             score_threshold=0.2,
             boost_exact_matches=True,
             boost_recent_docs=False
         )
         
-        self.reranker = SimpleReranker(config=self.config)
+        self.reranker = HeuristicReranker(config=self.config)
     
     def test_initial_statistics(self):
         """
@@ -546,8 +565,8 @@ class TestSimpleRerankerStatistics:
         assert stats["queries_processed"] == 0
         assert stats["processing_time"] == 0.0
         assert stats["errors_encountered"] == 0
-        assert stats["reranker_type"] == "SimpleReranker"
-        assert stats["rerank_model"] == "simple_heuristic"
+        assert stats["reranker_type"] == "HeuristicReranker"
+        assert stats["rerank_model"] == "heuristic"
         assert stats["score_threshold"] == 0.2
         assert stats["top_k"] == 5
         assert stats["boost_exact_matches"] is True
@@ -599,7 +618,7 @@ class TestSimpleRerankerStatistics:
         assert stats["errors_encountered"] == 0
 
 
-class TestSimpleRerankerErrorHandling:
+class TestHeuristicRerankerErrorHandling:
     """
     Test error handling and edge cases
     エラーハンドリングとエッジケースのテスト
@@ -610,7 +629,7 @@ class TestSimpleRerankerErrorHandling:
         Set up test environment
         テスト環境をセットアップ
         """
-        self.reranker = SimpleReranker()
+        self.reranker = HeuristicReranker()
     
     def test_rerank_with_exception(self):
         """
@@ -699,7 +718,7 @@ class TestSimpleRerankerErrorHandling:
         assert results[0].score >= 0.0
 
 
-class TestSimpleRerankerEdgeCases:
+class TestHeuristicRerankerEdgeCases:
     """
     Test edge cases and boundary conditions
     エッジケースと境界条件のテスト
@@ -710,8 +729,8 @@ class TestSimpleRerankerEdgeCases:
         Test reranking with zero top_k
         ゼロtop_kでの再ランクテスト
         """
-        config = SimpleRerankerConfig(top_k=0)
-        reranker = SimpleReranker(config=config)
+        config = HeuristicRerankerConfig(top_k=0)
+        reranker = HeuristicReranker(config=config)
         
         result = SearchResult(
             document_id="test",
@@ -730,8 +749,8 @@ class TestSimpleRerankerEdgeCases:
         Test reranking with very high score threshold
         非常に高いスコア閾値での再ランクテスト
         """
-        config = SimpleRerankerConfig(score_threshold=0.99)
-        reranker = SimpleReranker(config=config)
+        config = HeuristicRerankerConfig(score_threshold=0.99)
+        reranker = HeuristicReranker(config=config)
         
         result = SearchResult(
             document_id="test",
@@ -750,6 +769,9 @@ class TestSimpleRerankerEdgeCases:
         Test reranking with Unicode query
         Unicodeクエリでの再ランクテスト
         """
+        config = HeuristicRerankerConfig()
+        reranker = HeuristicReranker(config=config)
+        
         unicode_query = "機械学習 🤖 naïve café résumé"
         
         result = SearchResult(
@@ -763,7 +785,7 @@ class TestSimpleRerankerEdgeCases:
             metadata={}
         )
         
-        results = self.reranker.rerank(unicode_query, [result])
+        results = reranker.rerank(unicode_query, [result])
         
         # Should handle Unicode gracefully
         assert len(results) >= 0
@@ -784,7 +806,7 @@ class TestSimpleRerankerEdgeCases:
             metadata={}
         )
         
-        reranker = SimpleReranker()
+        reranker = HeuristicReranker()
         results = reranker.rerank(long_query, [result])
         
         # Should handle long query gracefully
@@ -812,7 +834,7 @@ class TestSimpleRerankerEdgeCases:
             )
             large_result_set.append(result)
         
-        reranker = SimpleReranker(config=SimpleRerankerConfig(top_k=10))
+        reranker = HeuristicReranker(config=HeuristicRerankerConfig(top_k=10))
         results = reranker.rerank("test query", large_result_set)
         
         # Should handle large set and limit results

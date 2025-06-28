@@ -57,20 +57,41 @@ class CorpusManager:
     - Knowledge graph file: {corpus_name}_knowledge_graph.md
     """
     
-    def __init__(self, **kwargs):
+    def __init__(self, 
+                 document_store=None,
+                 retrievers=None,
+                 max_chunks=None,
+                 chunk_size=None,
+                 chunk_overlap=None,
+                 debug_mode=None,
+                 normalize_text=None,
+                 create_embeddings=None,
+                 **kwargs):
         """Initialize CorpusManager
         
+        コーパス管理システムの初期化
+        
         Args:
-            **kwargs: Configuration parameters including:
-                - document_store: DocumentStore for document persistence (optional, can be created from env)
-                - retrievers: List of retrievers (VectorStore, KeywordSearch, etc.) or single retriever
-                             (optional, can be created from env)
-                - config: Optional global configuration dictionary
+            document_store: DocumentStore for document persistence (optional, can be created from env)
+            retrievers: List of retrievers (VectorStore, KeywordSearch, etc.) or single retriever (optional, can be created from env)
+            max_chunks: Maximum number of chunks per document (default from env or 50)
+            chunk_size: Size of each chunk in tokens (default from env or 512)
+            chunk_overlap: Overlap between chunks in tokens (default from env or 50)
+            debug_mode: Enable debug logging (default from env or False)
+            normalize_text: Enable text normalization (default from env or True)
+            create_embeddings: Enable embedding creation (default from env or True)
+            **kwargs: Additional configuration parameters
         """
-        # Extract components from kwargs
-        document_store = kwargs.pop('document_store', None)
-        retrievers = kwargs.pop('retrievers', None)
-        config = kwargs.pop('config', None)
+        # Configuration settings with environment variable fallback
+        self.max_chunks = self._get_setting(max_chunks, "REFINIRE_RAG_MAX_CHUNKS", 50, int)
+        self.chunk_size = self._get_setting(chunk_size, "REFINIRE_RAG_CHUNK_SIZE", 512, int)
+        self.chunk_overlap = self._get_setting(chunk_overlap, "REFINIRE_RAG_CHUNK_OVERLAP", 50, int)
+        self.debug_mode = self._get_setting(debug_mode, "REFINIRE_RAG_DEBUG_MODE", False, bool)
+        self.normalize_text = self._get_setting(normalize_text, "REFINIRE_RAG_NORMALIZE_TEXT", True, bool)
+        self.create_embeddings = self._get_setting(create_embeddings, "REFINIRE_RAG_CREATE_EMBEDDINGS", True, bool)
+        
+        # Store additional kwargs for backward compatibility
+        self.config = kwargs
         
         # Initialize document store
         if document_store is None:
@@ -88,33 +109,88 @@ class CorpusManager:
             else:
                 self.retrievers = retrievers
         
-        # Merge config with remaining kwargs
-        self.config = config or {}
-        self.config.update(kwargs)
+        # Initialize stats
         self.stats = CorpusStats()
+        
+        # Auto-configure embedders for retrievers that need them
+        self._auto_configure_embedders()
         
         # Backward compatibility - set vector_store to first VectorStore found
         self.vector_store = self._get_vector_store_from_retrievers()
         
+        # Debug logging
+        if self.debug_mode:
+            logger.setLevel(logging.DEBUG)
+        
         logger.info(f"Initialized CorpusManager with DocumentStore: {type(self.document_store).__name__}, "
                    f"Retrievers: {[type(r).__name__ for r in self.retrievers]}")
+    
+    def _get_setting(self, value, env_var, default, value_type=str):
+        """Get configuration setting from argument, environment variable, or default
+        
+        設定値を引数、環境変数、またはデフォルト値から取得
+        
+        Args:
+            value: Direct argument value
+            env_var: Environment variable name
+            default: Default value if neither argument nor env var is set
+            value_type: Type to convert to (str, int, bool)
+            
+        Returns:
+            Configuration value with proper type
+        """
+        if value is not None:
+            return value
+        
+        env_value = os.environ.get(env_var)
+        if env_value is not None:
+            if value_type == bool:
+                return env_value.lower() in ('true', '1', 'yes', 'on')
+            elif value_type == int:
+                try:
+                    return int(env_value)
+                except ValueError:
+                    logger.warning(f"Invalid integer value for {env_var}: {env_value}, using default: {default}")
+                    return default
+            else:
+                return env_value
+        
+        return default
     
     def get_config(self) -> Dict[str, Any]:
         """Get current configuration as dictionary
         
+        現在の設定を辞書として取得
+        
         Returns:
-            Current configuration settings
+            Current configuration settings including runtime values
         """
-        base_config = self.config.copy()
-        base_config.update({
+        config = {
+            # Core settings
+            'max_chunks': self.max_chunks,
+            'chunk_size': self.chunk_size,
+            'chunk_overlap': self.chunk_overlap,
+            'debug_mode': self.debug_mode,
+            'normalize_text': self.normalize_text,
+            'create_embeddings': self.create_embeddings,
+            
+            # Component information
             'document_store_type': type(self.document_store).__name__,
             'retriever_types': [type(r).__name__ for r in self.retrievers],
             'vector_store_type': type(self.vector_store).__name__ if self.vector_store else None,
+            
+            # Statistics
             'total_files_processed': self.stats.total_files_processed,
             'total_documents_created': self.stats.total_documents_created,
-            'total_chunks_created': self.stats.total_chunks_created
-        })
-        return base_config
+            'total_chunks_created': self.stats.total_chunks_created,
+            'total_processing_time': self.stats.total_processing_time,
+            'errors_encountered': self.stats.errors_encountered,
+        }
+        
+        # Add any additional config from kwargs
+        config.update(self.config)
+        
+        return config
     
     def _create_document_store_from_env(self):
         """Create document store from environment variables
@@ -177,6 +253,43 @@ class CorpusManager:
             logger.error(f"Failed to create retrievers from environment: {e}")
             # Final fallback to built-in in-memory vector store
             return [PluginRegistry.create_plugin('vector_stores', 'inmemory_vector')]
+    
+    def _auto_configure_embedders(self):
+        """Auto-configure embedders for retrievers that need them
+        
+        環境変数からEmbedderを取得して、必要なRetrieverに自動設定
+        """
+        try:
+            from ..factories.plugin_factory import PluginFactory
+            embedders = PluginFactory.create_embedders_from_env()
+            
+            if embedders:
+                default_embedder = embedders[0]
+                logger.info(f"Auto-configuring embedder: {type(default_embedder).__name__}")
+                
+                # Configure embedders for all retrievers that need them
+                for retriever in self.retrievers:
+                    # Set embedder on retriever if supported
+                    if hasattr(retriever, 'set_embedder'):
+                        retriever.set_embedder(default_embedder)
+                        logger.debug(f"Set embedder on {type(retriever).__name__}")
+                    
+                    # Set embedder on vector store if retriever has one
+                    if hasattr(retriever, 'vector_store') and hasattr(retriever.vector_store, 'set_embedder'):
+                        retriever.vector_store.set_embedder(default_embedder)
+                        logger.debug(f"Set embedder on {type(retriever.vector_store).__name__}")
+                    
+                    # Set embedder property if exists
+                    if hasattr(retriever, 'embedder'):
+                        retriever.embedder = default_embedder
+                        logger.debug(f"Set embedder property on {type(retriever).__name__}")
+                
+                logger.info(f"Auto-configured embedder for {len(self.retrievers)} retrievers")
+            else:
+                logger.warning("No embedders available from environment variables")
+                
+        except Exception as e:
+            logger.error(f"Failed to auto-configure embedders: {e}")
     
     def _get_vector_store_from_retrievers(self):
         """Get VectorStore from retrievers for backward compatibility

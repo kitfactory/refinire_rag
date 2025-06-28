@@ -21,6 +21,12 @@ openai = [
     "openai>=1.0.0",
     "tiktoken>=0.4.0",
 ]
+bm25 = [
+    "refinire-rag-bm25s-j>=0.0.3",
+]
+chroma = [
+    "refinire-rag-chroma>=0.0.3",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",

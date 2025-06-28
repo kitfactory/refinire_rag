@@ -73,18 +73,18 @@ def test_environment_variable_configuration():
         hybrid = HybridRetriever.from_env()
         print("   ✅ HybridRetriever.from_env() - Success")
         
-        # Test SimpleReranker with environment configuration
-        print("\n3. Testing SimpleReranker with custom environment...")
-        from refinire_rag.retrieval.simple_reranker import SimpleReranker, SimpleRerankerConfig
+        # Test HeuristicReranker with environment configuration
+        print("\n3. Testing HeuristicReranker with custom environment...")
+        from refinire_rag.retrieval.heuristic_reranker import HeuristicReranker, HeuristicRerankerConfig
         
-        config = SimpleRerankerConfig.from_env()
+        config = HeuristicRerankerConfig.from_env()
         print(f"   Score Threshold: {config.score_threshold} (expected: 0.2)")
         print(f"   Boost Exact Matches: {config.boost_exact_matches} (expected: True)")
         print(f"   Boost Recent Docs: {config.boost_recent_docs} (expected: True)")
         print(f"   Length Penalty Factor: {config.length_penalty_factor} (expected: 0.05)")
         
-        reranker = SimpleReranker.from_env()
-        print("   ✅ SimpleReranker.from_env() - Success")
+        reranker = HeuristicReranker.from_env()
+        print("   ✅ HeuristicReranker.from_env() - Success")
         
         # Test SimpleAnswerSynthesizer with environment configuration
         print("\n4. Testing SimpleAnswerSynthesizer with custom environment...")
@@ -123,7 +123,7 @@ def test_configuration_validation():
     try:
         from refinire_rag.retrieval.simple_retriever import SimpleRetrieverConfig
         from refinire_rag.retrieval.hybrid_retriever import HybridRetrieverConfig
-        from refinire_rag.retrieval.simple_reranker import SimpleRerankerConfig
+        from refinire_rag.retrieval.heuristic_reranker import HeuristicRerankerConfig
         from refinire_rag.retrieval.simple_reader import SimpleAnswerSynthesizerConfig
         
         # Test config objects with various parameters
@@ -144,8 +144,8 @@ def test_configuration_validation():
         )
         print(f"   ✅ Created with fusion_method={config.fusion_method}, weights={config.retriever_weights}")
         
-        print("\n3. Testing SimpleRerankerConfig...")
-        config = SimpleRerankerConfig(
+        print("\n3. Testing HeuristicRerankerConfig...")
+        config = HeuristicRerankerConfig(
             top_k=3,
             boost_exact_matches=False,
             length_penalty_factor=0.2

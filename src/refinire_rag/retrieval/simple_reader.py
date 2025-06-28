@@ -14,9 +14,9 @@ from ..utils.model_config import get_default_llm_model
 from ..config import RefinireRAGConfig
 
 try:
-    from refinire import LLMPipeline
+    from refinire import RefinireAgent
 except ImportError:
-    LLMPipeline = None
+    RefinireAgent = None
 
 logger = logging.getLogger(__name__)
 
@@ -134,18 +134,20 @@ class SimpleAnswerSynthesizer(AnswerSynthesizer):
             
         super().__init__(config)
         
-        # Initialize Refinire LLM Pipeline (preferred) or fallback to OpenAI
-        if LLMPipeline is not None:
+        # Initialize Refinire Agent (preferred) or fallback to OpenAI
+        if RefinireAgent is not None:
             try:
-                self._llm_pipeline = LLMPipeline(
+                self._refinire_agent = RefinireAgent(
                     name="answer_synthesizer",
                     generation_instructions=self.config.generation_instructions,
-                    model=self.config.llm_model
+                    model=self.config.llm_model,
+                    session_history=None,  # Disable session history for independent answers
+                    history_size=0  # No history retention
                 )
                 self._use_refinire = True
-                logger.info(f"Initialized SimpleAnswerSynthesizer with Refinire LLMPipeline, model: {self.config.llm_model}")
+                logger.info(f"Initialized SimpleAnswerSynthesizer with RefinireAgent, model: {self.config.llm_model}")
             except Exception as e:
-                logger.warning(f"Failed to initialize Refinire LLMPipeline: {e}. Falling back to OpenAI.")
+                logger.warning(f"Failed to initialize RefinireAgent: {e}. Falling back to OpenAI.")
                 self._init_openai_client()
         else:
             logger.warning("Refinire not available. Using OpenAI client.")
@@ -194,9 +196,9 @@ class SimpleAnswerSynthesizer(AnswerSynthesizer):
             prompt = self._prepare_prompt(query, context_text)
             
             # Generate answer using Refinire or OpenAI
-            if self._use_refinire and hasattr(self, '_llm_pipeline'):
-                result = self._llm_pipeline.run(prompt)
-                answer = result.content
+            if self._use_refinire and hasattr(self, '_refinire_agent'):
+                result = self._refinire_agent.run(prompt)
+                answer = result.content if hasattr(result, 'content') else str(result)
             elif self._use_refinire is False and hasattr(self, 'client'):
                 response = self.client.chat.completions.create(
                     model=self.config.llm_model,

@@ -1,8 +1,8 @@
 """
-Simple score-based document reranker
+Heuristic-based document reranker
 
-A basic implementation of the Reranker interface that reorders
-search results based on simple heuristics and score adjustments.
+A heuristic implementation of the Reranker interface that reorders
+search results based on keyword matching, document length, and other heuristics.
 """
 
 import logging
@@ -17,8 +17,11 @@ from ..config import RefinireRAGConfig
 logger = logging.getLogger(__name__)
 
 
-class SimpleRerankerConfig(RerankerConfig):
-    """Configuration for SimpleReranker"""
+class HeuristicRerankerConfig(RerankerConfig):
+    """Configuration for HeuristicReranker
+    
+    ヒューリスティックベースの再ランキング設定
+    """
     
     def __init__(self,
                  top_k: int = 5,
@@ -28,7 +31,7 @@ class SimpleRerankerConfig(RerankerConfig):
                  length_penalty_factor: float = 0.1,
                  **kwargs):
         super().__init__(top_k=top_k, 
-                        rerank_model="simple_heuristic",
+                        rerank_model="heuristic",
                         score_threshold=score_threshold)
         self.boost_exact_matches = boost_exact_matches
         self.boost_recent_docs = boost_recent_docs
@@ -39,14 +42,14 @@ class SimpleRerankerConfig(RerankerConfig):
             setattr(self, key, value)
     
     @classmethod
-    def from_env(cls) -> "SimpleRerankerConfig":
+    def from_env(cls) -> "HeuristicRerankerConfig":
         """Create configuration from environment variables
         
-        Creates a SimpleRerankerConfig instance from environment variables.
-        環境変数からSimpleRerankerConfigインスタンスを作成します。
+        Creates a HeuristicRerankerConfig instance from environment variables.
+        環境変数からHeuristicRerankerConfigインスタンスを作成します。
         
         Returns:
-            SimpleRerankerConfig instance with values from environment
+            HeuristicRerankerConfig instance with values from environment
         """
         config = RefinireRAGConfig()
         
@@ -66,36 +69,108 @@ class SimpleRerankerConfig(RerankerConfig):
         )
 
 
-class SimpleReranker(Reranker):
-    """Simple heuristic-based document reranker
+class HeuristicReranker(Reranker):
+    """Heuristic-based document reranker
     
-    Reorders search results using simple scoring adjustments:
-    - Exact term matches get score boost
-    - Document length penalty/bonus
-    - Optional recency boost
+    ヒューリスティックベースの文書再ランカー
+    
+    Reorders search results using heuristic scoring adjustments:
+    - Exact term matches get score boost - 完全一致語句にスコアブースト
+    - Document length penalty/bonus - 文書長ペナルティ/ボーナス
+    - Optional recency boost - オプション最新性ブースト
     """
     
-    def __init__(self, config: Optional[SimpleRerankerConfig] = None):
-        """Initialize SimpleReranker
+    def __init__(self, 
+                 config: Optional[HeuristicRerankerConfig] = None,
+                 top_k: Optional[int] = None,
+                 score_threshold: Optional[float] = None,
+                 boost_exact_matches: Optional[bool] = None,
+                 boost_recent_docs: Optional[bool] = None,
+                 length_penalty_factor: Optional[float] = None,
+                 **kwargs):
+        """Initialize HeuristicReranker
+        
+        ヒューリスティック再ランカーを初期化
         
         Args:
-            config: Reranker configuration
+            config: Reranker configuration (optional, can be created from other args)
+            top_k: Maximum number of results to return (default from env or 5)
+            score_threshold: Minimum score threshold (default from env or 0.0)
+            boost_exact_matches: Enable exact match boosting (default from env or True)
+            boost_recent_docs: Enable recency boosting (default from env or False)
+            length_penalty_factor: Factor for length adjustments (default from env or 0.1)
+            **kwargs: Additional configuration parameters
         """
-        # Create config from environment if not provided
-        if config is None:
-            config = SimpleRerankerConfig.from_env()
+        # If config is provided, use it directly
+        if config is not None:
+            super().__init__(config)
         else:
-            config = config or SimpleRerankerConfig()
+            # Create config using keyword arguments with environment variable fallback
+            actual_top_k = self._get_setting(top_k, "REFINIRE_RAG_RERANKER_TOP_K", 5, int)
+            actual_score_threshold = self._get_setting(score_threshold, "REFINIRE_RAG_RERANKER_SCORE_THRESHOLD", 0.0, float)
+            actual_boost_exact_matches = self._get_setting(boost_exact_matches, "REFINIRE_RAG_RERANKER_BOOST_EXACT_MATCHES", True, bool)
+            actual_boost_recent_docs = self._get_setting(boost_recent_docs, "REFINIRE_RAG_RERANKER_BOOST_RECENT_DOCS", False, bool)
+            actual_length_penalty_factor = self._get_setting(length_penalty_factor, "REFINIRE_RAG_RERANKER_LENGTH_PENALTY_FACTOR", 0.1, float)
             
-        super().__init__(config)
+            # Create config with resolved values
+            config = HeuristicRerankerConfig(
+                top_k=actual_top_k,
+                score_threshold=actual_score_threshold,
+                boost_exact_matches=actual_boost_exact_matches,
+                boost_recent_docs=actual_boost_recent_docs,
+                length_penalty_factor=actual_length_penalty_factor,
+                **kwargs
+            )
+            super().__init__(config)
         
-        logger.info("Initialized SimpleReranker with heuristic scoring")
+        logger.info("Initialized HeuristicReranker with heuristic scoring")
+    
+    def _get_setting(self, value, env_var, default, value_type=str):
+        """Get configuration setting from argument, environment variable, or default
+        
+        設定値を引数、環境変数、またはデフォルト値から取得
+        
+        Args:
+            value: Direct argument value
+            env_var: Environment variable name
+            default: Default value if neither argument nor env var is set
+            value_type: Type to convert to (str, int, bool, float)
+            
+        Returns:
+            Configuration value with proper type
+        """
+        if value is not None:
+            return value
+        
+        env_value = os.environ.get(env_var)
+        if env_value is not None:
+            if value_type == bool:
+                return env_value.lower() in ('true', '1', 'yes', 'on')
+            elif value_type == int:
+                try:
+                    return int(env_value)
+                except ValueError:
+                    logger.warning(f"Invalid integer value for {env_var}: {env_value}, using default: {default}")
+                    return default
+            elif value_type == float:
+                try:
+                    return float(env_value)
+                except ValueError:
+                    logger.warning(f"Invalid float value for {env_var}: {env_value}, using default: {default}")
+                    return default
+            else:
+                return env_value
+        
+        return default
     
     
     @classmethod
-    def get_config_class(cls) -> Type[SimpleRerankerConfig]:
-        """Get configuration class for this reranker"""
-        return SimpleRerankerConfig
+    def get_config_class(cls) -> Type[HeuristicRerankerConfig]:
+        """Get configuration class for this reranker
+        
+        この再ランカーの設定クラスを取得
+        """
+        return HeuristicRerankerConfig
     
     def rerank(self, query: str, results: List[SearchResult]) -> List[SearchResult]:
         """Rerank search results based on heuristic scoring
@@ -145,7 +220,7 @@ class SimpleReranker(Reranker):
                         **result.metadata,
                         "original_score": result.score,
                         "score_adjustments": score_adjustments,
-                        "reranked_by": "SimpleReranker"
+                        "reranked_by": "HeuristicReranker"
                     }
                 )
                 reranked_results.append(reranked_result)
@@ -245,7 +320,7 @@ class SimpleReranker(Reranker):
         
         # Add reranker-specific stats
         stats.update({
-            "reranker_type": "SimpleReranker",
+            "reranker_type": "HeuristicReranker",
             "rerank_model": self.config.rerank_model,
             "score_threshold": self.config.score_threshold,
             "top_k": self.config.top_k,

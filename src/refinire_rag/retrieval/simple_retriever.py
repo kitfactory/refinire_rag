@@ -123,12 +123,13 @@ class SimpleRetriever(Retriever):
         """Get configuration class for this retriever"""
         return SimpleRetrieverConfig
     
-    def retrieve(self, query: str, limit: Optional[int] = None) -> List[SearchResult]:
+    def retrieve(self, query: str, limit: Optional[int] = None, metadata_filter: Optional[Dict[str, Any]] = None) -> List[SearchResult]:
         """Retrieve relevant documents for query
         
         Args:
             query: Search query
             limit: Maximum number of results (uses config.top_k if None)
+            metadata_filter: Optional metadata filters for constraining search
             
         Returns:
             List of SearchResult objects with documents and scores
@@ -161,6 +162,16 @@ class SimpleRetriever(Retriever):
                 if self.config.enable_filtering and result.score < self.config.similarity_threshold:
                     continue
                 
+                # Apply metadata filtering if specified
+                if metadata_filter:
+                    metadata_match = True
+                    for key, value in metadata_filter.items():
+                        if key not in result.metadata or result.metadata[key] != value:
+                            metadata_match = False
+                            break
+                    if not metadata_match:
+                        continue
+                
                 # Create Document from VectorSearchResult
                 from ..models.document import Document
                 doc = Document(
@@ -169,12 +180,22 @@ class SimpleRetriever(Retriever):
                     metadata=result.metadata
                 )
                 
+                # Determine actual vector store type
+                vector_store_type = type(self.vector_store).__name__
+                if "Chroma" in vector_store_type:
+                    store_name = "Chroma"
+                elif "InMemory" in vector_store_type:
+                    store_name = "InMemory"
+                else:
+                    store_name = vector_store_type.replace("VectorStore", "")
+                
                 search_result = SearchResult(
                     document_id=result.document_id,
                     document=doc,
                     score=result.score,
                     metadata={
                         "retrieval_method": "vector_similarity",
+                        "retriever_type": store_name,
                         "embedding_model": self.config.embedding_model,
                         "query_length": len(query)
                     }

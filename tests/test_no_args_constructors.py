@@ -31,22 +31,22 @@ def test_retriever_no_args():
 
 
 def test_reranker_no_args():
-    """Test SimpleReranker with no arguments"""
-    print("\nTesting SimpleReranker with no arguments...")
+    """Test HeuristicReranker with no arguments"""
+    print("\nTesting HeuristicReranker with no arguments...")
     
     try:
-        from refinire_rag.retrieval.simple_reranker import SimpleReranker
+        from refinire_rag.retrieval.heuristic_reranker import HeuristicReranker
         
         # Test with environment fallback
-        reranker = SimpleReranker()
-        print("✅ SimpleReranker() - Success")
+        reranker = HeuristicReranker()
+        print("✅ HeuristicReranker() - Success")
         
         # Test from_env method
-        reranker_env = SimpleReranker.from_env()
-        print("✅ SimpleReranker.from_env() - Success")
+        reranker_env = HeuristicReranker.from_env()
+        print("✅ HeuristicReranker.from_env() - Success")
         
     except Exception as e:
-        print(f"❌ SimpleReranker test failed: {e}")
+        print(f"❌ HeuristicReranker test failed: {e}")
 
 
 def test_synthesizer_no_args():

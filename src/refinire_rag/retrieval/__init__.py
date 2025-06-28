@@ -12,10 +12,22 @@ except ImportError:
     SimpleRetrieverConfig = None
 
 try:
-    from .simple_reranker import SimpleReranker, SimpleRerankerConfig  
+    from .heuristic_reranker import HeuristicReranker, HeuristicRerankerConfig  
 except ImportError:
-    SimpleReranker = None
-    SimpleRerankerConfig = None
+    HeuristicReranker = None
+    HeuristicRerankerConfig = None
+
+try:
+    from .rrf_reranker import RRFReranker, RRFRerankerConfig
+except ImportError:
+    RRFReranker = None
+    RRFRerankerConfig = None
+
+try:
+    from .llm_reranker import LLMReranker, LLMRerankerConfig
+except ImportError:
+    LLMReranker = None
+    LLMRerankerConfig = None
 
 try:
     from .simple_answer_synthesizer import SimpleAnswerSynthesizer, SimpleAnswerSynthesizerConfig
@@ -33,7 +45,11 @@ __all__ = [
 # Add simple implementations if they exist
 if SimpleRetriever:
     __all__.extend(["SimpleRetriever", "SimpleRetrieverConfig"])
-if SimpleReranker:
-    __all__.extend(["SimpleReranker", "SimpleRerankerConfig"])
+if HeuristicReranker:
+    __all__.extend(["HeuristicReranker", "HeuristicRerankerConfig"])
+if RRFReranker:
+    __all__.extend(["RRFReranker", "RRFRerankerConfig"])
+if LLMReranker:
+    __all__.extend(["LLMReranker", "LLMRerankerConfig"])
 if SimpleAnswerSynthesizer:
     __all__.extend(["SimpleAnswerSynthesizer", "SimpleAnswerSynthesizerConfig"])

@@ -16,7 +16,7 @@ from refinire_rag.application.query_engine_new import QueryEngine, QueryEngineCo
 from refinire_rag.models.document import Document
 from refinire_rag.models.qa_pair import QAPair
 from refinire_rag.retrieval.simple_reader import SimpleAnswerSynthesizer, SimpleAnswerSynthesizerConfig
-from refinire_rag.retrieval.simple_reranker import SimpleReranker, SimpleRerankerConfig
+from refinire_rag.retrieval.heuristic_reranker import HeuristicReranker, HeuristicRerankerConfig
 
 
 class TestQualityLabComponentAnalysis:
@@ -51,7 +51,7 @@ class TestQualityLabComponentAnalysis:
         mock_retriever_2 = Mock()
         
         # Create mock reranker
-        mock_reranker = SimpleReranker(SimpleRerankerConfig())
+        mock_reranker = HeuristicReranker(HeuristicRerankerConfig())
         
         # Create mock synthesizer
         mock_synthesizer = SimpleAnswerSynthesizer(SimpleAnswerSynthesizerConfig())

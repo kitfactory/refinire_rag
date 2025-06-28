@@ -23,7 +23,7 @@ from refinire_rag.models.document import Document
 from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
 from refinire_rag.storage.document_store import DocumentStore
 from refinire_rag.retrieval.simple_reader import SimpleAnswerSynthesizer, SimpleAnswerSynthesizerConfig
-from refinire_rag.retrieval.simple_reranker import SimpleReranker, SimpleRerankerConfig
+from refinire_rag.retrieval.heuristic_reranker import HeuristicReranker, HeuristicRerankerConfig
 from refinire_rag.processing.normalizer import NormalizerConfig
 from refinire_rag.processing.chunker import ChunkingConfig
 

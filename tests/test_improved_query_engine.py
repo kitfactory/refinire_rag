@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch
 from typing import List
 
 from refinire_rag.application.query_engine_new import QueryEngine, QueryEngineConfig
-from refinire_rag.retrieval.simple_reranker import SimpleReranker, SimpleRerankerConfig
+from refinire_rag.retrieval.heuristic_reranker import HeuristicReranker, HeuristicRerankerConfig
 from refinire_rag.retrieval.simple_reader import SimpleAnswerSynthesizer, SimpleAnswerSynthesizerConfig
 from refinire_rag.retrieval.base import SearchResult, Retriever
 from refinire_rag.models.document import Document
@@ -136,7 +136,7 @@ class TestImprovedQueryEngine:
     @pytest.fixture
     def query_engine_components(self):
         """Create QueryEngine components"""
-        reranker = SimpleReranker(SimpleRerankerConfig(top_k=3))
+        reranker = HeuristicReranker(HeuristicRerankerConfig(top_k=3))
         synthesizer = SimpleAnswerSynthesizer(SimpleAnswerSynthesizerConfig())
         return {"reranker": reranker, "synthesizer": synthesizer}
 

@@ -521,7 +521,7 @@ class TestQueryEngineBasic:
 
     @patch.dict(os.environ, {
         'REFINIRE_RAG_RETRIEVERS': 'simple_retriever',
-        'REFINIRE_RAG_RERANKERS': 'simple_reranker',
+        'REFINIRE_RAG_RERANKERS': 'heuristic_reranker',
         'REFINIRE_RAG_SYNTHESIZERS': 'simple_reader'
     })
     @patch('refinire_rag.application.query_engine_new.PluginFactory')

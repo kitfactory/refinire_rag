@@ -183,11 +183,57 @@ class QueryEngine:
                 logger.info(f"Loaded {len(env_retrievers)} retrievers from environment")
                 return env_retrievers
             else:
-                logger.warning("No retrievers configured in environment, using empty list")
-                return []
+                logger.info("REFINIRE_RAG_RETRIEVERS not set, attempting to create retrievers from stores...")
+                # Try to create retrievers from configured stores
+                auto_retrievers = self._create_retrievers_from_stores()
+                if auto_retrievers:
+                    logger.info(f"Created {len(auto_retrievers)} retrievers from configured stores")
+                    return auto_retrievers
+                else:
+                    logger.warning("No retrievers configured in environment, using empty list")
+                    return []
         except Exception as e:
             logger.error(f"Failed to load retrievers from environment: {e}")
             return []
+    
+    def _create_retrievers_from_stores(self) -> List[Any]:
+        """Create retrievers from configured vector and keyword stores"""
+        retrievers = []
+        
+        # Get configured embedder for vector stores
+        embedders = PluginFactory.create_embedders_from_env()
+        default_embedder = embedders[0] if embedders else None
+        
+        # Create vector store retrievers
+        vector_stores = PluginFactory.create_vector_stores_from_env()
+        for vector_store in vector_stores:
+            try:
+                # Set embedder on vector store if it supports it
+                if default_embedder and hasattr(vector_store, 'set_embedder'):
+                    vector_store.set_embedder(default_embedder)
+                    logger.debug(f"Set embedder {type(default_embedder).__name__} on {type(vector_store).__name__}")
+                
+                # Create simple retriever using the vector store
+                from ..retrieval.simple_retriever import SimpleRetriever
+                retriever = SimpleRetriever(vector_store=vector_store, embedder=default_embedder)
+                retrievers.append(retriever)
+                logger.info(f"Created SimpleRetriever with {type(vector_store).__name__}")
+            except Exception as e:
+                logger.error(f"Failed to create retriever from vector store {type(vector_store).__name__}: {e}")
+        
+        # Create keyword store retrievers  
+        keyword_stores = PluginFactory.create_keyword_stores_from_env()
+        for keyword_store in keyword_stores:
+            try:
+                # Create keyword retriever using the keyword store
+                from ..retrieval.keyword_retriever import KeywordRetriever
+                retriever = KeywordRetriever(keyword_store=keyword_store)
+                retrievers.append(retriever)
+                logger.info(f"Created KeywordRetriever with {type(keyword_store).__name__}")
+            except Exception as e:
+                logger.error(f"Failed to create retriever from keyword store {type(keyword_store).__name__}: {e}")
+        
+        return retrievers
     
     def _initialize_reranker(self, reranker: Optional[Any]) -> Optional[Any]:
         """Initialize reranker from parameters or environment"""
@@ -382,7 +428,9 @@ class QueryEngine:
                     if not hasattr(result, 'metadata') or result.metadata is None:
                         result.metadata = {}
                     result.metadata["retriever_index"] = i
-                    result.metadata["retriever_type"] = type(retriever).__name__
+                    # Only set retriever_type if not already set by the retriever
+                    if "retriever_type" not in result.metadata:
+                        result.metadata["retriever_type"] = type(retriever).__name__
                 
                 all_results.extend(search_results)
                 
@@ -436,7 +484,13 @@ class QueryEngine:
         """Rerank search results for better relevance"""
         try:
             if hasattr(self.reranker, 'rerank'):
-                reranked_results = self.reranker.rerank(query, results, top_k=top_k)
+                # Try with top_k parameter first (for rerankers that support it)
+                try:
+                    reranked_results = self.reranker.rerank(query, results, top_k=top_k)
+                except TypeError:
+                    # If top_k parameter not supported, call without it and limit afterwards
+                    reranked_results = self.reranker.rerank(query, results)
+                    reranked_results = reranked_results[:top_k]
             else:
                 logger.warning(f"Reranker {type(self.reranker).__name__} has no 'rerank' method")
                 reranked_results = results[:top_k]
