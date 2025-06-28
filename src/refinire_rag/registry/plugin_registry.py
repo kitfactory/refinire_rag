@@ -38,6 +38,7 @@ class PluginRegistry:
         'evaluation_stores': 'refinire_rag.evaluation_stores',
         'contradiction_detectors': 'refinire_rag.contradiction_detectors',
         'test_suites': 'refinire_rag.test_suites',
+        'insight_reporters': 'refinire_rag.insight_reporters',
         'reporters': 'refinire_rag.reporters',
         'oneenv_templates': 'refinire_rag.oneenv_templates'
     }
@@ -73,6 +74,8 @@ class PluginRegistry:
             'rouge': 'refinire_rag.evaluation.rouge_evaluator:ROUGEEvaluator',
             'llm_judge': 'refinire_rag.evaluation.llm_judge_evaluator:LLMJudgeEvaluator',
             'questeval': 'refinire_rag.evaluation.questeval_evaluator:QuestEvalEvaluator',
+            'standard': 'refinire_rag.plugins.evaluators:StandardEvaluatorPlugin',
+            'detailed': 'refinire_rag.plugins.evaluators:DetailedEvaluatorPlugin',
         },
         'rerankers': {
             'heuristic': 'refinire_rag.retrieval.heuristic_reranker:HeuristicReranker',
@@ -100,6 +103,20 @@ class PluginRegistry:
             'test_suite': 'refinire_rag.processing.test_suite:TestSuite',
             'contradiction_detector': 'refinire_rag.processing.contradiction_detector:ContradictionDetector',
             'insight_reporter': 'refinire_rag.processing.insight_reporter:InsightReporter',
+        },
+        'test_suites': {
+            'llm': 'refinire_rag.plugins.test_suites:LLMTestSuitePlugin',
+            'rule_based': 'refinire_rag.plugins.test_suites:RuleBasedTestSuitePlugin',
+        },
+        'contradiction_detectors': {
+            'llm': 'refinire_rag.plugins.contradiction_detectors:LLMContradictionDetectorPlugin',
+            'rule_based': 'refinire_rag.plugins.contradiction_detectors:RuleBasedContradictionDetectorPlugin',
+            'hybrid': 'refinire_rag.plugins.contradiction_detectors:HybridContradictionDetectorPlugin',
+        },
+        'insight_reporters': {
+            'standard': 'refinire_rag.plugins.insight_reporters:StandardInsightReporterPlugin',
+            'executive': 'refinire_rag.plugins.insight_reporters:ExecutiveInsightReporterPlugin',
+            'detailed': 'refinire_rag.plugins.insight_reporters:DetailedInsightReporterPlugin',
         },
         'splitters': {
             'character': 'refinire_rag.splitter.character_splitter:CharacterSplitter',

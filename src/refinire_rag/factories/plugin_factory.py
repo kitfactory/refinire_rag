@@ -100,6 +100,31 @@ class PluginFactory:
         synthesizers = PluginFactory.create_plugins_from_env('synthesizers', 'REFINIRE_RAG_SYNTHESIZERS')
         return synthesizers[0] if synthesizers else None  # Usually single synthesizer
     
+    # QualityLab plugin creation methods
+    @staticmethod
+    def create_test_suites_from_env() -> Any:
+        """Create test suite from REFINIRE_RAG_TEST_SUITES"""
+        test_suites = PluginFactory.create_plugins_from_env('test_suites', 'REFINIRE_RAG_TEST_SUITES')
+        return test_suites[0] if test_suites else None  # Usually single test suite
+    
+    @staticmethod
+    def create_evaluators_from_env() -> Any:
+        """Create evaluator from REFINIRE_RAG_EVALUATORS"""
+        evaluators = PluginFactory.create_plugins_from_env('evaluators', 'REFINIRE_RAG_EVALUATORS')
+        return evaluators[0] if evaluators else None  # Usually single evaluator
+    
+    @staticmethod
+    def create_contradiction_detectors_from_env() -> Any:
+        """Create contradiction detector from REFINIRE_RAG_CONTRADICTION_DETECTORS"""
+        detectors = PluginFactory.create_plugins_from_env('contradiction_detectors', 'REFINIRE_RAG_CONTRADICTION_DETECTORS')
+        return detectors[0] if detectors else None  # Usually single detector
+    
+    @staticmethod
+    def create_insight_reporters_from_env() -> Any:
+        """Create insight reporter from REFINIRE_RAG_INSIGHT_REPORTERS"""
+        reporters = PluginFactory.create_plugins_from_env('insight_reporters', 'REFINIRE_RAG_INSIGHT_REPORTERS')
+        return reporters[0] if reporters else None  # Usually single reporter
+    
     @staticmethod
     def get_available_plugins(group: str) -> Dict[str, Any]:
         """Get information about available plugins for a group"""

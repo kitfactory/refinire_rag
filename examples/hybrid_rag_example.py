@@ -3,11 +3,12 @@
 Simple Hybrid RAG Example - 3 Clear Steps
 
 この例は、refinire-ragライブラリを使った基本的なRAGワークフローを、
-3つの明確なステップで示します：
+4つの明確なステップで示します：
 
 1. 環境変数の設定（Environment Variable Setup）
 2. コーパスの作成（Corpus Creation）  
 3. クエリエンジンでの検索（Query Engine Search）
+4. 品質評価（Quality Evaluation with QualityLab）
 
 Requirements:
 - Optional: refinire-rag[bm25,chroma] for hybrid search capabilities
@@ -32,7 +33,7 @@ from pathlib import Path
 # Add src to Python path for direct execution
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from refinire_rag.application import CorpusManager, QueryEngine
+from refinire_rag.application import CorpusManager, QueryEngine, QualityLab
 from refinire_rag.registry import PluginRegistry
 
 def cleanup_existing_data():
@@ -225,11 +226,13 @@ def step3_query_engine_search():
     print(f"      • Reranker: {type(query_engine.reranker).__name__ if query_engine.reranker else 'None'}")
     print(f"      • Synthesizer: {type(query_engine.synthesizer).__name__ if query_engine.synthesizer else 'None'}")
     
-    # サンプルクエリで検索テスト
+    # サンプルクエリで検索テスト（日本語ビジネス関連）
     sample_queries = [
-        "What is strategic planning?",
-        "How does digital transformation affect business?",
-        "What are key performance indicators for marketing?"
+        "会社の主な事業内容は何ですか？",
+        "AIソリューションの製品ラインナップを教えてください",
+        "2023年度の売上高と営業利益はいくらですか？",
+        "リモートワークの制度について教えてください",
+        "情報セキュリティの取り組みはどのようなものがありますか？"
     ]
     
     print(f"\n🔍 Testing {len(sample_queries)} sample queries...")
@@ -291,21 +294,103 @@ def step3_query_engine_search():
     
     return query_engine
 
+
+def step4_quality_evaluation(query_engine, sample_queries):
+    """
+    ステップ4: QualityLabで品質評価
+    
+    QualityLabも環境変数の設定に基づいて自動的にコンポーネントを初期化し、
+    RAGシステムの品質を包括的に評価します。
+    """
+    print("\n" + "="*60)
+    print("🔬 STEP 4: Quality Evaluation with QualityLab")
+    print("="*60)
+    
+    # QualityLab設定用の環境変数を設定
+    print("🔧 Setting up QualityLab environment variables...")
+    os.environ.setdefault("REFINIRE_RAG_TEST_SUITES", "llm")
+    os.environ.setdefault("REFINIRE_RAG_EVALUATORS", "standard") 
+    os.environ.setdefault("REFINIRE_RAG_CONTRADICTION_DETECTORS", "llm")
+    os.environ.setdefault("REFINIRE_RAG_INSIGHT_REPORTERS", "standard")
+    os.environ.setdefault("REFINIRE_RAG_QA_PAIRS_PER_DOCUMENT", "2")
+    os.environ.setdefault("REFINIRE_RAG_EVALUATION_TIMEOUT", "30")
+    os.environ.setdefault("REFINIRE_RAG_INCLUDE_CONTRADICTION_DETECTION", "true")
+    
+    print("   ✅ QualityLab evaluation environment configured")
+    print(f"      • Test Suite: {os.environ.get('REFINIRE_RAG_TEST_SUITES')}")
+    print(f"      • Evaluator: {os.environ.get('REFINIRE_RAG_EVALUATORS')}")
+    print(f"      • Contradiction Detector: {os.environ.get('REFINIRE_RAG_CONTRADICTION_DETECTORS')}")
+    print(f"      • Insight Reporter: {os.environ.get('REFINIRE_RAG_INSIGHT_REPORTERS')}")
+    
+    # QualityLab作成（環境変数から自動設定）
+    print("\n🏗️  Creating QualityLab from environment variables...")
+    try:
+        quality_lab = QualityLab()
+        print("   ✅ QualityLab initialized successfully")
+        print(f"      • Test Suite: {type(quality_lab.test_suite).__name__}")
+        print(f"      • Evaluator: {type(quality_lab.evaluator).__name__}")
+        print(f"      • Contradiction Detector: {type(quality_lab.contradiction_detector).__name__}")
+        print(f"      • Insight Reporter: {type(quality_lab.insight_reporter).__name__}")
+    except Exception as e:
+        print(f"   ⚠️  QualityLab initialization failed: {e}")
+        print("   💡 Continuing without quality evaluation...")
+        return None
+    
+    # サンプル評価の実行
+    print(f"\n🧪 Running evaluation on business knowledge corpus...")
+    try:
+        # 簡単な評価実行（実際のテストケース生成と評価）
+        evaluation_result = quality_lab.evaluate_rag_pipeline(
+            corpus_name="business_knowledge",
+            query_engine=query_engine,
+            sample_size=min(3, len(sample_queries)),  # 小さなサンプルサイズで実行
+            custom_queries=sample_queries[:3] if sample_queries else None
+        )
+        
+        print(f"   ✅ Evaluation completed successfully")
+        print(f"   📊 Overall Score: {evaluation_result.overall_score:.2f}")
+        print(f"   ⏱️  Total evaluation time: {evaluation_result.processing_time:.2f}s")
+        
+        # 詳細結果表示
+        if hasattr(evaluation_result, 'metrics') and evaluation_result.metrics:
+            print(f"\n📈 Detailed Metrics:")
+            for metric, value in evaluation_result.metrics.items():
+                if isinstance(value, (int, float)):
+                    print(f"      • {metric}: {value:.3f}")
+                else:
+                    print(f"      • {metric}: {value}")
+        
+        # インサイト表示
+        if hasattr(evaluation_result, 'insights') and evaluation_result.insights:
+            print(f"\n💡 Key Insights:")
+            for i, insight in enumerate(evaluation_result.insights[:3], 1):  # 最初の3つのみ表示
+                print(f"      {i}. {insight.get('title', 'Insight')}: {insight.get('description', 'No description')}")
+        
+        return evaluation_result
+        
+    except Exception as e:
+        print(f"   ❌ Evaluation failed: {e}")
+        print(f"   💡 This might be due to missing test data or configuration issues")
+        return None
+
+
 def main():
     """
-    メイン関数: 3ステップでのRAGシステム構築
+    メイン関数: 4ステップでのRAGシステム構築・評価
     
-    この関数は以下の3つのステップを順次実行します：
+    この関数は以下の4つのステップを順次実行します：
     1. 環境変数設定
     2. コーパス作成
     3. クエリエンジン検索
+    4. 品質評価
     """
-    print("🚀 Simple Hybrid RAG Example - 3 Clear Steps")
+    print("🚀 Simple Hybrid RAG Example - 4 Clear Steps")
     print("=" * 60)
-    print("This example demonstrates a complete RAG workflow in 3 simple steps:")
+    print("This example demonstrates a complete RAG workflow in 4 simple steps:")
     print("1. Environment Variable Setup")
     print("2. Corpus Creation with CorpusManager")
     print("3. Query Engine Search & Answer Generation")
+    print("4. Quality Evaluation with QualityLab")
     print()
     print("All components are automatically configured from environment variables!")
     
@@ -319,20 +404,35 @@ def main():
         # Step 3: クエリエンジン検索
         query_engine = step3_query_engine_search()
         
+        # Step 4: 品質評価
+        sample_queries = [
+            "会社の主な事業内容は何ですか？",
+            "AIソリューションの製品ラインナップを教えてください",
+            "2023年度の売上高と営業利益はいくらですか？",
+            "リモートワークの制度について教えてください",
+            "情報セキュリティの取り組みはどのようなものがありますか？"
+        ]
+        evaluation_result = step4_quality_evaluation(query_engine, sample_queries)
+        
         # 完了メッセージ
         print("\n" + "="*60)
-        print("🎉 SUCCESS: RAG System Ready!")
+        print("🎉 SUCCESS: RAG System Ready with Quality Evaluation!")
         print("="*60)
-        print("Your RAG system is now fully configured and ready to use.")
+        print("Your RAG system is now fully configured, tested, and ready to use.")
         print()
         print("Key components initialized:")
         print(f"• CorpusManager: {len(corpus_manager.retrievers)} retrievers")
         print(f"• QueryEngine: {[type(r).__name__ for r in query_engine.retrievers]}")
         print(f"• Reranker: {type(query_engine.reranker).__name__ if query_engine.reranker else 'None'}")
         print(f"• Synthesizer: {type(query_engine.synthesizer).__name__ if query_engine.synthesizer else 'None'}")
+        if evaluation_result:
+            print(f"• QualityLab: Evaluation completed with score {evaluation_result.overall_score:.2f}")
+        else:
+            print(f"• QualityLab: Evaluation skipped due to configuration issues")
         print()
         print("💡 Next steps:")
         print("- Try your own queries with: query_engine.query('your question here')")
+        print("- Run quality evaluations with: quality_lab.evaluate_rag_pipeline()")
         print("- Explore different environment variable configurations")
         print("- Add your own documents to the corpus")
         

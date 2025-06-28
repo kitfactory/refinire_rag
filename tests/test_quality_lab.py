@@ -10,8 +10,9 @@ Tests the QualityLab with:
 
 import pytest
 import tempfile
+import os
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 from typing import List
 
 from refinire_rag.application.quality_lab import QualityLab, QualityLabConfig
@@ -21,6 +22,10 @@ from refinire_rag.retrieval.heuristic_reranker import HeuristicReranker, Heurist
 from refinire_rag.retrieval.base import SearchResult, Retriever
 from refinire_rag.models.document import Document
 from refinire_rag.models.qa_pair import QAPair
+from refinire_rag.plugins.test_suites import LLMTestSuitePlugin
+from refinire_rag.plugins.evaluators import StandardEvaluatorPlugin
+from refinire_rag.plugins.contradiction_detectors import LLMContradictionDetectorPlugin
+from refinire_rag.plugins.insight_reporters import StandardInsightReporterPlugin
 
 
 class MockRetriever(Retriever):
@@ -117,16 +122,83 @@ class TestQualityLab:
         )
 
     def test_quality_lab_initialization(self, quality_lab_config):
-        """Test QualityLab initialization"""
+        """Test QualityLab initialization with explicit plugins"""
+        # Create mock plugins
+        mock_test_suite = MagicMock()
+        mock_evaluator = MagicMock()
+        mock_contradiction_detector = MagicMock()
+        mock_insight_reporter = MagicMock()
+        
         quality_lab = QualityLab(
-            config=quality_lab_config
+            config=quality_lab_config,
+            test_suite=mock_test_suite,
+            evaluator=mock_evaluator,
+            contradiction_detector=mock_contradiction_detector,
+            insight_reporter=mock_insight_reporter
         )
         
         assert quality_lab.config == quality_lab_config
-        assert quality_lab.test_suite is not None
-        assert quality_lab.evaluator is not None
-        assert quality_lab.contradiction_detector is not None
-        assert quality_lab.insight_reporter is not None
+        assert quality_lab.test_suite == mock_test_suite
+        assert quality_lab.evaluator == mock_evaluator
+        assert quality_lab.contradiction_detector == mock_contradiction_detector
+        assert quality_lab.insight_reporter == mock_insight_reporter
+
+    def test_quality_lab_initialization_with_environment_variables(self, quality_lab_config):
+        """Test QualityLab initialization using environment variables"""
+        # Set environment variables for plugin selection
+        env_vars = {
+            "REFINIRE_RAG_TEST_SUITES": "llm",
+            "REFINIRE_RAG_EVALUATORS": "standard",
+            "REFINIRE_RAG_CONTRADICTION_DETECTORS": "llm",
+            "REFINIRE_RAG_INSIGHT_REPORTERS": "standard"
+        }
+        
+        # Mock PluginFactory methods to return mock plugins
+        with patch.dict(os.environ, env_vars), \
+             patch('refinire_rag.factories.plugin_factory.PluginFactory.create_test_suites_from_env') as mock_test_suite, \
+             patch('refinire_rag.factories.plugin_factory.PluginFactory.create_evaluators_from_env') as mock_evaluator, \
+             patch('refinire_rag.factories.plugin_factory.PluginFactory.create_contradiction_detectors_from_env') as mock_detector, \
+             patch('refinire_rag.factories.plugin_factory.PluginFactory.create_insight_reporters_from_env') as mock_reporter:
+            
+            # Set up mock returns
+            mock_test_suite.return_value = MagicMock()
+            mock_evaluator.return_value = MagicMock()
+            mock_detector.return_value = MagicMock()
+            mock_reporter.return_value = MagicMock()
+            
+            quality_lab = QualityLab(config=quality_lab_config)
+            
+            # Verify that plugins were created from environment
+            mock_test_suite.assert_called_once()
+            mock_evaluator.assert_called_once()
+            mock_detector.assert_called_once()
+            mock_reporter.assert_called_once()
+            
+            assert quality_lab.test_suite is not None
+            assert quality_lab.evaluator is not None
+            assert quality_lab.contradiction_detector is not None
+            assert quality_lab.insight_reporter is not None
+
+    def test_quality_lab_fallback_to_default_plugins(self, quality_lab_config):
+        """Test QualityLab falls back to default plugins when environment variables fail"""
+        # Mock PluginFactory methods to return None (simulating failure)
+        with patch('refinire_rag.factories.plugin_factory.PluginFactory.create_test_suites_from_env', return_value=None), \
+             patch('refinire_rag.factories.plugin_factory.PluginFactory.create_evaluators_from_env', return_value=None), \
+             patch('refinire_rag.factories.plugin_factory.PluginFactory.create_contradiction_detectors_from_env', return_value=None), \
+             patch('refinire_rag.factories.plugin_factory.PluginFactory.create_insight_reporters_from_env', return_value=None):
+            
+            quality_lab = QualityLab(config=quality_lab_config)
+            
+            # Verify fallback worked by checking the components exist and are the expected types
+            from refinire_rag.processing.test_suite import TestSuite
+            from refinire_rag.processing.evaluator import Evaluator  
+            from refinire_rag.processing.contradiction_detector import ContradictionDetector
+            from refinire_rag.processing.insight_reporter import InsightReporter
+            
+            assert isinstance(quality_lab.test_suite, TestSuite)
+            assert isinstance(quality_lab.evaluator, Evaluator)
+            assert isinstance(quality_lab.contradiction_detector, ContradictionDetector)
+            assert isinstance(quality_lab.insight_reporter, InsightReporter)
         
         # Check initial statistics
         assert quality_lab.stats["qa_pairs_generated"] == 0

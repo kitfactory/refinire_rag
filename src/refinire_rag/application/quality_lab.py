@@ -186,11 +186,14 @@ class QualityLab:
         else:
             self.evaluation_store = evaluation_store
         
-        # Initialize processing components
-        self.test_suite = TestSuite(self.config.test_suite_config)
-        self.evaluator = Evaluator(self.config.evaluator_config)
-        self.contradiction_detector = ContradictionDetector(self.config.contradiction_config)
-        self.insight_reporter = InsightReporter(self.config.reporter_config)
+        # Initialize processing components using PluginFactory
+        from ..factories.plugin_factory import PluginFactory
+        
+        # Create plugins from environment variables with fallbacks
+        self.test_suite = kwargs.get('test_suite') or PluginFactory.create_test_suites_from_env() or TestSuite(self.config.test_suite_config)
+        self.evaluator = kwargs.get('evaluator') or PluginFactory.create_evaluators_from_env() or Evaluator(self.config.evaluator_config)
+        self.contradiction_detector = kwargs.get('contradiction_detector') or PluginFactory.create_contradiction_detectors_from_env() or ContradictionDetector(self.config.contradiction_config)
+        self.insight_reporter = kwargs.get('insight_reporter') or PluginFactory.create_insight_reporters_from_env() or InsightReporter(self.config.reporter_config)
         
         # Statistics tracking
         self.stats = {
