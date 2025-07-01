@@ -273,10 +273,10 @@ def refinire_rag_env_template() -> EnvTemplate:
             description="Embedder plugin name for SimpleRetriever",
             required=False,
             var_type="str",
-            default="openai_embedder",
+            default="openai",
             group="Component Configuration",
             importance="optional",
-            example="openai_embedder",
+            example="openai",
         ),
         
         # Hybrid Retriever Configuration

@@ -59,7 +59,7 @@ class SimpleRetrieverConfig(RetrieverConfig):
         enable_filtering = os.getenv("REFINIRE_RAG_RETRIEVER_ENABLE_FILTERING", "true").lower() == "true"
         embedding_model = os.getenv("REFINIRE_RAG_OPENAI_EMBEDDING_MODEL_NAME", "text-embedding-3-small")
         vector_store_name = os.getenv("REFINIRE_RAG_RETRIEVER_VECTOR_STORE", "inmemory_vector")
-        embedder_name = os.getenv("REFINIRE_RAG_RETRIEVER_EMBEDDER", "openai_embedder")
+        embedder_name = os.getenv("REFINIRE_RAG_RETRIEVER_EMBEDDER", "openai")
         
         return cls(
             top_k=top_k,
