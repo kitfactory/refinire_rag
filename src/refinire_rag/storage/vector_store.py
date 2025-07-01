@@ -12,6 +12,7 @@ import numpy as np
 
 from ..models.document import Document
 from ..document_processor import DocumentProcessor
+from ..retrieval.base import Retriever, Indexer
 
 
 @dataclass
@@ -48,23 +49,23 @@ class VectorStoreStats:
     similarity_metric: str = "cosine"
 
 
-class VectorStore(DocumentProcessor):
-    """Abstract base class for vector storage, retrieval, and indexing with DocumentProcessor integration
+class VectorStore(DocumentProcessor, Indexer, Retriever):
+    """Abstract base class for vector storage, retrieval, and indexing with unified interfaces
     
     This class combines:
-    - Vector storage and retrieval capabilities
-    - Document indexing functionality
+    - Vector storage and retrieval capabilities (Retriever interface)
+    - Document indexing functionality (Indexer interface)
     - DocumentProcessor pipeline integration
     - Embedding generation and management
     
     このクラスは以下を組み合わせます：
-    - ベクトルの保存と取得機能
-    - 文書インデックス機能
+    - ベクトルの保存と取得機能（Retrieverインターフェース）
+    - 文書インデックス機能（Indexerインターフェース）
     - DocumentProcessorパイプライン統合
     - 埋め込みの生成と管理
     
-    Note: This class provides both storage (add_vector) and retrieval (search_similar) 
-    capabilities, making it suitable for both indexing and searching operations.
+    Now consistent with KeywordStore architecture: (DocumentProcessor, Indexer, Retriever)
+    KeywordStoreアーキテクチャと一貫性: (DocumentProcessor, Indexer, Retriever)
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -336,6 +337,175 @@ class VectorStore(DocumentProcessor):
             entries.append(entry)
         
         return self.add_vectors(entries)
+    
+    # Retriever interface implementation
+    def retrieve(self, 
+                 query: str, 
+                 limit: Optional[int] = None,
+                 metadata_filter: Optional[Dict[str, Any]] = None) -> List['SearchResult']:
+        """Retrieve relevant documents for query (Retriever interface)
+        
+        Args:
+            query: Search query text
+            limit: Maximum number of results to return
+            metadata_filter: Optional metadata filters
+            
+        Returns:
+            List of SearchResult objects
+        """
+        # Import here to avoid circular imports
+        from ..retrieval.base import SearchResult
+        
+        # Get embedding for query
+        if not self._embedder:
+            raise ValueError("No embedder configured for vector store")
+        
+        query_vector = self._embedder.embed_text(query)
+        
+        # Search for similar vectors
+        vector_results = self.search_similar(
+            query_vector=query_vector,
+            limit=limit or 10,
+            filters=metadata_filter
+        )
+        
+        # Convert VectorSearchResult to SearchResult
+        search_results = []
+        for vr in vector_results:
+            # Create Document object
+            from ..models.document import Document
+            doc = Document(
+                id=vr.document_id,
+                content=vr.content,
+                metadata=vr.metadata
+            )
+            
+            # Create SearchResult
+            result = SearchResult(
+                document_id=vr.document_id,
+                document=doc,
+                score=vr.score,
+                metadata={
+                    **vr.metadata,
+                    'retriever_type': type(self).__name__,
+                    'retrieval_method': 'vector_similarity'
+                }
+            )
+            search_results.append(result)
+        
+        return search_results
+    
+    def get_config(self) -> Dict[str, Any]:
+        """Get the configuration for this vector store (Retriever interface)
+        
+        Returns:
+            Dictionary containing current configuration
+        """
+        return {
+            'vector_store_type': type(self).__name__,
+            'vector_dimension': self.get_vector_dimension(),
+            'total_vectors': self.count_vectors(),
+            'embedder': type(self._embedder).__name__ if self._embedder else None
+        }
+    
+    # Indexer interface implementation  
+    def index_document(self, document: 'Document') -> None:
+        """Index a single document for search (Indexer interface)
+        
+        Args:
+            document: Document to index
+        """
+        if not self._embedder:
+            raise ValueError("No embedder configured for vector store")
+        
+        # Generate embedding
+        embedding = self._embedder.embed_text(document.content)
+        
+        # Create vector entry
+        entry = VectorEntry(
+            document_id=document.id,
+            content=document.content,
+            embedding=embedding,
+            metadata=document.metadata
+        )
+        
+        # Add to store
+        self.add_vector(entry)
+    
+    def index_documents(self, documents: List['Document']) -> None:
+        """Index multiple documents efficiently (Indexer interface)
+        
+        Args:
+            documents: List of documents to index
+        """
+        if not self._embedder:
+            raise ValueError("No embedder configured for vector store")
+        
+        # Generate embeddings for all documents
+        texts = [doc.content for doc in documents]
+        embeddings = self._embedder.embed_texts(texts)
+        
+        # Create vector entries
+        entries = []
+        for doc, embedding in zip(documents, embeddings):
+            entry = VectorEntry(
+                document_id=doc.id,
+                content=doc.content,
+                embedding=embedding,
+                metadata=doc.metadata
+            )
+            entries.append(entry)
+        
+        # Add all to store
+        self.add_vectors(entries)
+    
+    def remove_document(self, document_id: str) -> bool:
+        """Remove document from index (Indexer interface)
+        
+        Args:
+            document_id: ID of document to remove
+            
+        Returns:
+            True if document was found and removed, False otherwise
+        """
+        return self.delete_vector(document_id)
+    
+    def update_document(self, document: 'Document') -> bool:
+        """Update an existing document in the index (Indexer interface)
+        
+        Args:
+            document: Updated document (must have existing ID)
+            
+        Returns:
+            True if document was found and updated, False otherwise
+        """
+        if not self._embedder:
+            raise ValueError("No embedder configured for vector store")
+        
+        # Generate new embedding
+        embedding = self._embedder.embed_text(document.content)
+        
+        # Create updated vector entry
+        entry = VectorEntry(
+            document_id=document.id,
+            content=document.content,
+            embedding=embedding,
+            metadata=document.metadata
+        )
+        
+        return self.update_vector(entry)
+    
+    def clear_index(self) -> None:
+        """Remove all documents from the index (Indexer interface)"""
+        self.clear()
+    
+    def get_document_count(self) -> int:
+        """Get the number of documents in the index (Indexer interface)
+        
+        Returns:
+            Number of indexed documents
+        """
+        return self.count_vectors()
     
     def search_similar_to_document(
         self,
