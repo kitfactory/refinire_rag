@@ -48,7 +48,6 @@ class PluginRegistry:
         'retrievers': {
             'simple': 'refinire_rag.retrieval.simple_retriever:SimpleRetriever',
             'hybrid': 'refinire_rag.retrieval.hybrid_retriever:HybridRetriever',
-            'keyword': 'refinire_rag.retrieval.keyword_retriever:KeywordRetriever',
         },
         'vector_stores': {
             'inmemory_vector': 'refinire_rag.storage.in_memory_vector_store:InMemoryVectorStore',

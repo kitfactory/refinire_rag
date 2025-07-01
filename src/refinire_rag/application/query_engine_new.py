@@ -221,17 +221,15 @@ class QueryEngine:
             except Exception as e:
                 logger.error(f"Failed to create retriever from vector store {type(vector_store).__name__}: {e}")
         
-        # Create keyword store retrievers  
+        # Add keyword stores directly (they already implement Retriever interface)
         keyword_stores = PluginFactory.create_keyword_stores_from_env()
         for keyword_store in keyword_stores:
             try:
-                # Create keyword retriever using the keyword store
-                from ..retrieval.keyword_retriever import KeywordRetriever
-                retriever = KeywordRetriever(keyword_store=keyword_store)
-                retrievers.append(retriever)
-                logger.info(f"Created KeywordRetriever with {type(keyword_store).__name__}")
+                # KeywordStore (e.g. BM25sKeywordStore) already implements Retriever interface
+                retrievers.append(keyword_store)
+                logger.info(f"Added {type(keyword_store).__name__} directly as retriever")
             except Exception as e:
-                logger.error(f"Failed to create retriever from keyword store {type(keyword_store).__name__}: {e}")
+                logger.error(f"Failed to add keyword store {type(keyword_store).__name__}: {e}")
         
         return retrievers
     

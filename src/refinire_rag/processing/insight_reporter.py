@@ -280,9 +280,58 @@ class InsightReporter(DocumentProcessor):
         return metrics
     
     def _parse_metrics_from_content(self, content: str) -> Dict[str, float]:
-        """コンテンツからメトリクスを解析"""
+        """コンテンツからメトリクスを解析（JSON対応版）"""
         
         metrics = {}
+        
+        # JSON形式のコンテンツを処理
+        if content.strip().startswith('{'):
+            try:
+                import json
+                data = json.loads(content)
+                
+                # evaluation_summaryからメトリクスを抽出
+                if "evaluation_summary" in data:
+                    summary = data["evaluation_summary"]
+                    
+                    # 成功率 → 精度
+                    if "success_rate" in summary:
+                        metrics["accuracy"] = float(summary["success_rate"])
+                    
+                    # 平均信頼度 → 信頼度
+                    if "average_confidence" in summary:
+                        metrics["confidence"] = float(summary["average_confidence"])
+                    
+                    # 平均処理時間 → 応答時間
+                    if "average_processing_time" in summary:
+                        metrics["response_time"] = float(summary["average_processing_time"])
+                    
+                    # その他の指標
+                    if "total_queries" in summary:
+                        metrics["total_queries"] = float(summary["total_queries"])
+                    
+                    if "passed_queries" in summary:
+                        metrics["passed_queries"] = float(summary["passed_queries"])
+                
+                # トップレベルの指標も確認
+                for key, value in data.items():
+                    if isinstance(value, (int, float)):
+                        if key == "success_rate":
+                            metrics["accuracy"] = float(value)
+                        elif key == "average_confidence":
+                            metrics["confidence"] = float(value) 
+                        elif key == "average_processing_time":
+                            metrics["response_time"] = float(value)
+                        elif key in ["overall_score", "f1_score", "consistency"]:
+                            metrics[key] = float(value)
+                
+                return metrics
+                
+            except json.JSONDecodeError:
+                # JSONでない場合は従来のテキスト解析にフォールバック
+                pass
+        
+        # 従来のテキスト解析
         lines = content.split('\n')
         
         for line in lines:

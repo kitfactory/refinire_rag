@@ -171,7 +171,7 @@ def step1_setup_environment():
         os.environ.setdefault("REFINIRE_RAG_LLM_MODEL", "gpt-4o-mini")
         print("   ✅ LLM model: gpt-4o-mini")
     
-    if len(retrievers_config) > 1:
+    if len(hybrid_components) > 1:
         print("   🚀 Hybrid search ready: Vector + Keyword + Reranking + LLM")
     else:
         print("   🔍 Single-mode search ready: Vector/Keyword + Reranking + LLM")

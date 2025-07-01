@@ -133,6 +133,66 @@ class StandardEvaluatorPlugin(EvaluatorPlugin):
             "success_rate": 0.0
         }
     
+    def process(self, document: Document) -> List[Document]:
+        """
+        Process evaluation document and return metrics as documents.
+        評価文書を処理し、メトリクスを文書として返す
+        
+        Args:
+            document: Document containing test result data
+            
+        Returns:
+            List of documents containing evaluation metrics and analysis
+        """
+        try:
+            # Extract test result information from document metadata
+            test_case_id = document.metadata.get("test_case_id", "unknown")
+            passed = document.metadata.get("passed", False)
+            confidence = document.metadata.get("confidence", 0.0)
+            processing_time = document.metadata.get("processing_time", 0.0)
+            
+            # Create evaluation metrics document
+            metrics_content = f"""
+Evaluation Metrics for Test Case: {test_case_id}
+
+Test Result: {'PASSED' if passed else 'FAILED'}
+Confidence Score: {confidence:.2f}
+Processing Time: {processing_time:.3f}s
+
+Analysis:
+- Test execution completed successfully
+- Confidence level: {'High' if confidence > 0.8 else 'Medium' if confidence > 0.5 else 'Low'}
+- Performance: {'Fast' if processing_time < 2.0 else 'Medium' if processing_time < 5.0 else 'Slow'}
+"""
+            
+            metrics_doc = Document(
+                id=f"metrics_{test_case_id}",
+                content=metrics_content,
+                metadata={
+                    "processing_stage": "evaluation_metrics",
+                    "test_case_id": test_case_id,
+                    "accuracy": 1.0 if passed else 0.0,
+                    "relevance": confidence,
+                    "response_time": processing_time,
+                    "evaluator_type": "standard",
+                    "evaluation_timestamp": document.metadata.get("evaluation_timestamp", ""),
+                }
+            )
+            
+            return [metrics_doc]
+            
+        except Exception as e:
+            # Return error document
+            error_doc = Document(
+                id=f"error_{document.id}",
+                content=f"Evaluation processing failed: {str(e)}",
+                metadata={
+                    "processing_stage": "evaluation_error",
+                    "error": str(e)
+                }
+            )
+            return [error_doc]
+    
     def initialize(self) -> bool:
         """Initialize the standard evaluator plugin."""
         self.is_initialized = True
@@ -208,6 +268,103 @@ class DetailedEvaluatorPlugin(EvaluatorPlugin):
             "consistency_score": 0.0,
             "robustness_score": 0.0
         }
+    
+    def process(self, document: Document) -> List[Document]:
+        """
+        Process evaluation document with detailed analysis.
+        詳細分析を伴う評価文書の処理
+        
+        Args:
+            document: Document containing test result data
+            
+        Returns:
+            List of documents containing detailed evaluation metrics and analysis
+        """
+        try:
+            # Extract test result information from document metadata
+            test_case_id = document.metadata.get("test_case_id", "unknown")
+            passed = document.metadata.get("passed", False)
+            confidence = document.metadata.get("confidence", 0.0)
+            processing_time = document.metadata.get("processing_time", 0.0)
+            
+            # Create detailed evaluation metrics document
+            detailed_content = f"""
+Detailed Evaluation Analysis for Test Case: {test_case_id}
+
+## Test Execution Results
+Test Result: {'PASSED' if passed else 'FAILED'}
+Confidence Score: {confidence:.3f}
+Processing Time: {processing_time:.3f}s
+
+## Performance Analysis
+- Accuracy Level: {'Excellent' if confidence > 0.9 else 'Good' if confidence > 0.7 else 'Fair' if confidence > 0.5 else 'Poor'}
+- Response Time Category: {'Fast' if processing_time < 1.0 else 'Acceptable' if processing_time < 3.0 else 'Slow'}
+- Success Rate Impact: {'Positive' if passed else 'Negative'}
+
+## Quality Metrics
+- Confidence Distribution: {'High Confidence' if confidence > 0.8 else 'Medium Confidence' if confidence > 0.5 else 'Low Confidence'}
+- Performance Consistency: {'Consistent' if abs(processing_time - 2.0) < 1.0 else 'Variable'}
+
+## Recommendations
+{'- Maintain current approach' if passed and confidence > 0.8 else '- Consider optimization' if passed else '- Requires improvement'}
+{'- Good response time' if processing_time < 3.0 else '- Consider performance optimization'}
+"""
+            
+            # Create main metrics document
+            metrics_doc = Document(
+                id=f"detailed_metrics_{test_case_id}",
+                content=detailed_content,
+                metadata={
+                    "processing_stage": "detailed_evaluation_metrics",
+                    "test_case_id": test_case_id,
+                    "accuracy": 1.0 if passed else 0.0,
+                    "relevance": confidence,
+                    "response_time": processing_time,
+                    "confidence_score": confidence,
+                    "consistency_score": 1.0 - abs(processing_time - 2.0) / 5.0,  # Normalize around 2s
+                    "robustness_score": confidence * (1.0 if passed else 0.5),
+                    "evaluator_type": "detailed",
+                    "evaluation_timestamp": document.metadata.get("evaluation_timestamp", ""),
+                }
+            )
+            
+            # Create additional analysis document if enabled
+            analysis_doc = Document(
+                id=f"root_cause_analysis_{test_case_id}",
+                content=f"""
+Root Cause Analysis for Test Case: {test_case_id}
+
+## Failure Analysis
+{'No failure detected - test passed successfully' if passed else 'Test failure detected - requires investigation'}
+
+## Performance Factors
+- Response Time: {processing_time:.3f}s
+- Confidence Level: {confidence:.3f}
+
+## Potential Improvements
+{'System performing well' if passed and confidence > 0.8 else 'Consider fine-tuning parameters' if confidence < 0.7 else 'Minor adjustments may help'}
+""",
+                metadata={
+                    "processing_stage": "root_cause_analysis",
+                    "test_case_id": test_case_id,
+                    "analysis_type": "root_cause",
+                    "evaluator_type": "detailed"
+                }
+            )
+            
+            return [metrics_doc, analysis_doc] if self.config.get("include_root_cause_analysis", True) else [metrics_doc]
+            
+        except Exception as e:
+            # Return error document
+            error_doc = Document(
+                id=f"detailed_error_{document.id}",
+                content=f"Detailed evaluation processing failed: {str(e)}",
+                metadata={
+                    "processing_stage": "detailed_evaluation_error",
+                    "error": str(e)
+                }
+            )
+            return [error_doc]
     
     def initialize(self) -> bool:
         """Initialize the detailed evaluator plugin."""

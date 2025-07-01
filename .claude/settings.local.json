@@ -8,7 +8,9 @@
       "Bash(mkdir:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(export CHROMA_TELEMETRY_DISABLED=true)",
+      "Bash(export ANONYMIZED_TELEMETRY=false)"
     ],
     "deny": []
   }

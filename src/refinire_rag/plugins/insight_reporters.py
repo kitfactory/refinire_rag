@@ -209,13 +209,12 @@ class StandardInsightReporterPlugin(InsightReporterPlugin):
             "include_detailed_analysis": False,
             "include_action_items": True,
             "accuracy_threshold": 0.8,
-            "relevance_threshold": 0.75,
-            "response_time_threshold": 5.0,
+            "confidence_threshold": 0.7,  # より明確な名前
+            "response_time_threshold": 10.0,  # より現実的な閾値（秒）
             "health_score_weights": {
-                "accuracy": 0.3,
-                "relevance": 0.3,
-                "response_time": 0.2,
-                "consistency": 0.2
+                "accuracy": 0.4,        # 成功率を重視
+                "confidence": 0.3,      # 信頼度を重視
+                "response_time": 0.3,   # 応答時間を重視
             },
             **self.config
         }
@@ -243,18 +242,18 @@ class StandardInsightReporterPlugin(InsightReporterPlugin):
                 recommendations=["Review and improve answer generation", "Update knowledge base"]
             ))
         
-        # Check relevance threshold
-        relevance = metrics.get("relevance", 0.0)
-        if relevance < self.config["relevance_threshold"]:
+        # Check confidence threshold  
+        confidence = metrics.get("confidence", 0.0)
+        if confidence < self.config["confidence_threshold"]:
             insights.append(Insight(
-                id="low_relevance_threshold",
-                insight_type="quality",
-                title="Low Relevance Detected",
-                description=f"System relevance ({relevance:.2f}) is below threshold ({self.config['relevance_threshold']:.2f})",
+                id="low_confidence_threshold",
+                insight_type="quality", 
+                title="Low Confidence Detected",
+                description=f"System confidence ({confidence:.2f}) is below threshold ({self.config['confidence_threshold']:.2f})",
                 severity="medium",
                 confidence=0.9,
-                affected_metrics=["relevance"],
-                recommendations=["Improve retrieval algorithm", "Review document indexing"]
+                affected_metrics=["confidence"],
+                recommendations=["Review answer generation quality", "Improve source document relevance", "Consider retraining or fine-tuning models"]
             ))
         
         return insights
@@ -275,8 +274,9 @@ class StandardInsightReporterPlugin(InsightReporterPlugin):
                 # Normalize metric value to 0-1 range if needed
                 metric_value = metrics[metric]
                 if metric == "response_time":
-                    # For response time, lower is better, so invert and normalize
-                    normalized_value = max(0.0, 1.0 - min(metric_value / 5.0, 1.0))
+                    # For response time, lower is better, normalize against threshold
+                    threshold = self.config.get("response_time_threshold", 10.0)
+                    normalized_value = max(0.0, 1.0 - min(metric_value / threshold, 1.0))
                 else:
                     # For other metrics, higher is better, clamp to 0-1
                     normalized_value = max(0.0, min(metric_value, 1.0))
@@ -298,6 +298,121 @@ class StandardInsightReporterPlugin(InsightReporterPlugin):
                 "relevance": self.config["relevance_threshold"]
             }
         }
+    
+    def process(self, document: Document) -> List[Document]:
+        """
+        Process evaluation results and generate insight reports.
+        評価結果を処理してインサイトレポートを生成
+        
+        Args:
+            document: Document containing evaluation metrics and analysis
+            
+        Returns:
+            List of documents containing generated insights and reports
+        """
+        try:
+            # Extract metrics from document metadata and content
+            # メタデータから直接取得
+            accuracy = document.metadata.get("accuracy", 0.0)
+            relevance = document.metadata.get("relevance", 0.0) 
+            response_time = document.metadata.get("response_time", 0.0)
+            
+            # メタデータに値がない場合はコンテンツのJSONから解析
+            confidence = relevance  # confidence として扱う
+            if accuracy == 0.0 or response_time == 0.0 or confidence == 0.0:
+                if document.content.strip().startswith('{'):
+                    try:
+                        import json
+                        data = json.loads(document.content)
+                        
+                        if "evaluation_summary" in data:
+                            summary = data["evaluation_summary"]
+                            if accuracy == 0.0 and "success_rate" in summary:
+                                accuracy = float(summary["success_rate"])
+                            if response_time == 0.0 and "average_processing_time" in summary:
+                                response_time = float(summary["average_processing_time"])
+                            # confidence として正しく設定
+                            if confidence == 0.0 and "average_confidence" in summary:
+                                confidence = float(summary["average_confidence"])
+                                
+                    except json.JSONDecodeError:
+                        pass
+            
+            # Generate insights based on thresholds（統一された指標）
+            metrics = {
+                "accuracy": accuracy,        # 成功率（0.0-1.0）
+                "confidence": confidence,    # LLM信頼度（0.0-1.0）
+                "response_time": response_time  # 1リクエストあたりの応答時間（秒）
+            }
+            
+            insights = self.generate_threshold_insights(metrics)
+            
+            # Compute health score
+            health_score = self.compute_health_score(metrics)
+            
+            # Create insight report document
+            insight_content = f"""
+# Standard Insight Report for {document.id}
+
+## System Health Score: {health_score:.2f}
+
+## Key Metrics Analysis:
+- **Success Rate**: {accuracy:.1%} {'✅' if accuracy >= self.config.get('accuracy_threshold', 0.8) else '⚠️'} (Query success rate)
+- **LLM Confidence**: {confidence:.3f} {'✅' if confidence >= self.config.get('confidence_threshold', 0.7) else '⚠️'} (Answer confidence 0.0-1.0)
+- **Response Time**: {response_time:.2f}s {'✅' if response_time <= self.config.get('response_time_threshold', 10.0) else '⚠️'} (Per request)
+
+## Generated Insights: {len(insights)}
+{chr(10).join([f"### {i+1}. {insight.title}" + chr(10) + f"   {insight.description}" + chr(10) + f"   **Severity**: {insight.severity}" + chr(10) + f"   **Recommendations**: {', '.join(insight.recommendations)}" for i, insight in enumerate(insights)]) if insights else "No threshold-based insights generated."}
+
+## Overall Assessment:
+{'✅ System performing well - all metrics within acceptable ranges' if health_score > 0.8 else '⚠️ System requires attention - some metrics below thresholds' if health_score > 0.5 else '🚨 System performance critical - immediate action required'}
+
+## Configuration & Thresholds:
+- Success Rate threshold: {self.config.get('accuracy_threshold', 0.8):.1%} (minimum acceptable query success rate)
+- LLM Confidence threshold: {self.config.get('confidence_threshold', 0.7):.2f} (minimum answer confidence score)
+- Response Time threshold: {self.config.get('response_time_threshold', 10.0):.1f}s (maximum acceptable per-request time)
+
+## Health Score Calculation:
+- Success Rate: {self.config['health_score_weights']['accuracy']:.0%} weight
+- LLM Confidence: {self.config['health_score_weights']['confidence']:.0%} weight  
+- Response Time: {self.config['health_score_weights']['response_time']:.0%} weight
+"""
+            
+            insight_doc = Document(
+                id=f"standard_insights_{document.id}",
+                content=insight_content,
+                metadata={
+                    "processing_stage": "insight_generation",
+                    "original_document_id": document.id,
+                    "health_score": health_score,
+                    "insights_count": len(insights),
+                    "success_rate": accuracy,      # 明確な名前
+                    "llm_confidence": confidence,  # 明確な名前  
+                    "response_time_per_request": response_time,  # 単位明記
+                    "reporter_type": "standard",
+                    "assessment_level": "good" if health_score > 0.8 else "warning" if health_score > 0.5 else "critical",
+                    "thresholds": {
+                        "success_rate_min": self.config.get('accuracy_threshold', 0.8),
+                        "confidence_min": self.config.get('confidence_threshold', 0.7),
+                        "response_time_max_seconds": self.config.get('response_time_threshold', 10.0)
+                    }
+                }
+            )
+            
+            return [insight_doc]
+            
+        except Exception as e:
+            # Return error document
+            error_doc = Document(
+                id=f"insight_error_{document.id}",
+                content=f"Insight generation failed: {str(e)}",
+                metadata={
+                    "processing_stage": "insight_error",
+                    "error": str(e),
+                    "reporter_type": "standard"
+                }
+            )
+            return [error_doc]
     
     def initialize(self) -> bool:
         """Initialize the standard insight reporter plugin."""
@@ -364,6 +479,76 @@ class ExecutiveInsightReporterPlugin(InsightReporterPlugin):
             "business_impact_insights": 0,
             "strategic_recommendations": 0
         }
+    
+    def process(self, document: Document) -> List[Document]:
+        """
+        Process evaluation results and generate executive-level insights.
+        評価結果を処理してエグゼクティブレベルのインサイトを生成
+        
+        Args:
+            document: Document containing evaluation metrics and analysis
+            
+        Returns:
+            List of documents containing executive-level insights and reports
+        """
+        try:
+            # Extract business-critical metrics
+            accuracy = document.metadata.get("accuracy", 0.0)
+            relevance = document.metadata.get("relevance", 0.0)
+            response_time = document.metadata.get("response_time", 0.0)
+            
+            # Create executive summary document
+            executive_content = f"""
+# Executive RAG System Report
+
+## Business Impact Summary
+**System Performance Score**: {((accuracy + relevance) / 2 * 100):.0f}%
+
+### Key Business Metrics:
+- **Customer Experience Quality**: {accuracy:.1%} {'🟢 Excellent' if accuracy > 0.9 else '🟡 Good' if accuracy > 0.7 else '🔴 Needs Improvement'}
+- **Information Relevance**: {relevance:.1%} {'🟢 High' if relevance > 0.8 else '🟡 Medium' if relevance > 0.6 else '🔴 Low'}
+- **Response Efficiency**: {response_time:.1f}s {'🟢 Fast' if response_time < 2.0 else '🟡 Acceptable' if response_time < 5.0 else '🔴 Slow'}
+
+## Strategic Recommendations:
+{'🎯 **MAINTAIN EXCELLENCE**: System performing at optimal levels. Continue current strategy.' if accuracy > 0.9 and relevance > 0.8 else '⚡ **OPTIMIZE PERFORMANCE**: Focus on improving accuracy and relevance metrics.' if accuracy > 0.7 else '🚨 **IMMEDIATE ACTION REQUIRED**: System performance below acceptable business standards.'}
+
+## Financial Impact:
+- Performance Level: {'High ROI' if accuracy > 0.8 else 'Medium ROI' if accuracy > 0.6 else 'Low ROI'}
+- Operational Efficiency: {'Optimal' if response_time < 3.0 else 'Requires Optimization'}
+
+## Next Steps:
+1. {'Continue monitoring current performance' if accuracy > 0.8 else 'Implement performance improvement plan'}
+2. {'Scale successful approaches' if relevance > 0.8 else 'Review content strategy and knowledge base'}
+3. {'Maintain current infrastructure' if response_time < 3.0 else 'Consider infrastructure optimization'}
+"""
+            
+            executive_doc = Document(
+                id=f"executive_insights_{document.id}",
+                content=executive_content,
+                metadata={
+                    "processing_stage": "executive_insights",
+                    "original_document_id": document.id,
+                    "business_score": (accuracy + relevance) / 2,
+                    "performance_level": "high" if accuracy > 0.8 else "medium" if accuracy > 0.6 else "low",
+                    "roi_category": "high" if accuracy > 0.8 else "medium" if accuracy > 0.6 else "low",
+                    "reporter_type": "executive"
+                }
+            )
+            
+            return [executive_doc]
+            
+        except Exception as e:
+            # Return error document
+            error_doc = Document(
+                id=f"executive_insight_error_{document.id}",
+                content=f"Executive insight generation failed: {str(e)}",
+                metadata={
+                    "processing_stage": "executive_insight_error",
+                    "error": str(e),
+                    "reporter_type": "executive"
+                }
+            )
+            return [error_doc]
     
     def initialize(self) -> bool:
         """Initialize the executive insight reporter plugin."""
@@ -433,6 +618,97 @@ class DetailedInsightReporterPlugin(InsightReporterPlugin):
             "root_cause_analyses": 0,
             "code_suggestions": 0
         }
+    
+    def process(self, document: Document) -> List[Document]:
+        """
+        Process evaluation results and generate detailed technical insights.
+        評価結果を処理して詳細な技術的インサイトを生成
+        
+        Args:
+            document: Document containing evaluation metrics and analysis
+            
+        Returns:
+            List of documents containing detailed technical insights and analysis
+        """
+        try:
+            # Extract comprehensive metrics
+            accuracy = document.metadata.get("accuracy", 0.0)
+            relevance = document.metadata.get("relevance", 0.0)
+            response_time = document.metadata.get("response_time", 0.0)
+            confidence_score = document.metadata.get("confidence_score", 0.0)
+            consistency_score = document.metadata.get("consistency_score", 0.0)
+            
+            # Create detailed technical analysis document
+            detailed_content = f"""
+# Detailed Technical RAG System Analysis
+
+## Performance Metrics Breakdown
+- **Accuracy**: {accuracy:.4f} (Target: ≥0.80)
+- **Relevance**: {relevance:.4f} (Target: ≥0.75)
+- **Response Time**: {response_time:.4f}s (Target: ≤5.0s)
+- **Confidence Score**: {confidence_score:.4f}
+- **Consistency Score**: {consistency_score:.4f}
+
+## Root Cause Analysis
+### Accuracy Assessment
+{'✅ **HIGH ACCURACY**: System demonstrates excellent answer quality.' if accuracy >= 0.9 else '⚠️ **MEDIUM ACCURACY**: Room for improvement in answer generation.' if accuracy >= 0.7 else '🚨 **LOW ACCURACY**: Significant issues with answer quality detected.'}
+
+### Relevance Analysis
+{'✅ **HIGH RELEVANCE**: Retrieval system effectively finding relevant content.' if relevance >= 0.8 else '⚠️ **MEDIUM RELEVANCE**: Some irrelevant content being retrieved.' if relevance >= 0.6 else '🚨 **LOW RELEVANCE**: Major issues with content retrieval relevance.'}
+
+### Performance Analysis
+{'✅ **OPTIMAL PERFORMANCE**: Response times within acceptable limits.' if response_time <= 2.0 else '⚠️ **ACCEPTABLE PERFORMANCE**: Response times adequate but could be improved.' if response_time <= 5.0 else '🚨 **POOR PERFORMANCE**: Response times exceeding acceptable limits.'}
+
+## Technical Recommendations
+
+### Immediate Actions:
+{f"1. **CONTINUE CURRENT APPROACH**: System performing optimally" if accuracy >= 0.9 and relevance >= 0.8 else f"1. **IMPROVE RETRIEVAL**: Focus on relevance optimization" if relevance < 0.7 else f"1. **ENHANCE GENERATION**: Focus on answer quality improvement"}
+{f"2. **MONITOR PERFORMANCE**: Maintain current monitoring levels" if response_time <= 3.0 else f"2. **OPTIMIZE PERFORMANCE**: Consider caching and indexing improvements"}
+{f"3. **SCALE INFRASTRUCTURE**: Prepare for increased load" if accuracy >= 0.8 else f"3. **REVIEW CONFIGURATION**: Analyze component settings and parameters"}
+
+### Technical Deep Dive:
+- **Retrieval Quality**: {'Excellent' if relevance >= 0.8 else 'Good' if relevance >= 0.6 else 'Needs Improvement'}
+- **Generation Quality**: {'Excellent' if accuracy >= 0.9 else 'Good' if accuracy >= 0.7 else 'Needs Improvement'}
+- **System Consistency**: {'High' if consistency_score >= 0.8 else 'Medium' if consistency_score >= 0.6 else 'Low'}
+
+## Code Optimization Suggestions:
+{f"- Maintain current retrieval configuration" if relevance >= 0.8 else f"- Review retrieval parameters and reranking settings"}
+{f"- Current generation settings are optimal" if accuracy >= 0.8 else f"- Consider adjusting LLM temperature and prompt engineering"}
+{f"- Performance configuration is adequate" if response_time <= 3.0 else f"- Implement response caching and optimize vector search"}
+
+## Monitoring Alerts:
+{f"🟢 All systems nominal" if accuracy >= 0.8 and relevance >= 0.7 and response_time <= 5.0 else f"🟡 Some metrics below optimal" if accuracy >= 0.6 or relevance >= 0.5 else f"🔴 Multiple metrics require attention"}
+"""
+            
+            detailed_doc = Document(
+                id=f"detailed_insights_{document.id}",
+                content=detailed_content,
+                metadata={
+                    "processing_stage": "detailed_insights",
+                    "original_document_id": document.id,
+                    "technical_score": (accuracy + relevance + min(5.0/max(response_time, 0.1), 1.0)) / 3,
+                    "accuracy_grade": "A" if accuracy >= 0.9 else "B" if accuracy >= 0.7 else "C",
+                    "relevance_grade": "A" if relevance >= 0.8 else "B" if relevance >= 0.6 else "C",
+                    "performance_grade": "A" if response_time <= 2.0 else "B" if response_time <= 5.0 else "C",
+                    "reporter_type": "detailed",
+                    "include_code_suggestions": self.config.get("include_code_suggestions", True)
+                }
+            )
+            
+            return [detailed_doc]
+            
+        except Exception as e:
+            # Return error document
+            error_doc = Document(
+                id=f"detailed_insight_error_{document.id}",
+                content=f"Detailed insight generation failed: {str(e)}",
+                metadata={
+                    "processing_stage": "detailed_insight_error",
+                    "error": str(e),
+                    "reporter_type": "detailed"
+                }
+            )
+            return [error_doc]
     
     def initialize(self) -> bool:
         """Initialize the detailed insight reporter plugin."""

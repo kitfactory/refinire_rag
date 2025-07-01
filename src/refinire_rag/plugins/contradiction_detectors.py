@@ -131,6 +131,75 @@ class LLMContradictionDetectorPlugin(ContradictionDetectorPlugin):
             "confidence_threshold": self.config.get("contradiction_threshold", 0.7)
         }
     
+    def process(self, document: Document) -> List[Document]:
+        """
+        Process document for contradiction detection analysis.
+        矛盾検出分析のために文書を処理
+        
+        Args:
+            document: Document to analyze for contradictions
+            
+        Returns:
+            List of documents containing contradiction analysis results
+        """
+        try:
+            # Extract claims from the document
+            claims = self.extract_claims(document)
+            
+            # Detect contradictions within the document
+            contradictions = self.detect_contradictions(claims, document)
+            
+            # Create contradiction analysis document
+            analysis_content = f"""
+Contradiction Analysis for Document: {document.id}
+
+## Claims Extracted: {len(claims)}
+Claims found in the document:
+{chr(10).join([f"- {i+1}. {claim.text}" for i, claim in enumerate(claims[:5])]) if claims else "No claims extracted"}
+{"..." if len(claims) > 5 else ""}
+
+## Contradiction Detection: {len(contradictions)}
+{'No contradictions detected' if not contradictions else f'{len(contradictions)} potential contradiction(s) found'}
+
+## Analysis Summary:
+- Claim extraction method: LLM-based
+- Claims confidence threshold: {self.config.get('claim_confidence_threshold', 0.6)}
+- Contradiction threshold: {self.config.get('contradiction_threshold', 0.7)}
+- Document length: {len(document.content)} characters
+
+## Risk Assessment:
+{'Low risk - no contradictions detected' if not contradictions else 'Medium to High risk - contradictions detected, review recommended'}
+"""
+            
+            analysis_doc = Document(
+                id=f"contradiction_analysis_{document.id}",
+                content=analysis_content,
+                metadata={
+                    "processing_stage": "contradiction_analysis",
+                    "original_document_id": document.id,
+                    "claims_count": len(claims),
+                    "contradictions_count": len(contradictions),
+                    "detector_type": "llm",
+                    "risk_level": "low" if not contradictions else "medium",
+                    "analysis_timestamp": document.metadata.get("analysis_timestamp", "")
+                }
+            )
+            
+            return [analysis_doc]
+            
+        except Exception as e:
+            # Return error document
+            error_doc = Document(
+                id=f"contradiction_error_{document.id}",
+                content=f"Contradiction detection failed: {str(e)}",
+                metadata={
+                    "processing_stage": "contradiction_error",
+                    "error": str(e),
+                    "detector_type": "llm"
+                }
+            )
+            return [error_doc]
+    
     def initialize(self) -> bool:
         """Initialize the LLM contradiction detector plugin."""
         self.is_initialized = True
@@ -199,6 +268,76 @@ class RuleBasedContradictionDetectorPlugin(ContradictionDetectorPlugin):
             "contradictions_found": 0,
             "patterns_used": len(self.config.get("contradiction_patterns", []))
         }
+    
+    def process(self, document: Document) -> List[Document]:
+        """
+        Process document for rule-based contradiction detection.
+        ルールベース矛盾検出のために文書を処理
+        
+        Args:
+            document: Document to analyze for contradictions
+            
+        Returns:
+            List of documents containing rule-based contradiction analysis
+        """
+        try:
+            # Extract claims using rule-based methods
+            claims = self.extract_claims(document)
+            
+            # Detect contradictions using patterns
+            contradictions = self.detect_contradictions(claims, document)
+            
+            # Create rule-based analysis document
+            analysis_content = f"""
+Rule-Based Contradiction Analysis for Document: {document.id}
+
+## Claims Extracted: {len(claims)}
+Claims identified using pattern matching:
+{chr(10).join([f"- {i+1}. {claim.text}" for i, claim in enumerate(claims[:5])]) if claims else "No claims extracted using rules"}
+{"..." if len(claims) > 5 else ""}
+
+## Pattern-Based Detection: {len(contradictions)}
+{'No contradictions found using rule patterns' if not contradictions else f'{len(contradictions)} potential contradiction(s) detected'}
+
+## Rule Analysis Summary:
+- Detection method: Pattern and rule-based
+- Negation detection: {'Enabled' if self.config.get('enable_negation_detection', True) else 'Disabled'}
+- Keyword matching: {'Enabled' if self.config.get('enable_keyword_matching', True) else 'Disabled'}
+- Patterns used: {len(self.config.get('contradiction_patterns', []))}
+- Document length: {len(document.content)} characters
+
+## Confidence Assessment:
+{'High confidence - rule-based detection' if contradictions else 'Rule patterns found no contradictions'}
+"""
+            
+            analysis_doc = Document(
+                id=f"rule_contradiction_analysis_{document.id}",
+                content=analysis_content,
+                metadata={
+                    "processing_stage": "rule_contradiction_analysis",
+                    "original_document_id": document.id,
+                    "claims_count": len(claims),
+                    "contradictions_count": len(contradictions),
+                    "detector_type": "rule_based",
+                    "patterns_matched": len(self.config.get("contradiction_patterns", [])),
+                    "negation_detection_enabled": self.config.get('enable_negation_detection', True)
+                }
+            )
+            
+            return [analysis_doc]
+            
+        except Exception as e:
+            # Return error document
+            error_doc = Document(
+                id=f"rule_contradiction_error_{document.id}",
+                content=f"Rule-based contradiction detection failed: {str(e)}",
+                metadata={
+                    "processing_stage": "rule_contradiction_error",
+                    "error": str(e),
+                    "detector_type": "rule_based"
+                }
+            )
+            return [error_doc]
     
     def initialize(self) -> bool:
         """Initialize the rule-based contradiction detector plugin."""
@@ -271,6 +410,87 @@ class HybridContradictionDetectorPlugin(ContradictionDetectorPlugin):
             "llm_weight": self.config.get("llm_weight", 0.7),
             "rule_weight": self.config.get("rule_weight", 0.3)
         }
+    
+    def process(self, document: Document) -> List[Document]:
+        """
+        Process document for hybrid contradiction detection.
+        ハイブリッド矛盾検出のために文書を処理
+        
+        Args:
+            document: Document to analyze for contradictions
+            
+        Returns:
+            List of documents containing hybrid contradiction analysis
+        """
+        try:
+            # Extract claims using hybrid approach
+            claims = self.extract_claims(document)
+            
+            # Detect contradictions using combined methods
+            contradictions = self.detect_contradictions(claims, document)
+            
+            # Create hybrid analysis document
+            llm_weight = self.config.get("llm_weight", 0.7)
+            rule_weight = self.config.get("rule_weight", 0.3)
+            
+            analysis_content = f"""
+Hybrid Contradiction Analysis for Document: {document.id}
+
+## Claims Extracted: {len(claims)}
+Claims identified using hybrid LLM + rule-based approach:
+{chr(10).join([f"- {i+1}. {claim.text}" for i, claim in enumerate(claims[:5])]) if claims else "No claims extracted"}
+{"..." if len(claims) > 5 else ""}
+
+## Hybrid Detection Results: {len(contradictions)}
+{'No contradictions detected using hybrid approach' if not contradictions else f'{len(contradictions)} potential contradiction(s) found'}
+
+## Hybrid Analysis Configuration:
+- Detection method: Combined LLM + Rule-based
+- LLM weight: {llm_weight:.1f} ({llm_weight*100:.0f}%)
+- Rule weight: {rule_weight:.1f} ({rule_weight*100:.0f}%)
+- Uses LLM for claims: {'Yes' if self.config.get('use_llm_for_claims', True) else 'No'}
+- Uses rules for patterns: {'Yes' if self.config.get('use_rules_for_patterns', True) else 'No'}
+- Document length: {len(document.content)} characters
+
+## Confidence Assessment:
+{'High confidence - hybrid detection with balanced approach' if contradictions else 'Hybrid analysis found no contradictions with high confidence'}
+
+## Method Integration:
+- Score combination: {'Enabled' if self.config.get('combine_scores', True) else 'Disabled'}
+- Approach: Best of both LLM semantic understanding and rule-based pattern matching
+"""
+            
+            analysis_doc = Document(
+                id=f"hybrid_contradiction_analysis_{document.id}",
+                content=analysis_content,
+                metadata={
+                    "processing_stage": "hybrid_contradiction_analysis",
+                    "original_document_id": document.id,
+                    "claims_count": len(claims),
+                    "contradictions_count": len(contradictions),
+                    "detector_type": "hybrid",
+                    "llm_weight": llm_weight,
+                    "rule_weight": rule_weight,
+                    "uses_llm": self.config.get('use_llm_for_claims', True),
+                    "uses_rules": self.config.get('use_rules_for_patterns', True),
+                    "score_combination": self.config.get('combine_scores', True)
+                }
+            )
+            
+            return [analysis_doc]
+            
+        except Exception as e:
+            # Return error document
+            error_doc = Document(
+                id=f"hybrid_contradiction_error_{document.id}",
+                content=f"Hybrid contradiction detection failed: {str(e)}",
+                metadata={
+                    "processing_stage": "hybrid_contradiction_error",
+                    "error": str(e),
+                    "detector_type": "hybrid"
+                }
+            )
+            return [error_doc]
     
     def initialize(self) -> bool:
         """Initialize the hybrid contradiction detector plugin."""
