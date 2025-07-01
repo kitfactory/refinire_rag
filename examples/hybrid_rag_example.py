@@ -130,19 +130,21 @@ def step1_setup_environment():
     # Retriever設定: 一貫した検索設定
     print("\n🎯 Configuring Unified Search Components...")
     
-    # ハイブリッド検索用統一Retriever設定（ChromaVectorStore + BM25sKeywordStore のみ）
-    retrievers_config = []
+    # ハイブリッド検索設定：ChromaVectorStore + BM25sKeywordStore のみ使用
+    # REFINIRE_RAG_RETRIEVERS は不要 - 直接 Vector Store と Keyword Store を使用
+    hybrid_components = []
     if available_plugins['chroma']:
-        retrievers_config.append("simple")  # ChromaVectorStore for vector search
+        hybrid_components.append("Chroma vector search")
     if available_plugins['bm25s']:
-        retrievers_config.append("keyword")  # BM25sKeywordStore for keyword search
+        hybrid_components.append("BM25s keyword search")
     
-    if retrievers_config:
-        os.environ.setdefault("REFINIRE_RAG_RETRIEVERS", ",".join(retrievers_config))
-        print(f"   ✅ Hybrid Retrievers configured: {', '.join(retrievers_config)} (Chroma + BM25s only)")
+    if hybrid_components:
+        print(f"   ✅ Direct hybrid search configured: {', '.join(hybrid_components)}")
+        print("   💡 Using direct storage access (no wrapper retrievers needed)")
     else:
+        # フォールバック: 基本的なRetrieverを設定
         os.environ.setdefault("REFINIRE_RAG_RETRIEVERS", "simple")
-        print("   ✅ Simple retriever configured (fallback)")
+        print("   ✅ Simple retriever configured (fallback - no plugins available)")
     
     # Reranker設定: 検索結果の再ランキング（パフォーマンス最適化）
     available_rerankers = PluginRegistry.list_available_plugins('rerankers')
