@@ -235,7 +235,7 @@ class CorpusManager:
                 all_retrievers.extend(keyword_stores)
                 logger.info(f"Created {len(keyword_stores)} keyword stores from environment")
             
-            # Get actual retrievers from environment (like SimpleRetriever, HybridRetriever)
+            # Get actual retrievers from environment (like HybridRetriever)
             retrievers = PluginFactory.create_retrievers_from_env()
             if retrievers:
                 all_retrievers.extend(retrievers)

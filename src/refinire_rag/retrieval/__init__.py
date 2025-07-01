@@ -5,11 +5,7 @@ from .base import QueryResult, SearchResult
 from .base import RetrieverConfig, RerankerConfig, AnswerSynthesizerConfig
 
 # Simple implementations (import only what exists)
-try:
-    from .simple_retriever import SimpleRetriever, SimpleRetrieverConfig
-except ImportError:
-    SimpleRetriever = None
-    SimpleRetrieverConfig = None
+# Note: SimpleRetriever removed - VectorStores now implement Retriever directly
 
 try:
     from .heuristic_reranker import HeuristicReranker, HeuristicRerankerConfig  
@@ -43,8 +39,7 @@ __all__ = [
 ]
 
 # Add simple implementations if they exist
-if SimpleRetriever:
-    __all__.extend(["SimpleRetriever", "SimpleRetrieverConfig"])
+# SimpleRetriever removed - VectorStores now implement Retriever directly
 if HeuristicReranker:
     __all__.extend(["HeuristicReranker", "HeuristicRerankerConfig"])
 if RRFReranker:

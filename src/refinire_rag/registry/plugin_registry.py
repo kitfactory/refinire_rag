@@ -46,7 +46,6 @@ class PluginRegistry:
     # Built-in components registry
     BUILTIN_COMPONENTS = {
         'retrievers': {
-            'simple': 'refinire_rag.retrieval.simple_retriever:SimpleRetriever',
             'hybrid': 'refinire_rag.retrieval.hybrid_retriever:HybridRetriever',
         },
         'vector_stores': {

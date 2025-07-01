@@ -260,7 +260,7 @@ def refinire_rag_env_template() -> EnvTemplate:
         ),
         
         "REFINIRE_RAG_RETRIEVER_VECTOR_STORE": EnvVarConfig(
-            description="Vector store plugin name for SimpleRetriever",
+            description="Vector store plugin name (legacy setting - VectorStores now implement Retriever directly)",
             required=False,
             var_type="str",
             default="inmemory_vector",
@@ -270,7 +270,7 @@ def refinire_rag_env_template() -> EnvTemplate:
         ),
         
         "REFINIRE_RAG_RETRIEVER_EMBEDDER": EnvVarConfig(
-            description="Embedder plugin name for SimpleRetriever",
+            description="Embedder plugin name (legacy setting - VectorStores now manage embedders directly)",
             required=False,
             var_type="str",
             default="openai",
