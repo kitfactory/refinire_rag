@@ -342,13 +342,17 @@ def step4_quality_evaluation(query_engine, sample_queries):
     # まず個別の評価機能をデモンストレーション
     print(f"\n📋 Step 4.1: Generating QA pairs from documents...")
     try:
-        qa_pairs = quality_lab.generate_qa_pairs(corpus_name="business_knowledge", limit=3)
+        qa_pairs = quality_lab.generate_qa_pairs(
+            qa_set_name="demo_evaluation",
+            corpus_name="business_knowledge", 
+            num_pairs=3
+        )
         print(f"   ✅ Generated {len(qa_pairs)} QA pairs for evaluation")
         
         # QAペアの例を表示
         for i, qa_pair in enumerate(qa_pairs[:2], 1):  # 最初の2つを表示
             print(f"      Q{i}: {qa_pair.question[:80]}...")
-            print(f"      A{i}: {qa_pair.expected_answer[:80]}...")
+            print(f"      A{i}: {qa_pair.answer[:80]}...")
             
     except Exception as e:
         print(f"   ⚠️  QA generation failed: {e}")
@@ -363,18 +367,40 @@ def step4_quality_evaluation(query_engine, sample_queries):
                 qa_pairs=qa_pairs[:3]  # 最初の3つで評価
             )
         else:
-            # カスタムクエリで評価
+            # サンプルクエリでQAペアを手動作成
+            print(f"   📝 Creating test QA pairs from sample queries...")
+            import uuid
+            from refinire_rag.models.qa_pair import QAPair
+            
+            manual_qa_pairs = []
+            for i, query in enumerate(sample_queries[:3]):
+                qa_pair = QAPair(
+                    question=query,
+                    answer="Expected answer placeholder",  # プレースホルダー回答
+                    document_id=f"test_doc_{i}",
+                    metadata={
+                        "qa_set_name": "manual_demo",
+                        "question_type": "factual",
+                        "source": "manual_creation"
+                    }
+                )
+                manual_qa_pairs.append(qa_pair)
+            
             evaluation_result = quality_lab.evaluate_query_engine(
                 query_engine=query_engine,
-                queries=sample_queries[:3]  # サンプルクエリを使用
+                qa_pairs=manual_qa_pairs
             )
             
         print(f"   ✅ QueryEngine evaluation completed")
-        print(f"   📊 Success Rate: {evaluation_result.success_rate:.1%}")
-        if hasattr(evaluation_result, 'average_relevance_score'):
-            print(f"   🎯 Average Relevance: {evaluation_result.average_relevance_score:.2f}")
-        if hasattr(evaluation_result, 'average_response_time'):
-            print(f"   ⏱️  Average Response Time: {evaluation_result.average_response_time:.2f}s")
+        
+        # 評価結果の表示（辞書形式）
+        if evaluation_result and "evaluation_summary" in evaluation_result:
+            summary = evaluation_result["evaluation_summary"]
+            print(f"   📊 Success Rate: {summary.get('success_rate', 0):.1%}")
+            print(f"   🎯 Average Confidence: {summary.get('average_confidence', 0):.2f}")
+            print(f"   ⏱️  Average Response Time: {summary.get('average_processing_time', 0):.2f}s")
+        else:
+            print(f"   ⚠️  Evaluation completed but no summary available")
             
     except Exception as e:
         print(f"   ⚠️  QueryEngine evaluation failed: {e}")
@@ -385,9 +411,7 @@ def step4_quality_evaluation(query_engine, sample_queries):
         # 包括的な評価レポート生成
         if evaluation_result:
             report = quality_lab.generate_evaluation_report(
-                evaluation_result=evaluation_result,
-                output_format="text",  # テキスト形式で出力
-                include_detailed_analysis=True
+                evaluation_results=evaluation_result  # 正しい引数名
             )
             
             print(f"   ✅ Evaluation report generated")
@@ -416,7 +440,7 @@ def step4_quality_evaluation(query_engine, sample_queries):
     print(f"\n🏥 Step 4.4: Quality health check...")
     try:
         # QualityLabの統計情報を表示
-        stats = quality_lab.get_lab_statistics()
+        stats = quality_lab.get_lab_stats()
         print(f"   ✅ Quality health check completed")
         print(f"   📊 QA Pairs Generated: {stats.get('qa_pairs_generated', 0)}")
         print(f"   🧪 Evaluations Completed: {stats.get('evaluations_completed', 0)}")
@@ -495,8 +519,9 @@ def main():
         print(f"   • Synthesizer: {type(query_engine.synthesizer).__name__ if query_engine.synthesizer else 'None'}")
         
         print(f"\n🔬 Quality Assurance:")
-        if evaluation_result:
-            success_rate = getattr(evaluation_result, 'success_rate', 0)
+        if evaluation_result and "evaluation_summary" in evaluation_result:
+            summary = evaluation_result["evaluation_summary"]
+            success_rate = summary.get('success_rate', 0)
             print(f"   • QualityLab: Comprehensive evaluation completed")
             print(f"   • Success Rate: {success_rate:.1%}")
             print(f"   • Evaluation Components: TestSuite → Evaluator → Insights")

@@ -97,6 +97,25 @@ class PluginInterface(ABC):
     def enabled(self) -> bool:
         """Check if plugin is enabled / プラグインが有効かチェック"""
         return self.config.enabled
+    
+    def get_processing_stats(self) -> Dict[str, Any]:
+        """
+        Get processing statistics for the plugin
+        プラグインの処理統計を取得
+        
+        Returns:
+            Dict[str, Any]: Processing statistics including basic usage metrics
+                           基本使用量メトリクスを含む処理統計
+        """
+        # Default implementation - can be overridden by specific plugins
+        return {
+            "plugin_name": self.name,
+            "plugin_version": self.version,
+            "is_initialized": getattr(self, 'is_initialized', False),
+            "total_operations": getattr(self, '_total_operations', 0),
+            "total_processing_time": getattr(self, '_total_processing_time', 0.0),
+            "last_operation_time": getattr(self, '_last_operation_time', None)
+        }
 
 
 class VectorStorePlugin(PluginInterface):
