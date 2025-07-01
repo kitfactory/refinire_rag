@@ -33,8 +33,7 @@ class OpenAIEmbeddingConfig(EmbeddingConfig):
     max_tokens: int = 8191  # Maximum tokens per input for text-embedding-3-small
     timeout: Optional[float] = 30.0  # API request timeout in seconds
     
-    # Rate limiting and retries
-    requests_per_minute: int = 3000  # Rate limit for API calls
+    # Retries (Rate limiting removed - let OpenAI handle their own limits)
     max_retries: int = 3
     retry_delay_seconds: float = 1.0
     
@@ -75,10 +74,6 @@ class OpenAIEmbedder(Embedder):
         # Set embedding dimension based on model
         self._set_model_dimensions()
         
-        # Rate limiting
-        self._last_request_time = 0.0
-        self._request_count = 0
-        self._rate_limit_window_start = time.time()
     
     def _init_client(self):
         """Initialize the OpenAI client"""
@@ -130,31 +125,6 @@ class OpenAIEmbedder(Embedder):
         if self.config.model_name in model_dimensions:
             self.config.embedding_dimension = model_dimensions[self.config.model_name]
     
-    def _apply_rate_limiting(self):
-        """Apply rate limiting to respect OpenAI's limits"""
-        current_time = time.time()
-        
-        # Reset counter if we're in a new minute window
-        if current_time - self._rate_limit_window_start >= 60:
-            self._request_count = 0
-            self._rate_limit_window_start = current_time
-        
-        # Check if we're approaching rate limit
-        if self._request_count >= self.config.requests_per_minute:
-            sleep_time = 60 - (current_time - self._rate_limit_window_start)
-            if sleep_time > 0:
-                time.sleep(sleep_time)
-                self._request_count = 0
-                self._rate_limit_window_start = time.time()
-        
-        # Minimum delay between requests
-        time_since_last = current_time - self._last_request_time
-        min_delay = 60.0 / self.config.requests_per_minute
-        if time_since_last < min_delay:
-            time.sleep(min_delay - time_since_last)
-        
-        self._last_request_time = time.time()
-        self._request_count += 1
     
     def embed_text(self, text: str) -> np.ndarray:
         """Embed a single text string using OpenAI API"""
@@ -175,9 +145,6 @@ class OpenAIEmbedder(Embedder):
             processed_text = self.truncate_text(text)
             if self.config.strip_newlines:
                 processed_text = processed_text.replace('\n', ' ')
-            
-            # Apply rate limiting
-            self._apply_rate_limiting()
             
             # Prepare request parameters
             request_params = {
@@ -268,9 +235,6 @@ class OpenAIEmbedder(Embedder):
                         if self.config.strip_newlines:
                             processed_text = processed_text.replace('\n', ' ')
                         processed_texts.append(processed_text)
-                    
-                    # Apply rate limiting
-                    self._apply_rate_limiting()
                     
                     # Prepare batch request
                     request_params = {
@@ -439,7 +403,6 @@ class OpenAIEmbedder(Embedder):
         batch_size = int(get_value('batch_size', '100', 'REFINIRE_RAG_OPENAI_BATCH_SIZE'))
         max_tokens = int(get_value('max_tokens', '8191', 'REFINIRE_RAG_OPENAI_MAX_TOKENS'))
         timeout = float(get_value('timeout', '30.0', 'REFINIRE_RAG_OPENAI_TIMEOUT')) if get_value('timeout', '30.0', 'REFINIRE_RAG_OPENAI_TIMEOUT') else None
-        requests_per_minute = int(get_value('requests_per_minute', '3000', 'REFINIRE_RAG_OPENAI_REQUESTS_PER_MINUTE'))
         max_retries = int(get_value('max_retries', '3', 'REFINIRE_RAG_OPENAI_MAX_RETRIES'))
         retry_delay_seconds = float(get_value('retry_delay_seconds', '1.0', 'REFINIRE_RAG_OPENAI_RETRY_DELAY'))
         
@@ -472,7 +435,6 @@ class OpenAIEmbedder(Embedder):
             fail_on_error=fail_on_error,
             strip_newlines=strip_newlines,
             timeout=timeout,
-            requests_per_minute=requests_per_minute,
             user_identifier=user_identifier
         )
     
@@ -496,7 +458,6 @@ class OpenAIEmbedder(Embedder):
             'enable_caching': self.config.enable_caching,
             'cache_ttl_seconds': self.config.cache_ttl_seconds,
             'timeout': self.config.timeout,
-            'requests_per_minute': self.config.requests_per_minute,
             'max_retries': self.config.max_retries,
             'retry_delay_seconds': self.config.retry_delay_seconds,
             'fail_on_error': self.config.fail_on_error,
@@ -511,7 +472,6 @@ class OpenAIEmbedder(Embedder):
             "embedding_dimension": self.config.embedding_dimension,
             "provider": "OpenAI",
             "api_key_set": self.config.api_key is not None,
-            "rate_limit": self.config.requests_per_minute,
             "max_tokens": self.config.max_tokens,
             "batch_size": self.config.batch_size
         }

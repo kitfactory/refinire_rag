@@ -11,11 +11,33 @@ import time
 import json
 from typing import List, Optional, Dict, Any, Type
 
+from pydantic import BaseModel, Field
 from .base import Reranker, RerankerConfig, SearchResult
 from ..config import RefinireRAGConfig
 from ..utils.model_config import get_default_llm_model
 
 logger = logging.getLogger(__name__)
+
+
+class DocumentScores(BaseModel):
+    """Pydantic model for structured LLM reranker output
+    
+    LLMリランカーの構造化出力用Pydanticモデル
+    """
+    scores: Dict[str, float] = Field(
+        description="Document ID to relevance score mapping. Scores should be between 0.0 and 10.0"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "scores": {
+                    "doc_123": 8.5,
+                    "doc_456": 6.2,
+                    "doc_789": 9.1
+                }
+            }
+        }
 
 
 class LLMRerankerConfig(RerankerConfig):
@@ -29,9 +51,8 @@ class LLMRerankerConfig(RerankerConfig):
                  score_threshold: float = 0.0,
                  llm_model: str = None,
                  temperature: float = 0.1,
-                 max_tokens: int = 100,
                  batch_size: int = 5,
-                 use_chain_of_thought: bool = True,
+                 use_chain_of_thought: bool = False,
                  scoring_method: str = "numerical",  # "numerical" or "ranking"
                  fallback_on_error: bool = True,
                  **kwargs):
@@ -46,12 +67,10 @@ class LLMRerankerConfig(RerankerConfig):
                       使用するLLMモデル（環境設定のデフォルト）
             temperature: Temperature for LLM generation
                         LLM生成の温度パラメータ
-            max_tokens: Maximum tokens for LLM response
-                       LLM応答の最大トークン数
             batch_size: Number of documents to process in one LLM call
                        1回のLLM呼び出しで処理する文書数
-            use_chain_of_thought: Use reasoning in prompts
-                                思考の連鎖をプロンプトで使用
+            use_chain_of_thought: Use reasoning in prompts (disabled by default for performance)
+                                思考の連鎖をプロンプトで使用（パフォーマンスのためデフォルト無効）
             scoring_method: Method for scoring ("numerical" or "ranking")
                            スコアリング方法（"numerical"または"ranking"）
             fallback_on_error: Return original results on LLM error
@@ -62,7 +81,6 @@ class LLMRerankerConfig(RerankerConfig):
                         score_threshold=score_threshold)
         self.llm_model = llm_model or get_default_llm_model()
         self.temperature = temperature
-        self.max_tokens = max_tokens
         self.batch_size = batch_size
         self.use_chain_of_thought = use_chain_of_thought
         self.scoring_method = scoring_method
@@ -88,9 +106,8 @@ class LLMRerankerConfig(RerankerConfig):
         score_threshold = float(os.getenv("REFINIRE_RAG_LLM_RERANKER_SCORE_THRESHOLD", "0.0"))
         llm_model = os.getenv("REFINIRE_RAG_LLM_RERANKER_MODEL") or get_default_llm_model()
         temperature = float(os.getenv("REFINIRE_RAG_LLM_RERANKER_TEMPERATURE", "0.1"))
-        max_tokens = int(os.getenv("REFINIRE_RAG_LLM_RERANKER_MAX_TOKENS", "100"))
         batch_size = int(os.getenv("REFINIRE_RAG_LLM_RERANKER_BATCH_SIZE", "5"))
-        use_chain_of_thought = os.getenv("REFINIRE_RAG_LLM_RERANKER_USE_COT", "true").lower() == "true"
+        use_chain_of_thought = os.getenv("REFINIRE_RAG_LLM_RERANKER_USE_COT", "false").lower() == "true"
         scoring_method = os.getenv("REFINIRE_RAG_LLM_RERANKER_SCORING_METHOD", "numerical")
         fallback_on_error = os.getenv("REFINIRE_RAG_LLM_RERANKER_FALLBACK_ON_ERROR", "true").lower() == "true"
         
@@ -99,7 +116,6 @@ class LLMRerankerConfig(RerankerConfig):
             score_threshold=score_threshold,
             llm_model=llm_model,
             temperature=temperature,
-            max_tokens=max_tokens,
             batch_size=batch_size,
             use_chain_of_thought=use_chain_of_thought,
             scoring_method=scoring_method,
@@ -125,7 +141,6 @@ class LLMReranker(Reranker):
                  score_threshold: Optional[float] = None,
                  llm_model: Optional[str] = None,
                  temperature: Optional[float] = None,
-                 max_tokens: Optional[int] = None,
                  batch_size: Optional[int] = None,
                  use_chain_of_thought: Optional[bool] = None,
                  scoring_method: Optional[str] = None,
@@ -141,9 +156,8 @@ class LLMReranker(Reranker):
             score_threshold: Minimum score threshold (default from env or 0.0)
             llm_model: LLM model to use (default from env or auto-detect)
             temperature: Temperature for LLM generation (default from env or 0.1)
-            max_tokens: Maximum tokens for LLM response (default from env or 100)
             batch_size: Documents per LLM call (default from env or 5)
-            use_chain_of_thought: Use reasoning in prompts (default from env or True)
+            use_chain_of_thought: Use reasoning in prompts (default from env or False)
             scoring_method: Scoring method (default from env or "numerical")
             fallback_on_error: Fallback to original on error (default from env or True)
             **kwargs: Additional configuration parameters
@@ -157,9 +171,8 @@ class LLMReranker(Reranker):
             actual_score_threshold = self._get_setting(score_threshold, "REFINIRE_RAG_LLM_RERANKER_SCORE_THRESHOLD", 0.0, float)
             actual_llm_model = self._get_setting(llm_model, "REFINIRE_RAG_LLM_RERANKER_MODEL", get_default_llm_model(), str)
             actual_temperature = self._get_setting(temperature, "REFINIRE_RAG_LLM_RERANKER_TEMPERATURE", 0.1, float)
-            actual_max_tokens = self._get_setting(max_tokens, "REFINIRE_RAG_LLM_RERANKER_MAX_TOKENS", 100, int)
             actual_batch_size = self._get_setting(batch_size, "REFINIRE_RAG_LLM_RERANKER_BATCH_SIZE", 5, int)
-            actual_use_chain_of_thought = self._get_setting(use_chain_of_thought, "REFINIRE_RAG_LLM_RERANKER_USE_COT", True, bool)
+            actual_use_chain_of_thought = self._get_setting(use_chain_of_thought, "REFINIRE_RAG_LLM_RERANKER_USE_COT", False, bool)
             actual_scoring_method = self._get_setting(scoring_method, "REFINIRE_RAG_LLM_RERANKER_SCORING_METHOD", "numerical", str)
             actual_fallback_on_error = self._get_setting(fallback_on_error, "REFINIRE_RAG_LLM_RERANKER_FALLBACK_ON_ERROR", True, bool)
             
@@ -169,7 +182,6 @@ class LLMReranker(Reranker):
                 score_threshold=actual_score_threshold,
                 llm_model=actual_llm_model,
                 temperature=actual_temperature,
-                max_tokens=actual_max_tokens,
                 batch_size=actual_batch_size,
                 use_chain_of_thought=actual_use_chain_of_thought,
                 scoring_method=actual_scoring_method,
@@ -223,29 +235,48 @@ class LLMReranker(Reranker):
         return default
     
     def _initialize_llm(self):
-        """Initialize LLM client using RefinireAgent
+        """Initialize LLM client using RefinireAgent with structured output
         
-        RefinireAgentを使用してLLMクライアントを初期化
+        構造化出力対応のRefinireAgentを使用してLLMクライアントを初期化
         """
         try:
             from refinire import RefinireAgent
             self._refinire_agent = RefinireAgent(
                 name="llm_reranker",
-                generation_instructions="You are an expert information retrieval system that evaluates document relevance.",
+                generation_instructions="You are an expert information retrieval system that evaluates document relevance. Rate each document on a scale of 0.0-10.0 based on how well it answers the given query.",
                 model=self.config.llm_model,
+                output_model=DocumentScores,  # Enable structured output
                 session_history=None,  # Disable session history for independent evaluations
                 history_size=0  # No history retention
             )
             self._use_refinire = True
-            logger.debug(f"Initialized LLM reranker with RefinireAgent, model: {self.config.llm_model}")
+            self._use_structured_output = True
+            logger.info(f"Initialized LLM reranker with RefinireAgent structured output, model: {self.config.llm_model}")
         except ImportError:
             logger.warning("Refinire library not available, LLM reranking will be disabled")
             self._refinire_agent = None
             self._use_refinire = False
+            self._use_structured_output = False
         except Exception as e:
-            logger.error(f"Failed to initialize RefinireAgent: {e}")
-            self._refinire_agent = None
-            self._use_refinire = False
+            logger.error(f"Failed to initialize RefinireAgent with structured output: {e}")
+            # Fallback to non-structured mode
+            try:
+                from refinire import RefinireAgent
+                self._refinire_agent = RefinireAgent(
+                    name="llm_reranker",
+                    generation_instructions="You are an expert information retrieval system that evaluates document relevance.",
+                    model=self.config.llm_model,
+                    session_history=None,
+                    history_size=0
+                )
+                self._use_refinire = True
+                self._use_structured_output = False
+                logger.warning(f"Fallback to non-structured mode: {e}")
+            except Exception as fallback_error:
+                logger.error(f"Failed to initialize RefinireAgent fallback: {fallback_error}")
+                self._refinire_agent = None
+                self._use_refinire = False
+                self._use_structured_output = False
     
     @classmethod
     def get_config_class(cls) -> Type[LLMRerankerConfig]:
@@ -348,9 +379,9 @@ class LLMReranker(Reranker):
             raise ValueError(f"Unknown scoring method: {self.config.scoring_method}")
     
     def _evaluate_numerical_batch(self, query: str, batch: List[SearchResult]) -> Dict[str, float]:
-        """Evaluate batch using numerical scoring (0-10 scale)
+        """Evaluate batch using numerical scoring with structured output
         
-        数値スコアリング（0-10スケール）を使用してバッチを評価
+        構造化出力を使用した数値スコアリング（0-10スケール）でバッチを評価
         """
         # Prepare documents for evaluation
         docs_text = []
@@ -365,43 +396,73 @@ class LLMReranker(Reranker):
             docs_text.append(content)
             doc_ids.append(result.document_id)
         
-        # Create evaluation prompt
-        prompt = self._create_numerical_prompt(query, docs_text, doc_ids)
-        
         try:
-            logger.info(f"[DEBUG] LLM Reranker - Processing {len(batch)} documents for query: {query}")
-            logger.info(f"[DEBUG] Document IDs: {doc_ids}")
+            logger.debug(f"LLM Reranker - Processing {len(batch)} documents for query: {query}")
+            logger.debug(f"Document IDs: {doc_ids}")
             
             # Call LLM using RefinireAgent
-            if self._use_refinire and self._refinire_agent:
-                logger.info("[DEBUG] Using RefinireAgent run method")
-                result = self._refinire_agent.run(prompt)
-                response = result.content if hasattr(result, 'content') else str(result)
-            else:
+            if not self._use_refinire or not self._refinire_agent:
                 raise RuntimeError("No LLM client available for reranking")
             
-            logger.info(f"[DEBUG] LLM Response length: {len(response) if response else 0}")
-            logger.info(f"[DEBUG] LLM Response preview: {response[:200] if response else 'None'}...")
+            if self._use_structured_output:
+                # Use structured output mode
+                prompt = self._create_structured_prompt(query, docs_text, doc_ids)
+                logger.debug("Using RefinireAgent structured output mode")
+                result = self._refinire_agent.run(prompt)
+                
+                # Extract structured output directly
+                if hasattr(result, 'content') and isinstance(result.content, DocumentScores):
+                    scores = result.content.scores
+                    logger.debug(f"Structured output scores: {scores}")
+                elif hasattr(result, 'content') and hasattr(result.content, 'scores'):
+                    scores = result.content.scores
+                    logger.debug(f"Structured output scores (via attribute): {scores}")
+                elif hasattr(result, 'content'):
+                    # Check if content is already a dict with scores
+                    content = result.content
+                    if isinstance(content, dict) and 'scores' in content:
+                        scores = content['scores']
+                        logger.debug(f"Structured output scores (dict format): {scores}")
+                    else:
+                        logger.warning(f"Unexpected structured output format: {type(content)}")
+                        logger.debug(f"Content preview: {str(content)[:200]}...")
+                        # Fallback to parsing
+                        scores = self._parse_numerical_response(str(content), doc_ids)
+                else:
+                    logger.warning(f"No content in result: {type(result)}")
+                    # Fallback to parsing
+                    response = str(result)
+                    scores = self._parse_numerical_response(response, doc_ids)
+            else:
+                # Use prompt-based mode
+                prompt = self._create_numerical_prompt(query, docs_text, doc_ids)
+                logger.debug("Using RefinireAgent prompt-based mode")
+                result = self._refinire_agent.run(prompt)
+                response = result.content if hasattr(result, 'content') else str(result)
+                scores = self._parse_numerical_response(str(response), doc_ids)
             
-            # Parse scores from response
-            scores = self._parse_numerical_response(response, doc_ids)
-            logger.info(f"[DEBUG] Parsed scores: {scores}")
-            
-            # Normalize scores to [0, 1] range
+            # Validate and normalize scores
             normalized_scores = {}
-            for doc_id, score in scores.items():
-                normalized_scores[doc_id] = min(max(score / 10.0, 0.0), 1.0)
+            for doc_id in doc_ids:
+                if doc_id in scores:
+                    score = float(scores[doc_id])
+                    # Clamp to valid range and normalize to [0, 1]
+                    score = min(max(score, 0.0), 10.0) / 10.0
+                    normalized_scores[doc_id] = score
+                else:
+                    logger.warning(f"Document ID {doc_id} not found in scores, using default")
+                    normalized_scores[doc_id] = 0.5  # Default middle score
             
-            logger.info(f"[DEBUG] Normalized scores: {normalized_scores}")
+            logger.debug(f"Final normalized scores: {normalized_scores}")
             return normalized_scores
             
         except Exception as e:
             logger.error(f"LLM evaluation failed for batch: {e}")
-            logger.error(f"[DEBUG] Exception type: {type(e).__name__}")
-            logger.error(f"[DEBUG] Exception details: {str(e)}")
+            logger.error(f"Exception type: {type(e).__name__}")
+            logger.error(f"Exception details: {str(e)}")
             # Return original scores as fallback
             fallback_scores = {result.document_id: result.score for result in batch}
-            logger.warning(f"[DEBUG] Using fallback scores: {fallback_scores}")
+            logger.warning(f"Using fallback scores: {fallback_scores}")
             return fallback_scores
     
     def _evaluate_ranking_batch(self, query: str, batch: List[SearchResult]) -> Dict[str, float]:
@@ -463,9 +524,9 @@ class LLMReranker(Reranker):
             return {result.document_id: result.score for result in batch}
     
     def _create_numerical_prompt(self, query: str, docs_text: List[str], doc_ids: List[str]) -> str:
-        """Create prompt for numerical scoring
+        """Create prompt for numerical scoring with structured output
         
-        数値スコアリング用のプロンプトを作成
+        構造化出力対応の数値スコアリング用プロンプトを作成
         """
         thinking_prompt = f"""
 Think step by step about how relevant each document is to the query: "{query}"
@@ -480,17 +541,28 @@ IMPORTANT: Prioritize documents that directly address the query topic over docum
 
 """ if self.config.use_chain_of_thought else ""
         
+        # Create concrete example with actual document IDs
+        example_scores = {}
+        for i, doc_id in enumerate(doc_ids):
+            example_scores[doc_id] = f"{5.0 + i * 0.5:.1f}"  # Generate realistic example scores
+        
+        example_json = "{\n    \"scores\": {\n"
+        for i, (doc_id, score) in enumerate(example_scores.items()):
+            comma = "," if i < len(doc_ids) - 1 else ""
+            example_json += f'        "{doc_id}": {score}{comma}\n'
+        example_json += "    }\n}"
+        
         prompt = f"""You are an expert information retrieval system. Your task is to evaluate how relevant each document is to the given query.
 
 Query: "{query}"
 
-{thinking_prompt}Rate each document on a scale of 0-10 where:
-- 10: Perfectly relevant - document directly discusses "{query}" as main topic and provides comprehensive information
-- 8-9: Highly relevant - document specifically addresses "{query}" with detailed information
-- 6-7: Moderately relevant - document mentions "{query}" and provides some specific information
-- 3-5: Slightly relevant - document mentions concepts related to "{query}" but doesn't focus on it
-- 1-2: Minimally relevant - document only tangentially mentions related concepts
-- 0: Not relevant - document doesn't address "{query}" or related concepts
+{thinking_prompt}Rate each document on a scale of 0.0-10.0 where:
+- 10.0: Perfectly relevant - document directly discusses "{query}" as main topic and provides comprehensive information
+- 8.0-9.0: Highly relevant - document specifically addresses "{query}" with detailed information
+- 6.0-7.0: Moderately relevant - document mentions "{query}" and provides some specific information
+- 3.0-5.0: Slightly relevant - document mentions concepts related to "{query}" but doesn't focus on it
+- 1.0-2.0: Minimally relevant - document only tangentially mentions related concepts
+- 0.0: Not relevant - document doesn't address "{query}" or related concepts
 
 Focus on DIRECT TOPICAL RELEVANCE. A document that specifically discusses "{query}" should score much higher than a document that only mentions related business concepts.
 
@@ -501,17 +573,62 @@ Documents to evaluate:
             prompt += f"\nDocument {doc_id}:\n{doc_text}\n"
         
         prompt += f"""
-Please provide scores in the following JSON format:
-{{
-    "scores": {{
+CRITICAL: You must respond with ONLY valid JSON in the exact format below. Do not include any text before or after the JSON.
+
+Required JSON format (use this exact structure):
+{example_json}
+
+Rules:
+- Use decimal numbers with one decimal place (e.g., 7.5, not 7 or 7.567)
+- Scores must be between 0.0 and 10.0
+- Include all document IDs exactly as shown
+- Do not add any explanation or text outside the JSON
+- Do not use markdown code blocks (```json)
+
+Respond with JSON only:"""
+        
+        return prompt
+    
+    def _create_structured_prompt(self, query: str, docs_text: List[str], doc_ids: List[str]) -> str:
+        """Create prompt for structured output mode
+        
+        構造化出力モード用のプロンプトを作成
+        """
+        thinking_prompt = f"""
+Think step by step about how relevant each document is to the query: "{query}"
+
+Evaluation criteria (in order of importance):
+1. DIRECT TOPIC RELEVANCE: Does the document directly discuss "{query}" as its main or significant topic?
+2. EXPLICIT MENTION: Does the document explicitly mention the key terms from "{query}"?
+3. CONTENT FOCUS: How much of the document content is specifically about "{query}" vs. related but different topics?
+4. ANSWER COMPLETENESS: How well does the document answer the specific question "{query}"?
+
+IMPORTANT: Prioritize documents that directly address the query topic over documents that only mention related concepts.
+
+""" if self.config.use_chain_of_thought else ""
+        
+        prompt = f"""You are an expert information retrieval system. Your task is to evaluate how relevant each document is to the given query.
+
+Query: "{query}"
+
+{thinking_prompt}Rate each document on a scale of 0.0-10.0 where:
+- 10.0: Perfectly relevant - document directly discusses "{query}" as main topic and provides comprehensive information
+- 8.0-9.0: Highly relevant - document specifically addresses "{query}" with detailed information
+- 6.0-7.0: Moderately relevant - document mentions "{query}" and provides some specific information
+- 3.0-5.0: Slightly relevant - document mentions concepts related to "{query}" but doesn't focus on it
+- 1.0-2.0: Minimally relevant - document only tangentially mentions related concepts
+- 0.0: Not relevant - document doesn't address "{query}" or related concepts
+
+Focus on DIRECT TOPICAL RELEVANCE. A document that specifically discusses "{query}" should score much higher than a document that only mentions related business concepts.
+
+Documents to evaluate:
 """
         
-        for i, doc_id in enumerate(doc_ids):
-            comma = "," if i < len(doc_ids) - 1 else ""
-            prompt += f'        "{doc_id}": <score>{comma}\n'
+        for i, (doc_id, doc_text) in enumerate(zip(doc_ids, docs_text)):
+            prompt += f"\nDocument {doc_id}:\n{doc_text}\n"
         
-        prompt += """    }
-}"""
+        prompt += f"""
+Provide relevance scores for each document ID: {', '.join(doc_ids)}"""
         
         return prompt
     
@@ -553,44 +670,76 @@ Provide rankings in the following JSON format:
         return prompt
     
     def _parse_numerical_response(self, response: str, doc_ids: List[str]) -> Dict[str, float]:
-        """Parse numerical scores from LLM response
+        """Parse numerical scores from LLM response using RefinireAgent pattern
         
-        LLM応答から数値スコアを解析
+        RefinireAgentパターンを使用してLLM応答から数値スコアを解析
         """
         try:
-            # Try to parse JSON response
-            if "{" in response and "}" in response:
-                json_start = response.find("{")
-                json_end = response.rfind("}") + 1
-                json_str = response[json_start:json_end]
-                data = json.loads(json_str)
+            # Clean response - remove markdown code block markers if present (RefinireAgent pattern)
+            clean_response = response.strip()
+            if clean_response.startswith("```json"):
+                clean_response = clean_response[7:]
+            if clean_response.startswith("```"):
+                clean_response = clean_response[3:]
+            if clean_response.endswith("```"):
+                clean_response = clean_response[:-3]
+            clean_response = clean_response.strip()
+            
+            logger.debug(f"Cleaned response for parsing: {clean_response[:200]}...")
+            
+            # Extract JSON from response if it contains other text
+            if "{" in clean_response and "}" in clean_response:
+                json_start = clean_response.find("{")
+                json_end = clean_response.rfind("}") + 1
+                json_str = clean_response[json_start:json_end]
                 
-                if "scores" in data:
+                # Parse JSON
+                data = json.loads(json_str)
+                logger.debug(f"Parsed JSON data: {data}")
+                
+                if "scores" in data and isinstance(data["scores"], dict):
                     scores = {}
                     for doc_id in doc_ids:
                         if doc_id in data["scores"]:
                             score = float(data["scores"][doc_id])
+                            # Clamp score to valid range
+                            score = min(max(score, 0.0), 10.0)
                             scores[doc_id] = score
                         else:
+                            logger.warning(f"Document ID {doc_id} not found in LLM response scores")
                             scores[doc_id] = 5.0  # Default middle score
+                    
+                    logger.debug(f"Extracted scores: {scores}")
                     return scores
+                else:
+                    logger.warning("No 'scores' field found in JSON response")
             
-            # Fallback: try to extract numbers from response
+            # Fallback: try to extract numbers in order from response
+            logger.warning("Falling back to number extraction from response")
             import re
-            numbers = re.findall(r'\d+\.?\d*', response)
+            numbers = re.findall(r'\d+\.?\d*', clean_response)
             scores = {}
             
             for i, doc_id in enumerate(doc_ids):
                 if i < len(numbers):
-                    scores[doc_id] = float(numbers[i])
+                    score = float(numbers[i])
+                    score = min(max(score, 0.0), 10.0)  # Clamp to valid range
+                    scores[doc_id] = score
                 else:
                     scores[doc_id] = 5.0
             
+            logger.warning(f"Fallback scores extracted: {scores}")
             return scores
             
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing failed: {e}")
+            logger.error(f"Response that failed to parse: {response[:500]}...")
+            # Return safe fallback scores
+            return {doc_id: 5.0 for doc_id in doc_ids}
         except Exception as e:
             logger.error(f"Failed to parse numerical response: {e}")
-            # Return default scores
+            logger.error(f"Response type: {type(response)}, content: {response[:200]}...")
+            # Return safe fallback scores
             return {doc_id: 5.0 for doc_id in doc_ids}
     
     def _parse_ranking_response(self, response: str, doc_ids: List[str]) -> Dict[str, int]:
@@ -674,7 +823,10 @@ Provide rankings in the following JSON format:
             "temperature": self.config.temperature,
             "batch_size": self.config.batch_size,
             "scoring_method": self.config.scoring_method,
-            "llm_available": self._llm_client is not None
+            "use_chain_of_thought": self.config.use_chain_of_thought,
+            "fallback_on_error": self.config.fallback_on_error,
+            "llm_available": self._refinire_agent is not None,
+            "structured_output_enabled": getattr(self, '_use_structured_output', False)
         })
         
         return stats
@@ -690,7 +842,6 @@ Provide rankings in the following JSON format:
             'score_threshold': self.config.score_threshold,
             'llm_model': self.config.llm_model,
             'temperature': self.config.temperature,
-            'max_tokens': self.config.max_tokens,
             'batch_size': self.config.batch_size,
             'use_chain_of_thought': self.config.use_chain_of_thought,
             'scoring_method': self.config.scoring_method,

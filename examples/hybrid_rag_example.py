@@ -30,6 +30,11 @@ import shutil
 import glob
 from pathlib import Path
 
+# Disable ChromaDB telemetry before any imports
+os.environ["CHROMA_TELEMETRY_DISABLED"] = "true"
+os.environ["ANONYMIZED_TELEMETRY"] = "false"
+os.environ["CHROMA_ANALYTICS_ENABLED"] = "false"
+
 # Add src to Python path for direct execution
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
@@ -89,7 +94,7 @@ def step1_setup_environment():
     os.environ.setdefault("REFINIRE_RAG_SQLITE_DB_PATH", "./business_rag.db")
     print("   ✅ SQLite document store configured")
     
-    # Embedder設定: ベクター検索用の埋め込みモデル
+    # Embedder設定: ベクター検索用の埋め込みモデル（正しい名前を使用）
     print("\n🧠 Setting up Embedder...")
     if os.environ.get("OPENAI_API_KEY"):
         os.environ.setdefault("REFINIRE_RAG_EMBEDDERS", "openai")
@@ -122,37 +127,52 @@ def step1_setup_environment():
     else:
         print("   ⚠️  No keyword store available (install refinire-rag[bm25] for hybrid search)")
     
-    # Hybrid Search可能かチェック
-    if available_plugins['chroma'] and available_plugins['bm25s']:
-        print("\n🎯 Configuring Hybrid Search Components...")
-        
-        # Reranker設定: 検索結果の再ランキング
-        available_rerankers = PluginRegistry.list_available_plugins('rerankers')
-        has_openai = bool(os.environ.get("OPENAI_API_KEY"))
-        
-        if "llm" in available_rerankers and has_openai:
-            os.environ.setdefault("REFINIRE_RAG_RERANKERS", "llm")
-            print("   ✅ LLM reranker configured (highest quality)")
-        elif "rrf" in available_rerankers:
-            os.environ.setdefault("REFINIRE_RAG_RERANKERS", "rrf")
-            print("   ✅ RRF reranker configured (mathematical fusion)")
-        elif "heuristic" in available_rerankers:
-            os.environ.setdefault("REFINIRE_RAG_RERANKERS", "heuristic")
-            print("   ✅ Heuristic reranker configured (keyword-based)")
-        
-        # Answer Synthesizer設定: 回答生成
-        os.environ.setdefault("REFINIRE_RAG_SYNTHESIZERS", "answer")
-        print("   ✅ Answer synthesizer configured")
-        
-        if has_openai:
-            os.environ.setdefault("REFINIRE_RAG_LLM_MODEL", "gpt-4o-mini")
-            print("   ✅ LLM model: gpt-4o-mini")
-        
+    # Retriever設定: 一貫した検索設定
+    print("\n🎯 Configuring Unified Search Components...")
+    
+    # ハイブリッド検索用統一Retriever設定（ChromaVectorStore + BM25sKeywordStore のみ）
+    retrievers_config = []
+    if available_plugins['chroma']:
+        retrievers_config.append("simple")  # ChromaVectorStore for vector search
+    if available_plugins['bm25s']:
+        retrievers_config.append("keyword")  # BM25sKeywordStore for keyword search
+    
+    if retrievers_config:
+        os.environ.setdefault("REFINIRE_RAG_RETRIEVERS", ",".join(retrievers_config))
+        print(f"   ✅ Hybrid Retrievers configured: {', '.join(retrievers_config)} (Chroma + BM25s only)")
+    else:
+        os.environ.setdefault("REFINIRE_RAG_RETRIEVERS", "simple")
+        print("   ✅ Simple retriever configured (fallback)")
+    
+    # Reranker設定: 検索結果の再ランキング（パフォーマンス最適化）
+    available_rerankers = PluginRegistry.list_available_plugins('rerankers')
+    has_openai = bool(os.environ.get("OPENAI_API_KEY"))
+    
+    if "llm" in available_rerankers and has_openai:
+        os.environ.setdefault("REFINIRE_RAG_RERANKERS", "llm")
+        # パフォーマンス最適化設定
+        os.environ.setdefault("REFINIRE_RAG_LLM_RERANKER_BATCH_SIZE", "15")  # バッチサイズは元に戻す（1バッチなので効果なし）
+        os.environ.setdefault("REFINIRE_RAG_LLM_RERANKER_TEMPERATURE", "0.0")  # より一貫したスコアリング
+        print("   ✅ LLM reranker configured (highest quality, optimized batching)")
+    elif "rrf" in available_rerankers:
+        os.environ.setdefault("REFINIRE_RAG_RERANKERS", "rrf")
+        print("   ✅ RRF reranker configured (mathematical fusion, fastest)")
+    elif "heuristic" in available_rerankers:
+        os.environ.setdefault("REFINIRE_RAG_RERANKERS", "heuristic")
+        print("   ✅ Heuristic reranker configured (keyword-based, fast)")
+    
+    # Answer Synthesizer設定: 回答生成
+    os.environ.setdefault("REFINIRE_RAG_SYNTHESIZERS", "answer")
+    print("   ✅ Answer synthesizer configured")
+    
+    if has_openai:
+        os.environ.setdefault("REFINIRE_RAG_LLM_MODEL", "gpt-4o-mini")
+        print("   ✅ LLM model: gpt-4o-mini")
+    
+    if len(retrievers_config) > 1:
         print("   🚀 Hybrid search ready: Vector + Keyword + Reranking + LLM")
     else:
-        # Simple retrieval設定
-        os.environ.setdefault("REFINIRE_RAG_RETRIEVERS", "simple")
-        print("   ✅ Simple retrieval configured")
+        print("   🔍 Single-mode search ready: Vector/Keyword + Reranking + LLM")
     
     print(f"\n📋 Environment Setup Summary:")
     print(f"   • Document Store: {os.environ.get('REFINIRE_RAG_DOCUMENT_STORES', 'None')}")
@@ -170,12 +190,13 @@ def step2_create_corpus():
     
     CorpusManagerは環境変数の設定に基づいて自動的にコンポーネントを初期化し、
     ビジネスデータセットからコーパス（検索可能な文書集合）を作成します。
+    ChromaVectorStore と BM25sKeywordStore のみを使用します。
     """
     print("\n" + "="*60)
     print("📚 STEP 2: Corpus Creation with CorpusManager")
     print("="*60)
-        
-    # CorpusManager作成（環境変数から自動設定）
+    
+    # CorpusManager作成（Chroma + BM25s ハイブリッド設定）
     corpus_manager = CorpusManager()
     data_path = Path(__file__).parent.parent / "tests" / "data" / "business_dataset"
     
@@ -196,35 +217,51 @@ def step2_create_corpus():
     print(f"   ✅ Chunks created: {build_stats.total_chunks_created}")
     print(f"   ⏱️  Build time: {build_stats.total_processing_time:.2f}s")
     
-    # コーパス情報表示
+    # コーパス情報表示（正しいハイブリッド設定の確認）
     print(f"\n📈 Corpus Information:")
     print(f"   🏷️  Name: business_knowledge")
     print(f"   📄 Documents: {import_stats.total_documents_created}")
     print(f"   📝 Chunks: {build_stats.total_chunks_created}")
-    print(f"   🔍 Retrievers: {len(corpus_manager.retrievers)}")
+    print(f"   🔍 Total Retrievers Available: {len(corpus_manager.retrievers)}")
+    
+    # 実際に使用するハイブリッド検索用のRetrieverを特定
+    hybrid_retrievers = []
+    for i, retriever in enumerate(corpus_manager.retrievers):
+        retriever_type = type(retriever).__name__
+        print(f"      {i}: {retriever_type}")
+        if retriever_type in ['ChromaVectorStore', 'BM25sKeywordStore']:
+            hybrid_retrievers.append(retriever)
+    
+    print(f"   🚀 Hybrid Search Retrievers: {len(hybrid_retrievers)} (Chroma + BM25s)")
     print(f"   🧠 Embedder: {os.environ.get('REFINIRE_RAG_EMBEDDERS')}")
     
-    return corpus_manager
+    # Return both corpus_manager and the hybrid retrievers for Step 3
+    return corpus_manager, hybrid_retrievers
 
-def step3_query_engine_search():
+def step3_query_engine_search(hybrid_retrievers):
     """
     ステップ3: QueryEngineで検索・回答生成
     
-    QueryEngineも環境変数の設定に基づいて自動的にコンポーネントを初期化し、
+    QueryEngineはStep2のCorpusManagerと同じハイブリッド検索設定を使用し、
     クエリに対して検索・再ランキング・回答生成を行います。
+    ChromaVectorStore + BM25sKeywordStore のハイブリッド検索を使用します。
     """
     print("\n" + "="*60)
     print("🔍 STEP 3: Query Engine Search & Answer Generation")
     print("="*60)
     
-    # QueryEngine作成（環境変数から自動設定）
-    print("🏗️  Creating QueryEngine from environment variables...")
-    query_engine = QueryEngine()
+    # QueryEngine作成（Step2と同じハイブリッド検索設定を使用）
+    print("🏗️  Creating QueryEngine with Step2 hybrid retriever configuration...")
+    query_engine = QueryEngine(retrievers=hybrid_retrievers)
     
-    print(f"   ✅ QueryEngine initialized with:")
+    print(f"   ✅ QueryEngine initialized with hybrid search:")
     print(f"      • Retrievers: {[type(r).__name__ for r in query_engine.retrievers]}")
     print(f"      • Reranker: {type(query_engine.reranker).__name__ if query_engine.reranker else 'None'}")
     print(f"      • Synthesizer: {type(query_engine.synthesizer).__name__ if query_engine.synthesizer else 'None'}")
+    
+    # ハイブリッド検索の確認
+    hybrid_types = [type(r).__name__ for r in hybrid_retrievers]
+    print(f"   🚀 Using Step2 hybrid configuration: {', '.join(hybrid_types)}")
     
     # サンプルクエリで検索テスト（日本語ビジネス関連）
     sample_queries = [
@@ -243,7 +280,7 @@ def step3_query_engine_search():
         
         try:
             # クエリ実行
-            result = query_engine.query(query_text, retriever_top_k=3)
+            result = query_engine.query(query_text)
             
             if result.sources:
                 print(f"   📄 Found {len(result.sources)} relevant documents:")
@@ -295,19 +332,26 @@ def step3_query_engine_search():
     return query_engine
 
 
-def step4_quality_evaluation(query_engine, sample_queries):
+def step4_quality_evaluation(query_engine, sample_queries, hybrid_retrievers):
     """
     ステップ4: QualityLabで品質評価
     
-    QualityLabも環境変数の設定に基づいて自動的にコンポーネントを初期化し、
+    QualityLabはStep2/3と同じハイブリッド検索設定を使用し、
     RAGシステムの品質を包括的に評価します。
+    ChromaVectorStore + BM25sKeywordStore のハイブリッド検索を使用します。
     """
     print("\n" + "="*60)
     print("🔬 STEP 4: Quality Evaluation with QualityLab")
     print("="*60)
     
-    # QualityLab設定用の環境変数を設定
+    # QualityLab設定用の環境変数を設定（統一設定の確保）
     print("🔧 Setting up QualityLab environment variables...")
+    
+    # 統一されたデータセット設定
+    unified_dataset_path = str(Path(__file__).parent.parent / "tests" / "data" / "business_dataset")
+    os.environ.setdefault("REFINIRE_RAG_UNIFIED_DATASET_PATH", unified_dataset_path)
+    
+    # QualityLab固有設定
     os.environ.setdefault("REFINIRE_RAG_TEST_SUITES", "llm")
     os.environ.setdefault("REFINIRE_RAG_EVALUATORS", "standard") 
     os.environ.setdefault("REFINIRE_RAG_CONTRADICTION_DETECTORS", "llm")
@@ -316,21 +360,37 @@ def step4_quality_evaluation(query_engine, sample_queries):
     os.environ.setdefault("REFINIRE_RAG_EVALUATION_TIMEOUT", "30")
     os.environ.setdefault("REFINIRE_RAG_INCLUDE_CONTRADICTION_DETECTION", "true")
     
+    # 統合性確保のため、全コンポーネントで同じコーパス名を使用
+    os.environ.setdefault("REFINIRE_RAG_DEFAULT_CORPUS_NAME", "business_knowledge")
+    
     print("   ✅ QualityLab evaluation environment configured")
     print(f"      • Test Suite: {os.environ.get('REFINIRE_RAG_TEST_SUITES')}")
     print(f"      • Evaluator: {os.environ.get('REFINIRE_RAG_EVALUATORS')}")
     print(f"      • Contradiction Detector: {os.environ.get('REFINIRE_RAG_CONTRADICTION_DETECTORS')}")
     print(f"      • Insight Reporter: {os.environ.get('REFINIRE_RAG_INSIGHT_REPORTERS')}")
     
-    # QualityLab作成（環境変数から自動設定）
-    print("\n🏗️  Creating QualityLab from environment variables...")
+    # 統一設定の検証
+    print(f"\n🔗 Unified Configuration Validation:")
+    print(f"   • Dataset Path: {unified_dataset_path}")
+    print(f"   • Default Corpus: {os.environ.get('REFINIRE_RAG_DEFAULT_CORPUS_NAME')}")
+    print(f"   • Document Store: {os.environ.get('REFINIRE_RAG_DOCUMENT_STORES')}")
+    print(f"   • Vector Store: {os.environ.get('REFINIRE_RAG_VECTOR_STORES')}")
+    print(f"   • Retrievers: {os.environ.get('REFINIRE_RAG_RETRIEVERS')}")
+    print(f"   • Reranker: {os.environ.get('REFINIRE_RAG_RERANKERS')}")
+    
+    # QualityLab作成（Step2/3と同じハイブリッド検索設定を使用）
+    print("\n🏗️  Creating QualityLab with Step2/3 hybrid retriever configuration...")
     try:
-        quality_lab = QualityLab()
-        print("   ✅ QualityLab initialized successfully")
+        quality_lab = QualityLab(retrievers=hybrid_retrievers)
+        print("   ✅ QualityLab initialized with hybrid search successfully")
         print(f"      • Test Suite: {type(quality_lab.test_suite).__name__}")
         print(f"      • Evaluator: {type(quality_lab.evaluator).__name__}")
         print(f"      • Contradiction Detector: {type(quality_lab.contradiction_detector).__name__}")
         print(f"      • Insight Reporter: {type(quality_lab.insight_reporter).__name__}")
+        
+        # ハイブリッド検索の確認
+        hybrid_types = [type(r).__name__ for r in hybrid_retrievers]
+        print(f"   🚀 Using Step2/3 hybrid configuration: {', '.join(hybrid_types)}")
     except Exception as e:
         print(f"   ⚠️  QualityLab initialization failed: {e}")
         print("   💡 Continuing without quality evaluation...")
@@ -490,13 +550,13 @@ def main():
         # Step 1: 環境変数設定
         available_plugins = step1_setup_environment()
         
-        # Step 2: コーパス作成
-        corpus_manager = step2_create_corpus()
+        # Step 2: コーパス作成（ハイブリッド検索設定）
+        corpus_manager, hybrid_retrievers = step2_create_corpus()
         
-        # Step 3: クエリエンジン検索
-        query_engine = step3_query_engine_search()
+        # Step 3: クエリエンジン検索（Step2と同じハイブリッド検索設定）
+        query_engine = step3_query_engine_search(hybrid_retrievers)
         
-        # Step 4: 品質評価
+        # Step 4: 品質評価（Step2/3と同じハイブリッド検索設定）
         sample_queries = [
             "会社の主な事業内容は何ですか？",
             "AIソリューションの製品ラインナップを教えてください",
@@ -504,7 +564,7 @@ def main():
             "リモートワークの制度について教えてください",
             "情報セキュリティの取り組みはどのようなものがありますか？"
         ]
-        evaluation_result = step4_quality_evaluation(query_engine, sample_queries)
+        evaluation_result = step4_quality_evaluation(query_engine, sample_queries, hybrid_retrievers)
         
         # 完了メッセージ
         print("\n" + "="*60)
@@ -512,11 +572,13 @@ def main():
         print("="*60)
         print("Your RAG system is now fully configured, tested, and ready for production use.")
         print()
-        print("🏗️  System Architecture:")
+        print("🏗️  System Architecture (Unified Hybrid Search):")
         print(f"   • CorpusManager: {len(corpus_manager.retrievers)} retrievers configured")
         print(f"   • QueryEngine: {[type(r).__name__ for r in query_engine.retrievers]}")
+        print(f"   • QualityLab: Same hybrid retriever configuration")
         print(f"   • Reranker: {type(query_engine.reranker).__name__ if query_engine.reranker else 'None'}")
         print(f"   • Synthesizer: {type(query_engine.synthesizer).__name__ if query_engine.synthesizer else 'None'}")
+        print(f"   🚀 All steps use consistent ChromaVectorStore + BM25sKeywordStore hybrid search")
         
         print(f"\n🔬 Quality Assurance:")
         if evaluation_result and "evaluation_summary" in evaluation_result:
