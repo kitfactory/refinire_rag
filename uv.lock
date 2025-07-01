@@ -1862,7 +1862,7 @@ wheels = [
 
 [[package]]
 name = "refinire-rag"
-version = "0.1.4"
+version = "0.1.5"
 source = { editable = "." }
 dependencies = [
     { name = "nltk" },
@@ -1870,7 +1870,6 @@ dependencies = [
     { name = "numpy", version = "2.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "oneenv" },
     { name = "refinire" },
-    { name = "refinire-rag-bm25s-j" },
     { name = "refinire-rag-chroma" },
     { name = "scikit-learn" },
 ]
@@ -1903,10 +1902,9 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "refinire" },
-    { name = "refinire-rag-bm25s-j", specifier = ">=0.0.3" },
-    { name = "refinire-rag-bm25s-j", marker = "extra == 'bm25'" },
-    { name = "refinire-rag-chroma", specifier = ">=0.0.3" },
-    { name = "refinire-rag-chroma", marker = "extra == 'chroma'" },
+    { name = "refinire-rag-bm25s-j", marker = "extra == 'bm25'", specifier = ">=0.0.3" },
+    { name = "refinire-rag-chroma", specifier = ">=0.0.6" },
+    { name = "refinire-rag-chroma", marker = "extra == 'chroma'", specifier = ">=0.0.6" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },
     { name = "scikit-learn", specifier = ">=1.0.0" },
     { name = "tiktoken", marker = "extra == 'openai'", specifier = ">=0.4.0" },
@@ -1929,7 +1927,7 @@ wheels = [
 
 [[package]]
 name = "refinire-rag-chroma"
-version = "0.0.3"
+version = "0.0.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "chromadb" },
@@ -1939,9 +1937,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "refinire-rag" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/67/4f/fc657201bd6db470d0035b7c0e903c93624e770e7dd1e71d5c492b75b583/refinire_rag_chroma-0.0.3.tar.gz", hash = "sha256:3ac0a67804da21f1cb54481a7a7f4b8440e562ca8317a3eb0c3e81e2b62a696e", size = 25119, upload-time = "2025-06-27T07:48:06.428Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c1/06/fadab354f0d6d173513eb5d0b0e6b1d04055e36a88c8bd833943aab4396c/refinire_rag_chroma-0.0.6.tar.gz", hash = "sha256:74ced162c57aa2b2746c6d54aad6180ceb65adf8ceebf5c623b3a9661940901b", size = 13377, upload-time = "2025-07-01T13:00:03.226Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/30/87c36f56453c77b8cb71b872f5b2d8f1618c19c081495f4e075b43c2a9f3/refinire_rag_chroma-0.0.3-py3-none-any.whl", hash = "sha256:c9ef1f81ab2f4200ab96a22c09369d67002e7e28a0cc2f92c2f40187a3bbf368", size = 29625, upload-time = "2025-06-27T07:48:04.047Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/e7/a44f6f35ade0faa7bbe8b99f3df9c4cab41e8e899b543026cfc859979480/refinire_rag_chroma-0.0.6-py3-none-any.whl", hash = "sha256:75a2b3d2d422c2670c98203649ed79f13240776d891a21ce704f289962d94c88", size = 12441, upload-time = "2025-07-01T13:00:01.88Z" },
 ]
 
 [[package]]
