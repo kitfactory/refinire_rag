@@ -198,7 +198,15 @@ class SimpleAnswerSynthesizer(AnswerSynthesizer):
             # Generate answer using Refinire or OpenAI
             if self._use_refinire and hasattr(self, '_refinire_agent'):
                 result = self._refinire_agent.run(prompt)
-                answer = result.content if hasattr(result, 'content') else str(result)
+                # Extract answer from Context object (refinire 0.2.8 API)
+                if hasattr(result, 'result') and result.result is not None:
+                    answer = str(result.result)
+                elif hasattr(result, 'shared_state') and f'{self._refinire_agent.name}_result' in result.shared_state:
+                    answer = str(result.shared_state[f'{self._refinire_agent.name}_result'])
+                elif hasattr(result, 'content'):
+                    answer = str(result.content)  # Fallback for old API
+                else:
+                    answer = str(result)
             elif self._use_refinire is False and hasattr(self, 'client'):
                 response = self.client.chat.completions.create(
                     model=self.config.llm_model,

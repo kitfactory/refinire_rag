@@ -19,23 +19,30 @@ from ..utils.model_config import get_default_llm_model
 logger = logging.getLogger(__name__)
 
 
+class DocumentScore(BaseModel):
+    """Simplified Pydantic model for single document score
+    
+    単一文書スコア用の簡素化されたPydanticモデル
+    """
+    document_id: str = Field(description="Document identifier")
+    score: float = Field(description="Relevance score between 0.0 and 10.0")
+
 class DocumentScores(BaseModel):
     """Pydantic model for structured LLM reranker output
     
     LLMリランカーの構造化出力用Pydanticモデル
     """
-    scores: Dict[str, float] = Field(
-        description="Document ID to relevance score mapping. Scores should be between 0.0 and 10.0"
+    scores: List[DocumentScore] = Field(
+        description="List of document scores"
     )
     
     class Config:
         json_schema_extra = {
             "example": {
-                "scores": {
-                    "doc_123": 8.5,
-                    "doc_456": 6.2,
-                    "doc_789": 9.1
-                }
+                "scores": [
+                    {"document_id": "doc_123", "score": 8.5},
+                    {"document_id": "doc_456", "score": 6.2}
+                ]
             }
         }
 
@@ -241,17 +248,18 @@ class LLMReranker(Reranker):
         """
         try:
             from refinire import RefinireAgent
+            # Try simplified structured output with list format
             self._refinire_agent = RefinireAgent(
                 name="llm_reranker",
                 generation_instructions="You are an expert information retrieval system that evaluates document relevance. Rate each document on a scale of 0.0-10.0 based on how well it answers the given query.",
                 model=self.config.llm_model,
-                output_model=DocumentScores,  # Enable structured output
+                output_model=DocumentScores,  # Simplified structured output
                 session_history=None,  # Disable session history for independent evaluations
                 history_size=0  # No history retention
             )
             self._use_refinire = True
-            self._use_structured_output = True
-            logger.info(f"Initialized LLM reranker with RefinireAgent structured output, model: {self.config.llm_model}")
+            self._use_structured_output = True  # Re-enabled with simplified model
+            logger.info(f"Initialized LLM reranker with RefinireAgent (simplified structured output), model: {self.config.llm_model}")
         except ImportError:
             logger.warning("Refinire library not available, LLM reranking will be disabled")
             self._refinire_agent = None
@@ -412,26 +420,44 @@ class LLMReranker(Reranker):
                 logger.debug(f"RefinireAgent result type: {type(result)}")
                 logger.debug(f"RefinireAgent result: {str(result)[:200]}...")
                 
-                # Handle RefinireAgent API - the main attribute is result.content
-                if hasattr(result, 'content') and result.content is not None:
-                    content = result.content
-                    logger.debug(f"Got result.content: {type(content)}")
-                    
+                # Handle RefinireAgent API - result is Context object with result.result attribute
+                content = None
+                
+                # Try to get result from different possible locations
+                if hasattr(result, 'result') and result.result is not None:
+                    content = result.result
+                    logger.debug(f"Got result.result: {type(content)}")
+                elif hasattr(result, 'shared_state') and f'{self._refinire_agent.name}_result' in result.shared_state:
+                    content = result.shared_state[f'{self._refinire_agent.name}_result']
+                    logger.debug(f"Got from shared_state: {type(content)}")
+                else:
+                    logger.warning(f"No result found in Context: {type(result)}")
+                    logger.debug(f"Result attributes: {[attr for attr in dir(result) if not attr.startswith('_')]}")
+                    if hasattr(result, 'shared_state'):
+                        logger.debug(f"Shared state keys: {list(result.shared_state.keys())}")
+                
+                if content is not None:
                     # Check if we got structured output (DocumentScores object)
                     if isinstance(content, DocumentScores):
-                        scores = content.scores
-                        logger.debug(f"Structured output scores: {scores}")
+                        # Convert list format to dict format
+                        scores = {item.document_id: item.score for item in content.scores}
+                        logger.debug(f"Structured output scores (list format): {scores}")
                     elif isinstance(content, dict) and 'scores' in content:
-                        scores = content['scores']
-                        logger.debug(f"Structured output scores (dict format): {scores}")
+                        if isinstance(content['scores'], list):
+                            # Handle list format: [{"document_id": "id", "score": 8.5}, ...]
+                            scores = {item['document_id']: item['score'] for item in content['scores']}
+                            logger.debug(f"Structured output scores (dict with list): {scores}")
+                        else:
+                            # Handle dict format: {"doc_id": 8.5, ...}
+                            scores = content['scores']
+                            logger.debug(f"Structured output scores (dict format): {scores}")
                     else:
                         # content is a string, parse it
                         logger.debug(f"Content is string, parsing: {str(content)[:200]}...")
                         scores = self._parse_numerical_response(str(content), doc_ids)
                 else:
-                    logger.warning(f"No content in result: {type(result)}")
-                    logger.debug(f"Result attributes: {[attr for attr in dir(result) if not attr.startswith('_')]}")
-                    # Fallback to parsing the string representation
+                    # Fallback to parsing the string representation of the whole result
+                    logger.warning(f"No content found, parsing string representation")
                     response = str(result)
                     scores = self._parse_numerical_response(response, doc_ids)
             else:
@@ -441,11 +467,15 @@ class LLMReranker(Reranker):
                 result = self._refinire_agent.run(prompt)
                 logger.debug(f"Non-structured result type: {type(result)}")
                 
-                # Handle RefinireAgent response
-                if hasattr(result, 'content') and result.content is not None:
-                    response = str(result.content)
+                # Handle RefinireAgent response - extract from Context object
+                if hasattr(result, 'result') and result.result is not None:
+                    response = str(result.result)
+                    logger.debug(f"Got result.result for non-structured: {response[:100]}...")
+                elif hasattr(result, 'shared_state') and f'{self._refinire_agent.name}_result' in result.shared_state:
+                    response = str(result.shared_state[f'{self._refinire_agent.name}_result'])
+                    logger.debug(f"Got from shared_state for non-structured: {response[:100]}...")
                 else:
-                    logger.warning(f"No content in non-structured result: {type(result)}")
+                    logger.warning(f"No result found in non-structured Context: {type(result)}")
                     response = str(result)
                 
                 scores = self._parse_numerical_response(response, doc_ids)
@@ -637,7 +667,15 @@ Documents to evaluate:
             prompt += f"\nDocument {doc_id}:\n{doc_text}\n"
         
         prompt += f"""
-Provide relevance scores for each document ID: {', '.join(doc_ids)}"""
+Provide relevance scores for each document in the following format:
+{{
+  "scores": [
+    {{"document_id": "{doc_ids[0]}", "score": 8.5}},
+    {{"document_id": "{doc_ids[1] if len(doc_ids) > 1 else doc_ids[0]}", "score": 6.0}}
+  ]
+}}
+
+Document IDs to score: {', '.join(doc_ids)}"""
         
         return prompt
     

@@ -428,10 +428,20 @@ class QualityLab:
             prompt = f"Generate {self.config.qa_pairs_per_document} QA pairs from the document content above."
             result = agent.run(prompt)
             
-            # Parse the generated response
+            # Parse the generated response from Context object
             try:
+                # Extract content from Context object (refinire 0.2.8 API)
+                if hasattr(result, 'result') and result.result is not None:
+                    content = str(result.result)
+                elif hasattr(result, 'shared_state') and f'{agent.name}_result' in result.shared_state:
+                    content = str(result.shared_state[f'{agent.name}_result'])
+                elif hasattr(result, 'content'):
+                    content = str(result.content)  # Fallback for old API
+                else:
+                    content = str(result)
+                
                 # Strip markdown code blocks if present
-                content = result.content.strip()
+                content = content.strip()
                 if content.startswith('```json'):
                     content = content[7:]  # Remove ```json
                 if content.endswith('```'):
