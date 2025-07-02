@@ -11,7 +11,7 @@ import json
 import logging
 
 from .base_evaluator import ReferenceBasedEvaluator, BaseEvaluatorConfig, EvaluationScore
-from refinire import create_simple_gen_agent, Context
+from refinire import create_simple_agent, Context
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +66,9 @@ class LLMJudgeEvaluator(ReferenceBasedEvaluator):
         self.config: LLMJudgeConfig = config
         
         # Initialize the LLM agent for judging
-        self.judge_agent = create_simple_gen_agent(
+        self.judge_agent = create_simple_agent(
             name="llm_judge",
-            instructions=self._get_judge_instructions(),
+            generation_instructions=self._get_judge_instructions(),
             model=config.judge_model_name or config.model_name
         )
     
@@ -164,9 +164,14 @@ class LLMJudgeEvaluator(ReferenceBasedEvaluator):
         
         LLM評価を非同期で実行
         """
-        context = Context()
-        result = await self.judge_agent.run(eval_prompt, context)
-        return result.shared_state.get("llm_judge_result", "")
+        result = await self.judge_agent.run(eval_prompt)
+        # Handle different response formats from new API
+        if hasattr(result, 'content'):
+            return result.content
+        elif hasattr(result, 'output'):
+            return result.output
+        else:
+            return str(result)
     
     def _create_evaluation_prompt(self,
                                 question: str,

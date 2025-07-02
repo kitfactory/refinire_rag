@@ -412,40 +412,26 @@ class LLMReranker(Reranker):
                 logger.debug(f"RefinireAgent result type: {type(result)}")
                 logger.debug(f"RefinireAgent result: {str(result)[:200]}...")
                 
-                # Extract structured output directly
-                if hasattr(result, 'content') and isinstance(result.content, DocumentScores):
-                    scores = result.content.scores
-                    logger.debug(f"Structured output scores: {scores}")
-                elif hasattr(result, 'content') and hasattr(result.content, 'scores'):
-                    scores = result.content.scores
-                    logger.debug(f"Structured output scores (via attribute): {scores}")
-                elif hasattr(result, 'content') and result.content is not None:
-                    # Check if content is already a dict with scores
+                # Handle RefinireAgent API - the main attribute is result.content
+                if hasattr(result, 'content') and result.content is not None:
                     content = result.content
-                    if isinstance(content, dict) and 'scores' in content:
+                    logger.debug(f"Got result.content: {type(content)}")
+                    
+                    # Check if we got structured output (DocumentScores object)
+                    if isinstance(content, DocumentScores):
+                        scores = content.scores
+                        logger.debug(f"Structured output scores: {scores}")
+                    elif isinstance(content, dict) and 'scores' in content:
                         scores = content['scores']
                         logger.debug(f"Structured output scores (dict format): {scores}")
-                    elif isinstance(content, DocumentScores):
-                        scores = content.scores
-                        logger.debug(f"Content is DocumentScores: {scores}")
                     else:
-                        logger.warning(f"Unexpected structured output format: {type(content)}")
-                        logger.debug(f"Content preview: {str(content)[:200]}...")
-                        # Fallback to parsing
+                        # content is a string, parse it
+                        logger.debug(f"Content is string, parsing: {str(content)[:200]}...")
                         scores = self._parse_numerical_response(str(content), doc_ids)
-                elif hasattr(result, 'content') and result.content is None:
-                    logger.warning(f"RefinireAgent returned None content - trying alternative access")
-                    # Try to access result directly (might be a DocumentScores instance)
-                    if isinstance(result, DocumentScores):
-                        scores = result.scores
-                        logger.debug(f"Result is DocumentScores directly: {scores}")
-                    else:
-                        logger.warning(f"Unexpected structured output format: {type(result.content)}")
-                        # Fallback to parsing the string representation
-                        scores = self._parse_numerical_response(str(result), doc_ids)
                 else:
                     logger.warning(f"No content in result: {type(result)}")
-                    # Fallback to parsing
+                    logger.debug(f"Result attributes: {[attr for attr in dir(result) if not attr.startswith('_')]}")
+                    # Fallback to parsing the string representation
                     response = str(result)
                     scores = self._parse_numerical_response(response, doc_ids)
             else:
@@ -453,8 +439,16 @@ class LLMReranker(Reranker):
                 prompt = self._create_numerical_prompt(query, docs_text, doc_ids)
                 logger.debug("Using RefinireAgent prompt-based mode")
                 result = self._refinire_agent.run(prompt)
-                response = result.content if hasattr(result, 'content') else str(result)
-                scores = self._parse_numerical_response(str(response), doc_ids)
+                logger.debug(f"Non-structured result type: {type(result)}")
+                
+                # Handle RefinireAgent response
+                if hasattr(result, 'content') and result.content is not None:
+                    response = str(result.content)
+                else:
+                    logger.warning(f"No content in non-structured result: {type(result)}")
+                    response = str(result)
+                
+                scores = self._parse_numerical_response(response, doc_ids)
             
             # Validate and normalize scores
             normalized_scores = {}
