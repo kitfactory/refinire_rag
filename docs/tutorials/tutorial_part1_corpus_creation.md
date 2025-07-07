@@ -24,67 +24,206 @@ export OPENAI_API_KEY="your-api-key"
 export REFINIRE_RAG_LLM_MODEL="gpt-4o-mini"
 ```
 
+## Core Concepts / 基本概念
+
+### What is a Document Corpus? / ドキュメントコーパスとは？
+
+A **document corpus** is a structured collection of processed documents that serves as the foundation for RAG (Retrieval-Augmented Generation) systems. Think of it as a searchable knowledge base where:
+
+**ドキュメントコーパス**は、RAG（検索拡張生成）システムの基礎となる、処理済み文書の構造化されたコレクションです。以下のような検索可能な知識ベースと考えてください：
+
+- **Raw documents** are converted into machine-readable format / **生文書**を機械可読形式に変換
+- **Text is segmented** into meaningful chunks for better retrieval / **テキストを分割**して検索精度を向上
+- **Semantic embeddings** are generated for similarity search / **セマンティック埋め込み**を生成して類似検索を実現
+- **Metadata** is extracted and indexed for filtering / **メタデータ**を抽出・インデックス化してフィルタリングを可能に
+
+### Why Different Corpus Building Approaches? / なぜ異なるコーパス構築アプローチが必要？
+
+Different use cases require different processing strategies:
+
+異なるユースケースには、異なる処理戦略が必要です：
+
+#### 1. **Simple RAG** - Quick Prototyping / クイックプロトタイピング
+- **When to use**: Testing, demos, simple applications / **使用場面**: テスト、デモ、シンプルなアプリケーション
+- **Processing**: Load → Chunk → Vectorize / **処理**: 読み込み → チャンク化 → ベクトル化
+- **Benefits**: Fast setup, minimal configuration / **利点**: 高速セットアップ、最小設定
+
+#### 2. **Semantic RAG** - Enhanced Understanding / 理解力向上
+- **When to use**: Domain-specific content, terminology consistency / **使用場面**: 専門分野コンテンツ、用語統一
+- **Processing**: Load → Dictionary → Normalize → Chunk → Vectorize / **処理**: 読み込み → 辞書 → 正規化 → チャンク化 → ベクトル化
+- **Benefits**: Better semantic consistency, domain adaptation / **利点**: セマンティック一貫性向上、ドメイン適応
+
+#### 3. **Knowledge RAG** - Advanced Analytics / 高度な分析
+- **When to use**: Complex relationships, knowledge discovery / **使用場面**: 複雑な関係性、知識発見
+- **Processing**: Load → Dictionary → Graph → Normalize → Chunk → Vectorize / **処理**: 読み込み → 辞書 → グラフ → 正規化 → チャンク化 → ベクトル化
+- **Benefits**: Relationship extraction, enhanced reasoning / **利点**: 関係抽出、推論能力向上
+
+### Document Processing Pipeline / 文書処理パイプライン
+
+Understanding the document processing stages is crucial for choosing the right approach:
+
+適切なアプローチを選択するには、文書処理ステージの理解が重要です：
+
+```
+📄 Raw Documents → 🔄 Processing Pipeline → 🗂️ Searchable Corpus
+                        ↓
+              [Load] → [Analyze] → [Normalize] → [Chunk] → [Vectorize]
+```
+
+Each stage serves a specific purpose:
+
+各ステージには特定の目的があります：
+
+| Stage | Purpose | What It Does | When to Use |
+|-------|---------|--------------|-------------|
+| **Load** | Import | File parsing and document creation / ファイル解析と文書作成 | Always required / 常に必要 |
+| **Dictionary** | Analyze | Extract domain terms and abbreviations / 専門用語・略語抽出 | Domain-specific content / 専門分野コンテンツ |
+| **Graph** | Relate | Build knowledge relationships / 知識関係の構築 | Complex documents / 複雑な文書 |
+| **Normalize** | Standardize | Unify terminology variations / 用語バリエーションの統一 | Inconsistent terminology / 用語の不統一 |
+| **Chunk** | Segment | Break text into optimal pieces / テキストを最適な断片に分割 | Always required / 常に必要 |
+| **Vector** | Index | Generate semantic embeddings / セマンティック埋め込み生成 | Always required / 常に必要 |
+
+### Choosing Your Approach / アプローチの選択
+
+**Decision Tree** for selecting the right corpus building approach:
+
+適切なコーパス構築アプローチを選択するための**決定ツリー**：
+
+```
+🤔 What type of content are you processing?
+   あなたが処理するコンテンツのタイプは？
+
+├── 📝 General documents, quick start needed
+│   一般的な文書、クイックスタートが必要
+│   → Use Simple RAG
+│
+├── 🏥 Domain-specific with technical terms  
+│   技術用語を含む専門分野
+│   → Use Semantic RAG
+│
+└── 🔬 Complex documents with relationships
+    関係性を含む複雑な文書
+    → Use Knowledge RAG
+```
+
 ## Quick Start Example / クイックスタート例
+
+This example demonstrates the simplest way to create a corpus using the **Simple RAG** approach:
+
+この例では、**Simple RAG**アプローチを使用してコーパスを作成する最もシンプルな方法を示します：
 
 ```python
 from refinire_rag.application.corpus_manager_new import CorpusManager
 from refinire_rag.storage.sqlite_store import SQLiteDocumentStore
 from refinire_rag.storage.in_memory_vector_store import InMemoryVectorStore
 
-# Initialize storage components
-doc_store = SQLiteDocumentStore("documents.db")
-vector_store = InMemoryVectorStore()
+# 🗄️ STEP 1: Initialize storage components
+#    ステップ1: ストレージコンポーネントの初期化
+doc_store = SQLiteDocumentStore("documents.db")        # Stores document metadata / 文書メタデータを保存
+vector_store = InMemoryVectorStore()                   # Stores vector embeddings / ベクトル埋め込みを保存
 
-# Create simple RAG corpus (Load → Chunk → Vector)
+# 🔧 STEP 2: Create Simple RAG corpus manager
+#    ステップ2: Simple RAGコーパスマネージャーの作成
+#    This implements: Load → Chunk → Vector pipeline
+#    これは以下を実装: 読み込み → チャンク化 → ベクトル化 パイプライン
 manager = CorpusManager.create_simple_rag(doc_store, vector_store)
+
+# 📄 STEP 3: Process documents and build corpus
+#    ステップ3: 文書を処理してコーパスを構築
 stats = manager.build_corpus(["documents/"])
 
-print(f"Processed {stats.total_files_processed} files")
-print(f"Created {stats.total_chunks_created} chunks")
+# 📊 STEP 4: Review processing results
+#    ステップ4: 処理結果の確認
+print(f"✅ Processed {stats.total_files_processed} files")
+print(f"✅ Created {stats.total_chunks_created} chunks")
 ```
 
-## 1. Preset Configurations / プリセット設定
+**What happened behind the scenes? / 内部で何が起こったのか？**
+1. **File loading** - Documents were parsed and converted to internal format / **ファイル読み込み** - 文書が解析され内部形式に変換
+2. **Chunking** - Large texts were split into optimal-sized pieces / **チャンク化** - 大きなテキストが最適なサイズに分割
+3. **Vectorization** - Each chunk was converted to semantic embeddings / **ベクトル化** - 各チャンクがセマンティック埋め込みに変換
+4. **Storage** - Results were saved to the database and vector store / **保存** - 結果がデータベースとベクトルストアに保存
 
-### 1.1 Simple RAG
-Basic pipeline for quick prototyping / プロトタイピング用の基本パイプライン
+## Implementation Examples / 実装例
+
+Now let's see how each approach translates the concepts into working code:
+
+各アプローチが概念をどのように動作するコードに変換するかを見てみましょう：
+
+### 1.1 Simple RAG Implementation / Simple RAG実装
+**Concept**: Quick prototyping with minimal processing / **概念**: 最小処理でのクイックプロトタイピング
 
 ```python
-# Simple RAG: Load → Chunk → Vector
+# 🎯 CONCEPT MAPPING: Simple RAG = Load → Chunk → Vector
+#    概念マッピング: Simple RAG = 読み込み → チャンク化 → ベクトル化
+
 simple_manager = CorpusManager.create_simple_rag(doc_store, vector_store)
 simple_stats = simple_manager.build_corpus(file_paths)
 
 print(f"Simple RAG Results:")
-print(f"- Files: {simple_stats.total_files_processed}")
-print(f"- Chunks: {simple_stats.total_chunks_created}")
-print(f"- Time: {simple_stats.total_processing_time:.3f}s")
+print(f"- Files: {simple_stats.total_files_processed}")      # 📄 Load stage output / 読み込みステージ出力
+print(f"- Chunks: {simple_stats.total_chunks_created}")      # ✂️ Chunk stage output / チャンクステージ出力  
+print(f"- Time: {simple_stats.total_processing_time:.3f}s")  # ⏱️ Processing efficiency / 処理効率
 ```
 
-### 1.2 Semantic RAG
-Enhanced with dictionary-based normalization / 辞書ベース正規化で強化
+**When to use this implementation / この実装を使用するタイミング:**
+- ✅ Testing new document collections / 新しい文書コレクションのテスト
+- ✅ Rapid prototyping / 高速プロトタイピング
+- ✅ Simple content without domain-specific terminology / 専門用語のないシンプルなコンテンツ
+
+### 1.2 Semantic RAG Implementation / Semantic RAG実装
+**Concept**: Enhanced understanding through terminology normalization / **概念**: 用語正規化による理解力向上
 
 ```python
-# Semantic RAG: Load → Dictionary → Normalize → Chunk → Vector
+# 🎯 CONCEPT MAPPING: Semantic RAG = Load → Dictionary → Normalize → Chunk → Vector
+#    概念マッピング: Semantic RAG = 読み込み → 辞書 → 正規化 → チャンク化 → ベクトル化
+
 semantic_manager = CorpusManager.create_semantic_rag(doc_store, vector_store)
 semantic_stats = semantic_manager.build_corpus(file_paths)
 
 print(f"Semantic RAG Results:")
-print(f"- Normalized expressions using domain dictionary")
-print(f"- Better semantic consistency")
+print(f"- Files: {semantic_stats.total_files_processed}")           # 📄 Load stage output
+print(f"- Dictionary terms: {semantic_stats.dictionary_terms}")     # 📚 Dictionary stage output  
+print(f"- Normalized chunks: {semantic_stats.total_chunks_created}") # 🔄 Normalize + Chunk output
+print(f"- Better semantic consistency achieved")                     # 🎯 Core benefit
 ```
 
-### 1.3 Knowledge RAG
-Full pipeline with knowledge graph generation / 知識グラフ生成を含む完全パイプライン
+**What the additional processing achieves / 追加処理で達成されること:**
+1. **Dictionary creation** - Domain-specific terms are automatically extracted / **辞書作成** - 専門分野の用語が自動抽出
+2. **Normalization** - Terminology variations are unified (e.g., "AI" = "Artificial Intelligence") / **正規化** - 用語のバリエーションが統一（例: "AI" = "Artificial Intelligence"）
+3. **Enhanced search** - Better matching between queries and content / **検索向上** - クエリとコンテンツ間のマッチング向上
+
+**When to use this implementation / この実装を使用するタイミング:**
+- ✅ Medical, legal, or technical documents / 医療・法律・技術文書
+- ✅ Content with many abbreviations / 略語が多いコンテンツ
+- ✅ Multi-language or mixed terminology / 多言語や混合用語
+
+### 1.3 Knowledge RAG Implementation / Knowledge RAG実装
+**Concept**: Advanced analytics with relationship discovery / **概念**: 関係発見による高度な分析
 
 ```python
-# Knowledge RAG: Load → Dictionary → Graph → Normalize → Chunk → Vector
+# 🎯 CONCEPT MAPPING: Knowledge RAG = Load → Dictionary → Graph → Normalize → Chunk → Vector
+#    概念マッピング: Knowledge RAG = 読み込み → 辞書 → グラフ → 正規化 → チャンク化 → ベクトル化
+
 knowledge_manager = CorpusManager.create_knowledge_rag(doc_store, vector_store)
 knowledge_stats = knowledge_manager.build_corpus(file_paths)
 
 print(f"Knowledge RAG Results:")
-print(f"- Generated domain-specific dictionary")
-print(f"- Built knowledge graph relationships")
-print(f"- Enhanced semantic understanding")
+print(f"- Files: {knowledge_stats.total_files_processed}")          # 📄 Load stage output
+print(f"- Dictionary terms: {knowledge_stats.dictionary_terms}")    # 📚 Dictionary stage output
+print(f"- Relationships: {knowledge_stats.graph_relationships}")    # 🕸️ Graph stage output
+print(f"- Knowledge chunks: {knowledge_stats.total_chunks_created}") # 🧠 Final enriched chunks
 ```
+
+**What the complete pipeline achieves / 完全パイプラインで達成されること:**
+1. **Relationship extraction** - Entities and their connections are identified / **関係抽出** - エンティティとその接続が特定
+2. **Knowledge graph** - Structured representation of domain knowledge / **知識グラフ** - ドメイン知識の構造化表現
+3. **Enhanced reasoning** - Better understanding of context and implications / **推論向上** - コンテキストと含意の理解向上
+
+**When to use this implementation / この実装を使用するタイミング:**
+- ✅ Research documents with complex relationships / 複雑な関係性を持つ研究文書
+- ✅ Business processes and workflows / ビジネスプロセスとワークフロー
+- ✅ Educational content requiring deep understanding / 深い理解が必要な教育コンテンツ
 
 ## 2. Stage Selection Approach / ステージ選択アプローチ
 

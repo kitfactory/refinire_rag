@@ -122,6 +122,7 @@ stats = corpus_manager.get_corpus_stats()
 #### **🚀 コアチュートリアルシリーズ（ここから始めよう！）**
 RAGワークフロー全体をカバーする完全な3部構成チュートリアル：
 
+- **[📘 包括的チュートリアルガイド](docs/tutorials/TUTORIAL_GUIDE_ja.md)** - レベル別学習進行による完全な学習ロードマップ | **[English](docs/tutorials/TUTORIAL_GUIDE.md)**
 - **[パート1: コーパス作成](docs/tutorials/tutorial_part1_corpus_creation_ja.md)** - 文書処理・インデックス化
 - **[パート2: クエリエンジン](docs/tutorials/tutorial_part2_query_engine_ja.md)** - 検索・回答生成  
 - **[パート3: 評価](docs/tutorials/tutorial_part3_evaluation_ja.md)** - 性能評価・最適化

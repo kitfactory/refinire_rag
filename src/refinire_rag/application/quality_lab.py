@@ -1488,6 +1488,108 @@ class QualityLab:
             } if slowest_run else None
         }
     
+    def register_qa_pairs(self, 
+                         qa_pairs: List[QAPair],
+                         qa_set_name: str,
+                         metadata: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Register existing QA pairs to QualityLab for evaluation
+        
+        既存のQAペアをQualityLabに登録して評価用に使用
+        
+        Args:
+            qa_pairs: List of QA pairs to register
+                     登録するQAペアのリスト
+            qa_set_name: Name/ID for the QA pair set
+                        QAペアセットの名前/ID
+            metadata: Optional metadata for the QA pair set
+                     QAペアセットのオプションメタデータ
+                     
+        Returns:
+            bool: True if registration was successful
+                  登録が成功した場合True
+        """
+        try:
+            if not qa_pairs:
+                logger.warning("No QA pairs provided for registration")
+                return False
+            
+            # Validate QA pairs format
+            for i, qa_pair in enumerate(qa_pairs):
+                if not isinstance(qa_pair, QAPair):
+                    logger.error(f"Invalid QA pair format at index {i}: expected QAPair instance")
+                    return False
+                if not qa_pair.question or not qa_pair.answer:
+                    logger.error(f"QA pair at index {i} missing required question or answer")
+                    return False
+            
+            # Create registration metadata
+            registration_metadata = {
+                "qa_set_name": qa_set_name,
+                "registration_timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "qa_pairs_count": len(qa_pairs),
+                "registration_source": "external_registration"
+            }
+            
+            if metadata:
+                registration_metadata.update(metadata)
+            
+            # Add registration metadata to each QA pair
+            for qa_pair in qa_pairs:
+                if qa_pair.metadata is None:
+                    qa_pair.metadata = {}
+                qa_pair.metadata.update({
+                    "qa_set_name": qa_set_name,
+                    "registration_source": "external_registration",
+                    "registration_timestamp": registration_metadata["registration_timestamp"]
+                })
+            
+            # Store QA pairs in evaluation store if available
+            if self.evaluation_store:
+                try:
+                    # Create evaluation run for the registered QA pairs
+                    evaluation_run = EvaluationRun(
+                        id=f"registered_qa_set_{qa_set_name}_{int(time.time())}",
+                        name=f"Registered QA Set: {qa_set_name}",
+                        description=f"Registered QA pairs set '{qa_set_name}' with {len(qa_pairs)} pairs",
+                        status="completed",
+                        config=registration_metadata,
+                        tags=["registered", "qa_pairs", qa_set_name]
+                    )
+                    
+                    run_id = self.evaluation_store.create_evaluation_run(evaluation_run)
+                    
+                    # Convert QA pairs to test cases for storage
+                    test_cases = []
+                    for i, qa_pair in enumerate(qa_pairs):
+                        test_case_id = qa_pair.metadata.get("qa_id", f"qa_pair_{i}")
+                        test_case = TestCase(
+                            id=f"{test_case_id}_test",
+                            query=qa_pair.question,
+                            expected_answer=qa_pair.answer,
+                            expected_sources=qa_pair.metadata.get("expected_sources", []),
+                            metadata=qa_pair.metadata,
+                            category=qa_pair.metadata.get("question_type", "registered")
+                        )
+                        test_cases.append(test_case)
+                    
+                    self.evaluation_store.save_test_cases(run_id, test_cases)
+                    logger.info(f"Stored {len(test_cases)} test cases from registered QA pairs in evaluation store")
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to store QA pairs in evaluation store: {e}")
+                    # Continue with registration even if storage fails
+            
+            # Update statistics
+            self.stats["qa_pairs_generated"] += len(qa_pairs)
+            
+            logger.info(f"Successfully registered {len(qa_pairs)} QA pairs for set '{qa_set_name}'")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to register QA pairs: {e}")
+            return False
+    
     def get_evaluation_history(self,
                              limit: int = 50,
                              status: Optional[str] = None) -> List[Dict[str, Any]]:

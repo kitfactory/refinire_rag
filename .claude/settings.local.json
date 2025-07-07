@@ -12,7 +12,12 @@
       "Bash(export CHROMA_TELEMETRY_DISABLED=true)",
       "Bash(export ANONYMIZED_TELEMETRY=false)",
       "Bash(uv sync:*)",
-      "Bash(PYTHONPATH=../src:$PYTHONPATH source ./.venv/bin/activate)"
+      "Bash(PYTHONPATH=../src:$PYTHONPATH source ./.venv/bin/activate)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(rm:*)",
+      "Bash(pip install:*)",
+      "Bash(uv add:*)"
     ],
     "deny": []
   }

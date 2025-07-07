@@ -130,9 +130,178 @@ questeval = QuestEvalEvaluator(
 )
 ```
 
-## 2. Automated QA Pair Generation / 自動QAペア生成
+## 2. QA Pair Management / QAペア管理
 
-### 2.1 Basic QA Generation / 基本QA生成
+### 2.1 Registering Existing QA Pairs / 既存QAペアの登録
+
+If you already have high-quality QA pairs from human experts, domain specialists, or previous evaluations, you can register them directly in QualityLab for evaluation purposes.
+
+すでに人間の専門家、ドメインスペシャリスト、または過去の評価から高品質なQAペアがある場合、評価目的でQualityLabに直接登録できます。
+
+```python
+from refinire_rag.models.qa_pair import QAPair
+
+# Create existing QA pairs from expert knowledge / 専門知識から既存QAペアを作成
+expert_qa_pairs = [
+    QAPair(
+        question="What is the fundamental difference between RAG and traditional LLM approaches?",
+        answer="RAG combines information retrieval with text generation, allowing LLMs to access external knowledge bases in real-time, while traditional approaches rely solely on pre-trained parameters.",
+        document_id="rag_concepts_001",
+        metadata={
+            "qa_id": "expert_001",
+            "question_type": "conceptual",
+            "topic": "rag_fundamentals", 
+            "difficulty": "intermediate",
+            "source": "domain_expert",
+            "expert_reviewer": "Dr. Smith",
+            "review_date": "2024-01-15",
+            "expected_sources": ["rag_concepts_001", "rag_architecture_002"]
+        }
+    ),
+    QAPair(
+        question="How does semantic search improve retrieval accuracy in RAG systems?",
+        answer="Semantic search uses dense vector embeddings to capture meaning rather than just keyword matching, enabling retrieval of contextually relevant documents even when exact terms don't match.",
+        document_id="semantic_search_002",
+        metadata={
+            "qa_id": "expert_002",
+            "question_type": "technical",
+            "topic": "semantic_search",
+            "difficulty": "advanced",
+            "source": "technical_review",
+            "expert_reviewer": "Engineering Team",
+            "review_date": "2024-01-16",
+            "expected_sources": ["semantic_search_002", "vector_embeddings_003"]
+        }
+    ),
+    QAPair(
+        question="What evaluation metrics best assess RAG system performance?",
+        answer="Key metrics include retrieval metrics (Hit Rate, MRR, NDCG), generation quality (BLEU, ROUGE, BERTScore), and end-to-end metrics (Faithfulness, Answer Relevance, Context Precision/Recall).",
+        document_id="evaluation_metrics_003",
+        metadata={
+            "qa_id": "expert_003",
+            "question_type": "analytical", 
+            "topic": "evaluation_metrics",
+            "difficulty": "advanced",
+            "source": "research_paper",
+            "citation": "Smith et al. 2024",
+            "expected_sources": ["evaluation_metrics_003", "rag_benchmarks_004"]
+        }
+    )
+]
+
+# Register the expert QA pairs / 専門家QAペアを登録
+print("📋 Registering expert QA pairs...")
+registration_success = quality_lab.register_qa_pairs(
+    qa_pairs=expert_qa_pairs,
+    qa_set_name="expert_rag_knowledge_v1",
+    metadata={
+        "collection_source": "domain_experts",
+        "validation_status": "expert_reviewed",
+        "intended_use": "benchmark_evaluation",
+        "creation_date": "2024-01-15",
+        "quality_level": "gold_standard",
+        "language": "english",
+        "domain": "rag_systems"
+    }
+)
+
+if registration_success:
+    print("✅ Successfully registered expert QA pairs!")
+    
+    # Verify registration metadata / 登録メタデータを確認
+    print("\nRegistered QA Pairs Summary:")
+    for qa_pair in expert_qa_pairs:
+        print(f"- {qa_pair.metadata['qa_id']}: {qa_pair.question[:60]}...")
+        print(f"  Enhanced metadata: qa_set_name, registration_timestamp added")
+    
+    # Get QualityLab statistics / QualityLab統計を取得
+    stats = quality_lab.get_lab_stats()
+    print(f"\nTotal QA pairs in QualityLab: {stats['qa_pairs_generated']}")
+else:
+    print("❌ Failed to register QA pairs")
+```
+
+### 2.2 Loading QA Pairs from External Sources / 外部ソースからのQAペア読み込み
+
+```python
+import json
+import csv
+from pathlib import Path
+
+def load_qa_pairs_from_json(file_path: str) -> List[QAPair]:
+    """
+    Load QA pairs from JSON file
+    JSONファイルからQAペアを読み込み
+    """
+    with open(file_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    qa_pairs = []
+    for item in data:
+        qa_pair = QAPair(
+            question=item['question'],
+            answer=item['answer'],
+            document_id=item.get('document_id', 'unknown'),
+            metadata={
+                'qa_id': item.get('id', f"imported_{len(qa_pairs)}"),
+                'question_type': item.get('type', 'imported'),
+                'source_file': file_path,
+                'import_timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+                **item.get('metadata', {})
+            }
+        )
+        qa_pairs.append(qa_pair)
+    
+    return qa_pairs
+
+def load_qa_pairs_from_csv(file_path: str) -> List[QAPair]:
+    """
+    Load QA pairs from CSV file
+    CSVファイルからQAペアを読み込み
+    """
+    qa_pairs = []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        reader = csv.DictReader(f)
+        for i, row in enumerate(reader):
+            qa_pair = QAPair(
+                question=row['question'],
+                answer=row['answer'],
+                document_id=row.get('document_id', 'csv_import'),
+                metadata={
+                    'qa_id': row.get('id', f"csv_{i}"),
+                    'question_type': row.get('type', 'imported'),
+                    'source_file': file_path,
+                    'import_timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+                    'original_row': i
+                }
+            )
+            qa_pairs.append(qa_pair)
+    
+    return qa_pairs
+
+# Example usage / 使用例
+if Path("expert_qa_pairs.json").exists():
+    imported_qa_pairs = load_qa_pairs_from_json("expert_qa_pairs.json")
+    quality_lab.register_qa_pairs(
+        qa_pairs=imported_qa_pairs,
+        qa_set_name="imported_expert_set",
+        metadata={"source": "json_import"}
+    )
+    print(f"Imported {len(imported_qa_pairs)} QA pairs from JSON")
+
+if Path("evaluation_dataset.csv").exists():
+    csv_qa_pairs = load_qa_pairs_from_csv("evaluation_dataset.csv")
+    quality_lab.register_qa_pairs(
+        qa_pairs=csv_qa_pairs,
+        qa_set_name="csv_evaluation_set",
+        metadata={"source": "csv_import"}
+    )
+    print(f"Imported {len(csv_qa_pairs)} QA pairs from CSV")
+```
+
+### 2.3 Automated QA Pair Generation / 自動QAペア生成
+
+### 2.3.1 Basic QA Generation / 基本QA生成
 
 ```python
 from refinire_rag.models.document import Document
@@ -396,9 +565,421 @@ print(f"Query groups tested: {len(similar_queries)}")
 print(f"Average consistency score: {consistency_results['average_consistency']:.3f}")
 ```
 
-## 4. Evaluation Metrics / 評価メトリクス
+## 4. Evaluation Metrics Deep Dive / 評価メトリクス詳細解説
 
-### 4.1 Automatic Metrics / 自動メトリクス
+### 4.1 Understanding Evaluation Metrics / 評価メトリクスの理解
+
+Before using evaluation metrics, it's crucial to understand what each metric measures and when to use them.
+
+評価メトリクスを使用する前に、各メトリクスが何を測定し、いつ使用するかを理解することが重要です。
+
+#### 4.1.1 Evaluation Perspectives / 評価の観点
+
+RAG system evaluation should be approached from multiple perspectives to ensure comprehensive assessment:
+
+RAGシステムの評価は、包括的な評価を確実にするために複数の観点からアプローチする必要があります：
+
+```python
+# Evaluation Framework by Perspective / 観点別評価フレームワーク
+
+evaluation_perspectives = {
+    "linguistic_quality": {
+        "description": "How well-formed and natural is the generated text?",
+        "description_ja": "生成されたテキストはどの程度自然で適切に形成されているか？",
+        "metrics": ["bleu", "rouge", "perplexity", "fluency_score"],
+        "focus": "Text surface quality and linguistic correctness",
+        "focus_ja": "テキストの表面的品質と言語的正確性",
+        "key_questions": [
+            "Is the grammar correct?",
+            "Does it sound natural?", 
+            "Is the vocabulary appropriate?",
+            "Are there any linguistic errors?"
+        ],
+        "key_questions_ja": [
+            "文法は正しいか？",
+            "自然に聞こえるか？",
+            "語彙は適切か？",
+            "言語的エラーはないか？"
+        ]
+    },
+    
+    "semantic_accuracy": {
+        "description": "How accurately does the answer preserve meaning?",
+        "description_ja": "回答はどの程度正確に意味を保持しているか？",
+        "metrics": ["bertscore", "semantic_similarity", "meaning_preservation"],
+        "focus": "Semantic correctness and meaning alignment",
+        "focus_ja": "意味的正確性と意味の一致",
+        "key_questions": [
+            "Does the answer convey the correct meaning?",
+            "Are the concepts accurately represented?",
+            "Is the semantic relationship preserved?",
+            "How close is the meaning to the reference?"
+        ],
+        "key_questions_ja": [
+            "回答は正しい意味を伝えているか？",
+            "概念は正確に表現されているか？",
+            "意味的関係は保持されているか？",
+            "参照との意味的距離はどの程度か？"
+        ]
+    },
+    
+    "factual_correctness": {
+        "description": "Are the facts and information presented accurately?",
+        "description_ja": "提示された事実と情報は正確か？",
+        "metrics": ["fact_verification", "claim_accuracy", "entity_consistency"],
+        "focus": "Truth and factual accuracy of information",
+        "focus_ja": "情報の真実性と事実的正確性",
+        "key_questions": [
+            "Are all stated facts correct?",
+            "Are there any factual errors or hallucinations?",
+            "Do the entities and relationships match reality?",
+            "Is the information up-to-date and accurate?"
+        ],
+        "key_questions_ja": [
+            "記載された事実はすべて正しいか？",
+            "事実的エラーや幻覚はないか？",
+            "エンティティと関係は現実と一致するか？",
+            "情報は最新で正確か？"
+        ]
+    },
+    
+    "retrieval_effectiveness": {
+        "description": "How well does the system find relevant information?",
+        "description_ja": "システムはどの程度関連情報を見つけられるか？",
+        "metrics": ["hit_rate", "mrr", "ndcg", "precision_at_k", "recall_at_k"],
+        "focus": "Quality and relevance of retrieved documents",
+        "focus_ja": "検索された文書の品質と関連性",
+        "key_questions": [
+            "Are the most relevant documents retrieved?",
+            "How good is the ranking of retrieved documents?",
+            "Is important information being missed?",
+            "How precise are the search results?"
+        ],
+        "key_questions_ja": [
+            "最も関連性の高い文書が検索されているか？",
+            "検索された文書のランキングの品質は？",
+            "重要な情報が見逃されていないか？",
+            "検索結果の精度はどの程度か？"
+        ]
+    },
+    
+    "answer_completeness": {
+        "description": "Does the answer provide complete information?",
+        "description_ja": "回答は完全な情報を提供しているか？",
+        "metrics": ["coverage_score", "information_completeness", "aspect_coverage"],
+        "focus": "Comprehensiveness of the provided answer",
+        "focus_ja": "提供された回答の包括性",
+        "key_questions": [
+            "Are all aspects of the question addressed?",
+            "Is any critical information missing?",
+            "Does the answer cover the main points?",
+            "Is the level of detail appropriate?"
+        ],
+        "key_questions_ja": [
+            "質問のすべての側面が扱われているか？",
+            "重要な情報が欠けていないか？",
+            "回答は主要ポイントをカバーしているか？",
+            "詳細レベルは適切か？"
+        ]
+    },
+    
+    "context_faithfulness": {
+        "description": "How faithful is the answer to the source context?",
+        "description_ja": "回答は元のコンテキストにどの程度忠実か？",
+        "metrics": ["faithfulness", "context_adherence", "hallucination_detection"],
+        "focus": "Alignment between answer and source information",
+        "focus_ja": "回答と元情報の一致度",
+        "key_questions": [
+            "Does the answer stay true to the source material?",
+            "Are there any contradictions with the context?",
+            "Is information being invented or hallucinated?",
+            "How well does the answer reflect the source content?"
+        ],
+        "key_questions_ja": [
+            "回答は元の資料に忠実か？",
+            "コンテキストとの矛盾はないか？",
+            "情報が創作されたり幻覚されていないか？",
+            "回答は元のコンテンツをどの程度反映しているか？"
+        ]
+    },
+    
+    "relevance_appropriateness": {
+        "description": "How relevant and appropriate is the answer to the question?",
+        "description_ja": "回答は質問に対してどの程度関連性があり適切か？",
+        "metrics": ["answer_relevance", "topic_relevance", "appropriateness_score"],
+        "focus": "Direct relevance and appropriateness to the query",
+        "focus_ja": "クエリに対する直接的関連性と適切性",
+        "key_questions": [
+            "Does the answer directly address the question?",
+            "Is the response appropriate for the question type?",
+            "How well does the answer match the user's intent?",
+            "Is the answer on-topic and focused?"
+        ],
+        "key_questions_ja": [
+            "回答は質問に直接答えているか？",
+            "質問タイプに対して回答は適切か？",
+            "回答はユーザーの意図とどの程度一致するか？",
+            "回答はトピックに集中し焦点が合っているか？"
+        ]
+    },
+    
+    "usability_practicality": {
+        "description": "How useful and practical is the answer for the user?",
+        "description_ja": "回答はユーザーにとってどの程度有用で実用的か？",
+        "metrics": ["helpfulness", "actionability", "clarity", "understandability"],
+        "focus": "Practical utility and user experience",
+        "focus_ja": "実用的有用性とユーザー体験",
+        "key_questions": [
+            "Can the user act on this information?",
+            "Is the answer clear and understandable?",
+            "Does it provide practical value?",
+            "How helpful is this for solving the user's problem?"
+        ],
+        "key_questions_ja": [
+            "ユーザーはこの情報に基づいて行動できるか？",
+            "回答は明確で理解しやすいか？",
+            "実用的価値を提供しているか？",
+            "ユーザーの問題解決にどの程度役立つか？"
+        ]
+    },
+    
+    "consistency_reliability": {
+        "description": "How consistent and reliable are the system outputs?",
+        "description_ja": "システムの出力はどの程度一貫性があり信頼できるか？",
+        "metrics": ["consistency_score", "variance_analysis", "reliability_measure"],
+        "focus": "Consistency across similar queries and reliability",
+        "focus_ja": "類似クエリ間の一貫性と信頼性",
+        "key_questions": [
+            "Does the system give consistent answers to similar questions?",
+            "Are outputs stable across multiple runs?",
+            "How reliable is the system's performance?",
+            "Are there significant variations in quality?"
+        ],
+        "key_questions_ja": [
+            "類似質問に対して一貫した回答をするか？",
+            "複数回の実行で出力は安定しているか？",
+            "システムのパフォーマンスはどの程度信頼できるか？",
+            "品質に大きなばらつきはないか？"
+        ]
+    }
+}
+
+# Display evaluation perspectives / 評価観点を表示
+print("🎯 RAG Evaluation Perspectives / RAG評価の観点\n")
+for perspective, details in evaluation_perspectives.items():
+    print(f"📊 {perspective.upper().replace('_', ' ')}")
+    print(f"   Focus: {details['focus']}")
+    print(f"   焦点: {details['focus_ja']}")
+    print(f"   Key Metrics: {', '.join(details['metrics'])}")
+    print(f"   Example Questions:")
+    for i, question in enumerate(details['key_questions'][:2]):
+        print(f"   - {question}")
+        print(f"   - {details['key_questions_ja'][i]}")
+    print()
+```
+
+#### 4.1.2 Metric Selection by Evaluation Goal / 評価目標別メトリクス選択
+
+```python
+# Choose metrics based on your evaluation goals / 評価目標に基づいてメトリクスを選択
+
+evaluation_goals = {
+    "development_debugging": {
+        "description": "Identify specific issues during development",
+        "description_ja": "開発中の特定の問題を特定",
+        "recommended_metrics": [
+            "hit_rate",  # Are we finding relevant docs?
+            "faithfulness",  # Are we staying true to context?
+            "answer_relevance",  # Are we answering the right question?
+            "bertscore"  # Is the semantic meaning preserved?
+        ],
+        "frequency": "Every development iteration",
+        "frequency_ja": "開発イテレーションごと"
+    },
+    
+    "performance_benchmarking": {
+        "description": "Compare system performance against baselines",
+        "description_ja": "ベースラインに対するシステム性能の比較",
+        "recommended_metrics": [
+            "bleu",  # Standard text generation quality
+            "rouge",  # Content coverage comparison
+            "ndcg",  # Retrieval ranking quality
+            "mrr"  # Search effectiveness
+        ],
+        "frequency": "Weekly or monthly",
+        "frequency_ja": "週次または月次"
+    },
+    
+    "production_monitoring": {
+        "description": "Monitor system quality in production",
+        "description_ja": "本番環境でのシステム品質監視",
+        "recommended_metrics": [
+            "consistency_score",  # System reliability
+            "response_time",  # Performance efficiency
+            "error_rate",  # System stability
+            "user_satisfaction"  # End-user experience
+        ],
+        "frequency": "Continuous monitoring",
+        "frequency_ja": "継続的監視"
+    },
+    
+    "research_evaluation": {
+        "description": "Comprehensive academic or research assessment",
+        "description_ja": "包括的学術研究評価",
+        "recommended_metrics": [
+            "all_linguistic_metrics",  # Complete linguistic analysis
+            "all_semantic_metrics",  # Thorough semantic evaluation
+            "all_retrieval_metrics",  # Full retrieval assessment
+            "human_evaluation"  # Gold standard comparison
+        ],
+        "frequency": "For major releases or research papers",
+        "frequency_ja": "メジャーリリースまたは研究論文時"
+    }
+}
+
+def recommend_metrics_for_goal(evaluation_goal: str) -> dict:
+    """
+    Recommend specific metrics configuration for evaluation goals
+    評価目標に特化したメトリクス設定を推奨
+    """
+    if evaluation_goal not in evaluation_goals:
+        return {"error": "Unknown evaluation goal"}
+    
+    goal_info = evaluation_goals[evaluation_goal]
+    
+    return {
+        "goal": evaluation_goal,
+        "description": goal_info["description"],
+        "metrics": goal_info["recommended_metrics"],
+        "evaluation_frequency": goal_info["frequency"],
+        "配置_rationale": f"These metrics focus on {goal_info['description'].lower()}"
+    }
+
+# Example usage / 使用例
+print("🎯 Metric Recommendations by Goal / 目標別メトリクス推奨")
+for goal in evaluation_goals.keys():
+    recommendation = recommend_metrics_for_goal(goal)
+    print(f"\n📋 {goal.replace('_', ' ').title()}:")
+    print(f"   Description: {recommendation['description']}")
+    print(f"   Recommended Metrics: {', '.join(recommendation['metrics'])}")
+    print(f"   Frequency: {recommendation['evaluation_frequency']}")
+```
+
+```python
+# Comprehensive guide to evaluation metrics / 評価メトリクスの包括的ガイド
+
+# 1. BLEU (Bilingual Evaluation Understudy) Score
+# - Measures n-gram overlap between reference and candidate text
+# - Range: 0-1 (higher is better)
+# - Good for: Exact match evaluation, translation quality
+# - Limitations: Focuses on precision, sensitive to exact wording
+
+from refinire_rag.evaluation.bleu_evaluator import BleuEvaluator
+
+bleu_config = {
+    "max_ngram": 4,              # Consider up to 4-grams
+    "smooth": True,              # Apply smoothing for short texts
+    "weights": [0.25, 0.25, 0.25, 0.25],  # Equal weight for all n-grams
+    "case_sensitive": False      # Ignore case differences
+}
+
+bleu_evaluator = BleuEvaluator(bleu_config)
+
+# Example BLEU evaluation / BLEU評価の例
+reference_answer = "RAG combines retrieval and generation to improve LLM responses with external knowledge."
+candidate_answer = "RAG merges information retrieval with text generation to enhance LLM answers using external data."
+
+bleu_score = bleu_evaluator.evaluate(
+    reference=reference_answer,
+    candidate=candidate_answer
+)
+
+print(f"BLEU Score: {bleu_score['bleu_score']:.3f}")
+print(f"N-gram precisions: {bleu_score['precisions']}")
+print(f"Brevity penalty: {bleu_score['brevity_penalty']:.3f}")
+
+# 2. ROUGE (Recall-Oriented Understudy for Gisting Evaluation)
+# - Measures recall of important words/phrases
+# - Multiple variants: ROUGE-1 (unigrams), ROUGE-2 (bigrams), ROUGE-L (longest common subsequence)
+# - Good for: Content coverage, summarization quality
+# - Focuses more on recall than BLEU
+
+from refinire_rag.evaluation.rouge_evaluator import RougeEvaluator
+
+rouge_config = {
+    "rouge_types": ["rouge-1", "rouge-2", "rouge-l"],
+    "use_stemmer": True,         # Apply stemming for better matching
+    "alpha": 0.5,               # Balance precision and recall (F1 score)
+    "split_summaries": True,     # Split long texts into sentences
+    "remove_stopwords": False    # Keep stopwords for context
+}
+
+rouge_evaluator = RougeEvaluator(rouge_config)
+
+rouge_scores = rouge_evaluator.evaluate(
+    reference=reference_answer,
+    candidate=candidate_answer
+)
+
+print("\nROUGE Scores:")
+for rouge_type, scores in rouge_scores.items():
+    print(f"  {rouge_type.upper()}:")
+    print(f"    Precision: {scores['precision']:.3f}")
+    print(f"    Recall: {scores['recall']:.3f}")
+    print(f"    F1-Score: {scores['f1']:.3f}")
+
+# 3. BERTScore - Semantic similarity using contextual embeddings
+# - Uses pre-trained BERT models to compute semantic similarity
+# - More robust to paraphrasing than n-gram based metrics
+# - Good for: Semantic accuracy, meaning preservation
+
+from refinire_rag.evaluation.bertscore_evaluator import BertScoreEvaluator
+
+bertscore_config = {
+    "model_type": "microsoft/deberta-xlarge-mnli",  # High-quality model
+    "num_layers": 40,           # Number of layers to use
+    "verbose": False,           # Reduce output verbosity
+    "idf": True,               # Use inverse document frequency weighting
+    "device": "auto",          # Automatically detect GPU/CPU
+    "lang": "en"               # Language for tokenization
+}
+
+bertscore_evaluator = BertScoreEvaluator(bertscore_config)
+
+bertscore_result = bertscore_evaluator.evaluate(
+    reference=reference_answer,
+    candidate=candidate_answer
+)
+
+print(f"\nBERTScore:")
+print(f"  Precision: {bertscore_result['precision']:.3f}")
+print(f"  Recall: {bertscore_result['recall']:.3f}")
+print(f"  F1-Score: {bertscore_result['f1']:.3f}")
+
+# 4. Semantic Similarity (Cosine Similarity of Embeddings)
+# - Direct cosine similarity between sentence embeddings
+# - Fast and simple semantic comparison
+# - Good for: Quick semantic similarity assessment
+
+from refinire_rag.evaluation.semantic_evaluator import SemanticSimilarityEvaluator
+
+semantic_config = {
+    "embedding_model": "all-mpnet-base-v2",  # High-quality sentence transformer
+    "similarity_metric": "cosine",          # cosine, dot_product, euclidean
+    "normalize_embeddings": True            # L2 normalize embeddings
+}
+
+semantic_evaluator = SemanticSimilarityEvaluator(semantic_config)
+
+semantic_score = semantic_evaluator.evaluate(
+    reference=reference_answer,
+    candidate=candidate_answer
+)
+
+print(f"\nSemantic Similarity: {semantic_score['similarity']:.3f}")
+```
+
+### 4.2 Comprehensive Metric Configuration / 包括的メトリクス設定
 
 ```python
 # Configure evaluation metrics / 評価メトリクスを設定
@@ -406,19 +987,372 @@ evaluation_config = {
     "bleu": {
         "max_ngram": 4,
         "smooth": True,
-        "weights": [0.25, 0.25, 0.25, 0.25]
+        "weights": [0.25, 0.25, 0.25, 0.25],
+        "case_sensitive": False
     },
     "rouge": {
         "rouge_types": ["rouge-1", "rouge-2", "rouge-l"],
         "use_stemmer": True,
-        "alpha": 0.5  # Balance precision and recall
+        "alpha": 0.5,  # Balance precision and recall
+        "remove_stopwords": False
+    },
+    "bertscore": {
+        "model_type": "microsoft/deberta-xlarge-mnli",
+        "num_layers": 40,
+        "idf": True,
+        "lang": "en"
+    },
+    "semantic_similarity": {
+        "embedding_model": "all-mpnet-base-v2",
+        "similarity_metric": "cosine",
+        "normalize_embeddings": True
     },
     "questeval": {
         "model": "gpt-4o-mini",
         "check_answerability": True,
         "check_consistency": True,
-        "language": "japanese"  # For Japanese evaluation
+        "language": "english"  # For Japanese evaluation use "japanese"
     }
+}
+
+# Practical example using multiple metrics / 複数メトリクスを使用した実践例
+def evaluate_answer_quality(reference_answer: str, generated_answer: str, evaluation_config: dict):
+    """
+    Comprehensive answer quality evaluation using multiple metrics
+    複数メトリクスを使用した包括的回答品質評価
+    """
+    results = {}
+    
+    # BLEU evaluation / BLEU評価
+    if "bleu" in evaluation_config:
+        bleu_evaluator = BleuEvaluator(evaluation_config["bleu"])
+        bleu_result = bleu_evaluator.evaluate(reference_answer, generated_answer)
+        results["bleu"] = bleu_result["bleu_score"]
+    
+    # ROUGE evaluation / ROUGE評価
+    if "rouge" in evaluation_config:
+        rouge_evaluator = RougeEvaluator(evaluation_config["rouge"])
+        rouge_result = rouge_evaluator.evaluate(reference_answer, generated_answer)
+        results["rouge"] = {
+            "rouge-1": rouge_result["rouge-1"]["f1"],
+            "rouge-2": rouge_result["rouge-2"]["f1"], 
+            "rouge-l": rouge_result["rouge-l"]["f1"]
+        }
+    
+    # BERTScore evaluation / BERTScore評価
+    if "bertscore" in evaluation_config:
+        bertscore_evaluator = BertScoreEvaluator(evaluation_config["bertscore"])
+        bertscore_result = bertscore_evaluator.evaluate(reference_answer, generated_answer)
+        results["bertscore"] = bertscore_result["f1"]
+    
+    # Semantic similarity / 意味的類似度
+    if "semantic_similarity" in evaluation_config:
+        semantic_evaluator = SemanticSimilarityEvaluator(evaluation_config["semantic_similarity"])
+        semantic_result = semantic_evaluator.evaluate(reference_answer, generated_answer)
+        results["semantic_similarity"] = semantic_result["similarity"]
+    
+    return results
+
+# Example usage / 使用例
+reference = "RAG systems combine retrieval and generation to provide accurate, contextual responses."
+generated = "RAG approaches merge information retrieval with text generation for contextual answers."
+
+quality_scores = evaluate_answer_quality(reference, generated, evaluation_config)
+
+print("Comprehensive Quality Assessment:")
+print(f"  BLEU Score: {quality_scores.get('bleu', 0):.3f}")
+print(f"  ROUGE-1 F1: {quality_scores.get('rouge', {}).get('rouge-1', 0):.3f}")
+print(f"  ROUGE-2 F1: {quality_scores.get('rouge', {}).get('rouge-2', 0):.3f}")
+print(f"  ROUGE-L F1: {quality_scores.get('rouge', {}).get('rouge-l', 0):.3f}")
+print(f"  BERTScore F1: {quality_scores.get('bertscore', 0):.3f}")
+print(f"  Semantic Similarity: {quality_scores.get('semantic_similarity', 0):.3f}")
+```
+
+### 4.3 RAG-Specific Evaluation Metrics / RAG特化評価メトリクス
+
+```python
+# RAG systems require specialized metrics beyond traditional NLG metrics
+# RAGシステムには従来のNLGメトリクス以上の特化メトリクスが必要
+
+# 1. Retrieval Metrics / 検索メトリクス
+from refinire_rag.evaluation.retrieval_evaluator import RetrievalEvaluator
+
+retrieval_config = {
+    "metrics": ["hit_rate", "mrr", "ndcg"],
+    "k_values": [1, 3, 5, 10],  # Top-k values to evaluate
+    "relevance_threshold": 0.5   # Minimum relevance score
+}
+
+retrieval_evaluator = RetrievalEvaluator(retrieval_config)
+
+# Example retrieval evaluation / 検索評価の例
+def evaluate_retrieval_performance(qa_pairs, query_engine):
+    """
+    Evaluate retrieval component performance
+    検索コンポーネントのパフォーマンス評価
+    """
+    retrieval_results = []
+    
+    for qa_pair in qa_pairs:
+        # Get retrieval results / 検索結果を取得
+        search_results = query_engine.retriever.search(
+            query=qa_pair.question,
+            top_k=10
+        )
+        
+        # Expected relevant documents / 期待される関連文書
+        expected_docs = qa_pair.metadata.get("expected_sources", [])
+        
+        # Evaluate retrieval / 検索を評価
+        retrieval_metrics = retrieval_evaluator.evaluate(
+            search_results=search_results,
+            relevant_docs=expected_docs
+        )
+        
+        retrieval_results.append({
+            "qa_id": qa_pair.metadata.get("qa_id"),
+            "question": qa_pair.question,
+            "hit_rate@5": retrieval_metrics["hit_rate@5"],
+            "mrr": retrieval_metrics["mrr"],
+            "ndcg@5": retrieval_metrics["ndcg@5"],
+            "precision@5": retrieval_metrics["precision@5"],
+            "recall@5": retrieval_metrics["recall@5"]
+        })
+    
+    return retrieval_results
+
+# 2. Answer Faithfulness / 回答忠実度
+from refinire_rag.evaluation.faithfulness_evaluator import FaithfulnessEvaluator
+
+faithfulness_config = {
+    "model": "gpt-4",
+    "evaluation_prompt": """
+    Evaluate if the answer is faithful to the provided context.
+    Rate faithfulness on a scale of 1-5:
+    1 = Answer contradicts the context
+    2 = Answer has major inconsistencies with context
+    3 = Answer is partially consistent with context
+    4 = Answer is mostly consistent with context
+    5 = Answer is completely faithful to context
+    """,
+    "check_hallucination": True,
+    "check_consistency": True
+}
+
+faithfulness_evaluator = FaithfulnessEvaluator(faithfulness_config)
+
+# 3. Context Precision & Recall / コンテキスト適合率・再現率
+from refinire_rag.evaluation.context_evaluator import ContextEvaluator
+
+context_config = {
+    "model": "gpt-4o-mini",
+    "precision_prompt": """
+    Evaluate the relevance of each retrieved context to answering the question.
+    Return relevance scores (0-1) for each context passage.
+    """,
+    "recall_prompt": """
+    Evaluate if the retrieved contexts contain all necessary information
+    to completely answer the question.
+    """
+}
+
+context_evaluator = ContextEvaluator(context_config)
+
+# 4. Answer Relevance / 回答関連性
+from refinire_rag.evaluation.relevance_evaluator import AnswerRelevanceEvaluator
+
+relevance_config = {
+    "model": "gpt-4o-mini",
+    "evaluation_criteria": [
+        "directness",      # Direct answer to question
+        "completeness",    # Complete information
+        "accuracy",        # Factual accuracy
+        "clarity"          # Clear presentation
+    ]
+}
+
+relevance_evaluator = AnswerRelevanceEvaluator(relevance_config)
+
+# Comprehensive RAG evaluation / 包括的RAG評価
+def evaluate_rag_system_comprehensively(qa_pairs, query_engine):
+    """
+    Comprehensive RAG system evaluation with all metrics
+    全メトリクスによる包括的RAGシステム評価
+    """
+    results = {
+        "retrieval_metrics": [],
+        "generation_metrics": [],
+        "rag_specific_metrics": []
+    }
+    
+    for qa_pair in qa_pairs:
+        # Get full RAG response / 完全なRAG応答を取得
+        rag_response = query_engine.query(qa_pair.question)
+        
+        # 1. Evaluate retrieval / 検索を評価
+        retrieval_metrics = retrieval_evaluator.evaluate(
+            search_results=rag_response.search_results,
+            relevant_docs=qa_pair.metadata.get("expected_sources", [])
+        )
+        
+        # 2. Evaluate generation quality / 生成品質を評価
+        generation_metrics = evaluate_answer_quality(
+            reference_answer=qa_pair.answer,
+            generated_answer=rag_response.answer,
+            evaluation_config=evaluation_config
+        )
+        
+        # 3. Evaluate RAG-specific aspects / RAG特化側面を評価
+        faithfulness_score = faithfulness_evaluator.evaluate(
+            answer=rag_response.answer,
+            contexts=rag_response.contexts
+        )
+        
+        context_precision = context_evaluator.evaluate_precision(
+            question=qa_pair.question,
+            contexts=rag_response.contexts
+        )
+        
+        context_recall = context_evaluator.evaluate_recall(
+            question=qa_pair.question,
+            contexts=rag_response.contexts,
+            expected_answer=qa_pair.answer
+        )
+        
+        answer_relevance = relevance_evaluator.evaluate(
+            question=qa_pair.question,
+            answer=rag_response.answer
+        )
+        
+        # Store results / 結果を保存
+        results["retrieval_metrics"].append(retrieval_metrics)
+        results["generation_metrics"].append(generation_metrics)
+        results["rag_specific_metrics"].append({
+            "faithfulness": faithfulness_score,
+            "context_precision": context_precision,
+            "context_recall": context_recall,
+            "answer_relevance": answer_relevance
+        })
+    
+    return results
+
+# Calculate aggregate scores / 集計スコアを計算
+def calculate_aggregate_scores(evaluation_results):
+    """
+    Calculate aggregate scores across all test cases
+    全テストケースにわたる集計スコアを計算
+    """
+    aggregates = {}
+    
+    # Retrieval aggregates / 検索集計
+    retrieval_metrics = evaluation_results["retrieval_metrics"]
+    aggregates["retrieval"] = {
+        "avg_hit_rate@5": sum(r["hit_rate@5"] for r in retrieval_metrics) / len(retrieval_metrics),
+        "avg_mrr": sum(r["mrr"] for r in retrieval_metrics) / len(retrieval_metrics),
+        "avg_ndcg@5": sum(r["ndcg@5"] for r in retrieval_metrics) / len(retrieval_metrics)
+    }
+    
+    # Generation aggregates / 生成集計
+    generation_metrics = evaluation_results["generation_metrics"]
+    aggregates["generation"] = {
+        "avg_bleu": sum(g.get("bleu", 0) for g in generation_metrics) / len(generation_metrics),
+        "avg_rouge_1": sum(g.get("rouge", {}).get("rouge-1", 0) for g in generation_metrics) / len(generation_metrics),
+        "avg_bertscore": sum(g.get("bertscore", 0) for g in generation_metrics) / len(generation_metrics)
+    }
+    
+    # RAG-specific aggregates / RAG特化集計
+    rag_metrics = evaluation_results["rag_specific_metrics"]
+    aggregates["rag_specific"] = {
+        "avg_faithfulness": sum(r["faithfulness"] for r in rag_metrics) / len(rag_metrics),
+        "avg_context_precision": sum(r["context_precision"] for r in rag_metrics) / len(rag_metrics),
+        "avg_context_recall": sum(r["context_recall"] for r in rag_metrics) / len(rag_metrics),
+        "avg_answer_relevance": sum(r["answer_relevance"] for r in rag_metrics) / len(rag_metrics)
+    }
+    
+    return aggregates
+
+print("RAG System Comprehensive Evaluation:")
+comprehensive_results = evaluate_rag_system_comprehensively(qa_pairs, query_engine)
+aggregate_scores = calculate_aggregate_scores(comprehensive_results)
+
+print("\nRetrieval Performance:")
+for metric, score in aggregate_scores["retrieval"].items():
+    print(f"  {metric}: {score:.3f}")
+
+print("\nGeneration Quality:")
+for metric, score in aggregate_scores["generation"].items():
+    print(f"  {metric}: {score:.3f}")
+
+print("\nRAG-Specific Metrics:")
+for metric, score in aggregate_scores["rag_specific"].items():
+    print(f"  {metric}: {score:.3f}")
+```
+
+### 4.4 QualityLab Integration with Custom Metrics / QualityLabとカスタムメトリクスの統合
+
+```python
+# Integrate all evaluation approaches with QualityLab
+# 全評価アプローチをQualityLabと統合
+
+# Step 1: Register expert QA pairs / ステップ1: 専門家QAペアを登録
+quality_lab.register_qa_pairs(
+    qa_pairs=expert_qa_pairs,
+    qa_set_name="gold_standard_benchmark",
+    metadata={
+        "evaluation_type": "comprehensive_rag_metrics",
+        "metrics_included": ["bleu", "rouge", "bertscore", "retrieval", "faithfulness"]
+    }
+)
+
+# Step 2: Configure comprehensive evaluation / ステップ2: 包括的評価を設定
+rag_evaluation_config = QualityLabConfig(
+    qa_pairs_per_document=0,  # Don't generate, use registered pairs
+    evaluation_metrics=[
+        "bleu", "rouge", "bertscore", "semantic_similarity",
+        "hit_rate", "mrr", "ndcg", "faithfulness", 
+        "context_precision", "context_recall", "answer_relevance"
+    ],
+    similarity_threshold=0.7,
+    include_detailed_analysis=True,
+    include_contradiction_detection=True,
+    llm_model="gpt-4o-mini",
+    evaluation_model="gpt-4"
+)
+
+# Step 3: Run comprehensive evaluation / ステップ3: 包括的評価を実行
+comprehensive_evaluation = quality_lab.evaluate_query_engine(
+    query_engine=query_engine,
+    qa_pairs=expert_qa_pairs,  # Use registered expert QA pairs
+    evaluation_config=rag_evaluation_config,
+    include_detailed_breakdown=True
+)
+
+# Step 4: Generate comprehensive report / ステップ4: 包括的レポートを生成
+evaluation_report = quality_lab.generate_evaluation_report(
+    evaluation_results=comprehensive_evaluation,
+    output_file="comprehensive_rag_evaluation_with_metrics.md",
+    include_metric_explanations=True,
+    include_improvement_recommendations=True
+)
+
+print("Comprehensive RAG Evaluation with All Metrics:")
+print(f"✅ Evaluated {len(expert_qa_pairs)} expert QA pairs")
+print(f"📊 Generated comprehensive report: comprehensive_rag_evaluation_with_metrics.md")
+print(f"📈 Included {len(rag_evaluation_config.evaluation_metrics)} different metrics")
+
+# Display summary results / 要約結果を表示
+if 'metric_summaries' in comprehensive_evaluation:
+    print("\n📋 Evaluation Summary:")
+    for metric_category, results in comprehensive_evaluation['metric_summaries'].items():
+        print(f"\n{metric_category.upper()} Metrics:")
+        for metric, score in results.items():
+            print(f"  {metric}: {score:.3f}")
+
+# Show recommendations if available / 推奨事項があれば表示
+if 'recommendations' in comprehensive_evaluation:
+    print("\n💡 Improvement Recommendations:")
+    for i, recommendation in enumerate(comprehensive_evaluation['recommendations'][:3]):
+        print(f"  {i+1}. {recommendation}")
 }
 
 # Run comprehensive evaluation / 包括的評価を実行

@@ -172,6 +172,7 @@ Learn how to build RAG systems step by step - from simple prototypes to enterpri
 #### **🚀 Core Tutorial Series (Start Here!)**
 Complete 3-part tutorial series covering the entire RAG workflow:
 
+- **[📘 Comprehensive Tutorial Guide](docs/tutorials/TUTORIAL_GUIDE.md)** - Complete learning roadmap with level-based progression | **[日本語版](docs/tutorials/TUTORIAL_GUIDE_ja.md)**
 - **[Part 1: Corpus Creation](docs/tutorials/tutorial_part1_corpus_creation.md)** - Document processing & indexing
 - **[Part 2: Query Engine](docs/tutorials/tutorial_part2_query_engine.md)** - Search & answer generation  
 - **[Part 3: Evaluation](docs/tutorials/tutorial_part3_evaluation.md)** - Performance assessment & optimization
